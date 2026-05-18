@@ -1,0 +1,2049 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"/>
+<title>NEXUS — Grupo Ilha</title>
+<meta name="theme-color" content="#F59500"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-title" content="NEXUS"/>
+<link rel="manifest" href="manifest.json"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@700;800&display=swap" rel="stylesheet"/>
+<style>
+:root{
+  --app-max:600px;--side-w:0px;--content-max:1760px;
+  --or:#F59500;--or2:#C97800;--or3:#FFF8EC;--or4:#FFB733;
+  --gr:#16A34A;--gr3:#F0FDF4;
+  --rd:#DC2626;--rd3:#FEF2F2;
+  --am:#D97706;--am3:#FFFBEB;
+  --bl:#2563EB;--bl3:#EFF6FF;
+  --bg:#F4F4F5;--card:#fff;
+  --ink:#111827;--s2:#6B7280;--s3:#9CA3AF;
+  --bd:#E5E7EB;--bd2:#F3F4F6;
+  --r:14px;--rsm:8px;
+  --sh:0 1px 3px rgba(0,0,0,.07),0 1px 2px rgba(0,0,0,.04);
+  --shm:0 4px 20px rgba(0,0,0,.10);
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent;margin:0;padding:0}
+html,body{height:100%}
+body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--ink);-webkit-font-smoothing:antialiased}
+button,input,select,textarea,.card,.badge,.slbl,.ghdr,.irow{font-family:'Inter',sans-serif}
+h1,h2,h3,p{margin:0}
+.card h2,.page h2{line-height:1.15}
+/* Layout */
+.page{padding:16px;max-width:var(--app-max);margin:0 auto;padding-bottom:88px;width:100%}
+.pb88{padding-bottom:88px}
+/* Cards */
+.card{background:var(--card);border-radius:var(--r);box-shadow:var(--sh)}
+/* Buttons */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;font-weight:600;border-radius:10px;border:none;cursor:pointer;transition:all .15s ease;font-family:'Inter',sans-serif;white-space:nowrap;line-height:1}
+.btn:disabled{opacity:.45;cursor:not-allowed;transform:none!important}
+.bp{background:var(--or);color:#fff;padding:10px 18px;font-size:14px}
+.bp:not(:disabled):active{background:var(--or2);transform:scale(.98)}
+.bs{background:#fff;color:var(--ink);padding:10px 18px;font-size:14px;border:1.5px solid var(--bd)}
+.bs:active{background:#F9FAFB}
+.bg0{background:none;color:var(--s2);padding:8px;border:none}
+.bgr{background:var(--gr);color:#fff;padding:10px 18px;font-size:14px}
+.bgr:not(:disabled):active{background:#14532d;transform:scale(.98)}
+.brd{background:var(--rd3);color:var(--rd);padding:10px 18px;font-size:14px;border:1.5px solid rgba(220,38,38,.2)}
+.bsm{padding:6px 12px;font-size:12px;border-radius:8px}
+.bic{width:36px;height:36px;border-radius:10px;padding:0;flex-shrink:0}
+/* Inputs */
+.inp{width:100%;padding:10px 14px;border:1.5px solid var(--bd);border-radius:10px;font-size:14px;font-family:'Inter',sans-serif;color:var(--ink);background:#fff;outline:none;transition:border-color .15s}
+.inp:focus{border-color:var(--or)}
+.inp-n{width:68px;padding:8px 4px;border:1.5px solid var(--bd);border-radius:8px;font-size:14px;font-weight:700;text-align:center;color:var(--ink);background:#fff;outline:none;transition:all .15s;-moz-appearance:textfield}
+.inp-n::-webkit-outer-spin-button,.inp-n::-webkit-inner-spin-button{-webkit-appearance:none}
+.inp-n:focus{border-color:var(--or);background:var(--or3)}
+select.inp{cursor:pointer;appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236B7280' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center;padding-right:32px}
+textarea.inp{resize:none;line-height:1.5}
+/* Badges */
+.badge{display:inline-flex;align-items:center;padding:3px 8px;border-radius:20px;font-size:11px;font-weight:700;letter-spacing:.02em;white-space:nowrap}
+.bor{background:var(--or3);color:var(--or2)}
+.bgr2{background:var(--gr3);color:var(--gr)}
+.brd2{background:var(--rd3);color:var(--rd)}
+.bgy{background:var(--bd2);color:var(--s2)}
+.bam{background:var(--am3);color:var(--am)}
+.bbl{background:var(--bl3);color:var(--bl)}
+/* Nav */
+.bnav{position:fixed;bottom:0;left:0;right:0;z-index:50;background:rgba(255,255,255,.97);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border-top:1px solid var(--bd);padding-bottom:env(safe-area-inset-bottom)}
+.nbtn{display:flex;flex-direction:column;align-items:center;gap:2px;padding:7px 2px;border:none;background:none;cursor:pointer;flex:1;min-width:0;position:relative;transition:opacity .1s}
+.nbtn:active{opacity:.7}
+.nlbl{font-size:9px;font-weight:600;color:var(--s3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;width:100%;text-align:center;transition:color .15s}
+.nic{color:var(--s3);transition:color .15s}
+.nbtn.on .nic{color:var(--or)}
+.nbtn.on .nlbl{color:var(--or);font-weight:700}
+.nbtn.on::before{content:'';position:absolute;top:0;left:15%;right:15%;height:2.5px;background:var(--or);border-radius:0 0 4px 4px}
+/* Modal */
+.mbg{position:fixed;inset:0;background:rgba(0,0,0,.4);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);z-index:100;display:flex;align-items:flex-end;justify-content:center}
+.msheet{background:#fff;border-radius:20px 20px 0 0;width:100%;max-width:var(--app-max);max-height:92dvh;display:flex;flex-direction:column;animation:slideUp .25s cubic-bezier(.32,0,.67,0) forwards}
+.mcenter{align-items:center;padding:16px}
+.mbox{background:#fff;border-radius:20px;width:calc(100% - 32px);max-width:440px;padding:24px;animation:popIn .2s ease}
+@keyframes slideUp{from{transform:translateY(100%);opacity:.5}to{transform:translateY(0);opacity:1}}
+@keyframes popIn{from{transform:scale(.94);opacity:0}to{transform:scale(1);opacity:1}}
+/* Sticky */
+.stk{position:sticky;top:0;z-index:30;background:#fff;border-bottom:1px solid var(--bd)}
+/* Section label */
+.slbl{font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--s3);display:block;padding:0 2px 8px}
+/* Accordion */
+details summary{list-style:none;cursor:pointer;-webkit-tap-highlight-color:transparent}
+details summary::-webkit-details-marker{display:none}
+details[open] .chv{transform:rotate(90deg)}
+.chv{transition:transform .2s}
+/* Toast */
+.toast{position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:#111827;color:#fff;padding:10px 22px;border-radius:100px;font-size:13px;font-weight:600;white-space:nowrap;z-index:500;animation:tIn .2s ease;box-shadow:0 4px 20px rgba(0,0,0,.25);pointer-events:none}
+@keyframes tIn{from{opacity:0;transform:translateX(-50%) translateY(10px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}
+/* Spinner */
+.spin{border:3px solid var(--bd);border-top-color:var(--or);border-radius:50%;animation:rot .7s linear infinite;flex-shrink:0}
+@keyframes rot{to{transform:rotate(360deg)}}
+/* Empty state */
+.empty{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:56px 24px;text-align:center;gap:12px}
+.empty p{font-size:14px;color:var(--s2);line-height:1.5}
+/* Signature canvas */
+.sig-cv{border:2px dashed var(--bd);border-radius:12px;touch-action:none;cursor:crosshair;background:#FAFAFA;display:block;width:100%}
+.sig-cv.has{border-color:var(--gr);background:#fff}
+/* Header */
+header{background:var(--or);position:sticky;top:0;z-index:40;box-shadow:0 2px 8px rgba(245,149,0,.3)}
+/* Row layout */
+.row{display:flex;align-items:center;gap:8px}
+/* Item row in lists */
+.irow{padding:10px 16px;border-top:1px solid var(--bd);display:grid;align-items:center}
+.irow:first-child{border-top:none}
+/* Stat card */
+.stcard{background:#fff;border-radius:var(--r);padding:14px 16px;box-shadow:var(--sh);cursor:pointer;transition:all .15s;border:2px solid transparent;text-align:left;width:100%;display:flex;flex-direction:column}
+.stcard:active{border-color:var(--or);transform:scale(.98)}
+/* Cat header */
+.cat-hdr{background:#fff;border-radius:var(--r);box-shadow:var(--sh);padding:12px 16px;display:flex;align-items:center;gap:10px;border:none;width:100%;text-align:left;cursor:pointer}
+/* Item list content */
+.ilist{background:#fff;border-radius:0 0 var(--r) var(--r);border:1px solid var(--bd);border-top:none;overflow:hidden}
+/* Grid headers */
+.ghdr{padding:8px 16px;background:#F9FAFB;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--s3);display:grid;align-items:center}
+/* Pill tabs */
+.ptab{display:flex;gap:6px;overflow-x:auto;padding-bottom:2px;scrollbar-width:none}
+.ptab::-webkit-scrollbar{display:none}
+.ptab button{flex-shrink:0;padding:7px 16px;border-radius:100px;font-weight:700;font-size:13px;cursor:pointer;transition:all .15s;border:1.5px solid var(--bd);background:#fff;color:var(--s2)}
+.ptab button.on{background:var(--or);color:#fff;border-color:var(--or)}
+
+@media (min-width:900px){
+  :root{--app-max:1760px;--side-w:264px;--r:16px}
+  body{background:#F3F4F6}
+  header{position:fixed;left:0;top:0;bottom:0;width:var(--side-w);height:100dvh;box-shadow:6px 0 18px rgba(17,24,39,.08);display:flex;align-items:flex-start;background:linear-gradient(180deg,var(--or),var(--or2))}
+  header>div{width:100%;margin:0!important;padding:24px 18px!important;display:block!important}
+  header .row{display:block}
+  main{margin-left:var(--side-w);min-height:100dvh;padding:28px 40px 40px;max-width:none}
+  .page{padding:0 0 32px!important;max-width:none!important;width:100%!important;margin:0!important}
+  .bnav{left:0;right:auto;top:188px;bottom:auto;width:var(--side-w);background:transparent;border-top:0;backdrop-filter:none;-webkit-backdrop-filter:none;padding:0 14px;z-index:60}
+  .bnav>div{display:flex!important;flex-direction:column!important;gap:6px!important;max-width:none!important;padding:0!important;width:100%}
+  .nbtn{flex-direction:row!important;justify-content:flex-start!important;gap:10px!important;padding:11px 12px!important;border-radius:12px!important;color:#fff;opacity:.82}
+  .nbtn.on{background:rgba(255,255,255,.18);opacity:1}
+  .nbtn.on::before{display:none}
+  .nic,.nbtn.on .nic,.nlbl,.nbtn.on .nlbl{color:#fff!important}
+  .nlbl{font-size:13px!important;text-align:left!important;width:auto!important;font-weight:700!important}
+  .card,.stcard,.cat-hdr{box-shadow:0 1px 2px rgba(0,0,0,.06),0 8px 24px rgba(15,23,42,.04)}
+  .stk{top:0;border-radius:16px;margin-bottom:16px;box-shadow:var(--sh);position:sticky}
+  .msheet{max-width:min(1120px,calc(100vw - var(--side-w) - 80px));border-radius:20px;margin-bottom:24px}
+  .mbg{align-items:center}
+  .toast{bottom:32px}
+  .ptab{flex-wrap:wrap;overflow:visible}
+}
+@media (min-width:1100px){
+  .page>div[style*="grid-template-columns: 1fr 1fr"]{grid-template-columns:repeat(4,1fr)!important}
+}
+
+
+@media (min-width:900px){
+  .stk{border-radius:16px;margin-bottom:16px;box-shadow:0 1px 2px rgba(0,0,0,.05);top:0}
+  .ilist{border-radius:0 0 16px 16px}
+  details{break-inside:avoid}
+  .irow{grid-auto-rows:minmax(44px,auto)}
+}
+
+
+
+/* Fase 1 — refinamento desktop */
+@media (min-width:900px){
+  .nx-brand{display:block;width:100%;margin-bottom:18px}
+  .nx-logo-wrap{width:124px;height:86px;display:flex;align-items:center;justify-content:flex-start;margin-bottom:8px;overflow:visible;background:transparent;border:0;box-shadow:none}
+  .nx-logo-img{width:124px;height:86px;object-fit:contain;display:block;filter:drop-shadow(0 5px 12px rgba(0,0,0,.12))}
+  .nx-brand-kicker{font-size:10px!important;letter-spacing:.18em!important;line-height:1.1;margin-top:2px;color:rgba(255,255,255,.78)!important}
+  .nx-brand-title{font-size:19px!important;line-height:1.15!important;margin-top:4px;max-width:220px;white-space:normal}
+  main{padding-right:48px!important}
+  .page{max-width:none!important;width:100%!important}
+  .page > .card:first-child{width:100%}
+  .stcard{min-height:104px;justify-content:center}
+  .stcard div:last-child{font-size:36px!important}
+  .irow{min-height:48px}
+  .desktop-wide{max-width:none!important;width:100%!important;margin:0!important}
+  .desktop-split{display:grid!important;grid-template-columns:minmax(0,1fr) 320px;gap:18px;align-items:start}
+  .desktop-panel{position:sticky;top:18px}
+}
+@media (min-width:1400px){
+  main{padding-right:64px!important}
+  .page>div[style*="grid-template-columns: repeat(4"]{grid-template-columns:repeat(4,minmax(0,1fr))!important}
+  .page>div[style*="grid-template-columns: 1fr 1fr"]{grid-template-columns:repeat(4,minmax(0,1fr))!important}
+  .card,.stcard{border-radius:18px}
+}
+@media (min-width:1700px){
+  :root{--side-w:272px}
+  main{padding-left:48px!important;padding-right:72px!important}
+}
+
+
+.gsearch-fab{position:fixed;left:18px;bottom:22px;z-index:90;width:48px;height:48px;border-radius:999px;padding:0;box-shadow:var(--shm);background:#fff;border:1.5px solid var(--bd);color:var(--ink)}
+.gsearch-fab:hover{border-color:var(--or);color:var(--or)}
+.gsearch-tip{position:absolute;left:58px;bottom:8px;background:#111827;color:#fff;border-radius:8px;padding:7px 10px;font-size:12px;font-weight:700;white-space:nowrap;opacity:0;pointer-events:none;transform:translateX(-6px);transition:all .15s ease;box-shadow:var(--sh)}
+.gsearch-fab:hover .gsearch-tip,.gsearch-fab:focus-visible .gsearch-tip{opacity:1;transform:translateX(0)}
+@media(max-width:760px){.gsearch-fab{left:14px;bottom:78px}.gsearch-tip{display:none}}
+
+
+
+/* v2.4.1 — navegação lateral rolável e busca global protegida */
+@media (min-width:900px){
+  .bnav{
+    top:220px!important;
+    bottom:82px!important;
+    height:auto!important;
+    overflow-y:auto!important;
+    overflow-x:hidden!important;
+    padding:0 14px 8px!important;
+    scrollbar-width:thin;
+    scrollbar-color:rgba(255,255,255,.40) transparent;
+    overscroll-behavior:contain;
+    -webkit-overflow-scrolling:touch;
+  }
+  .bnav::-webkit-scrollbar{width:6px}
+  .bnav::-webkit-scrollbar-track{background:transparent}
+  .bnav::-webkit-scrollbar-thumb{background:rgba(255,255,255,.35);border-radius:999px}
+  .bnav::-webkit-scrollbar-thumb:hover{background:rgba(255,255,255,.55)}
+  .bnav>div{padding-bottom:8px!important}
+  .gsearch-fab{
+    left:22px!important;
+    bottom:20px!important;
+    z-index:95!important;
+  }
+}
+@media (min-width:900px) and (max-height:760px){
+  .bnav{top:202px!important;bottom:78px!important}
+  .nbtn{padding-top:9px!important;padding-bottom:9px!important}
+}
+</style>
+</head>
+<body>
+<div id="root"><div style="min-height:100dvh;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:16px;background:#FFF8EC"><div style="width:56px;height:56px;background:#F59500;border-radius:14px;display:flex;align-items:center;justify-content:center"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg></div><div style="font-family:'Plus Jakarta Sans',sans-serif;font-size:18px;font-weight:800;color:#111827">NEXUS</div><div style="width:28px;height:28px;border:3px solid #E5E7EB;border-top-color:#F59500;border-radius:50%;animation:rot .7s linear infinite"></div><style>@keyframes rot{to{transform:rotate(360deg)}}
+@media (min-width:900px){
+  :root{--app-max:1760px;--side-w:264px;--r:16px}
+  body{background:#F3F4F6}
+  header{position:fixed;left:0;top:0;bottom:0;width:var(--side-w);height:100dvh;box-shadow:6px 0 18px rgba(17,24,39,.08);display:flex;align-items:flex-start;background:linear-gradient(180deg,var(--or),var(--or2))}
+  header>div{width:100%;margin:0!important;padding:24px 18px!important;display:block!important}
+  header .row{display:block}
+  main{margin-left:var(--side-w);min-height:100dvh;padding:28px 40px 40px;max-width:none}
+  .page{padding:0 0 32px!important;max-width:none!important;width:100%!important;margin:0!important}
+  .bnav{left:0;right:auto;top:188px;bottom:auto;width:var(--side-w);background:transparent;border-top:0;backdrop-filter:none;-webkit-backdrop-filter:none;padding:0 14px;z-index:60}
+  .bnav>div{display:flex!important;flex-direction:column!important;gap:6px!important;max-width:none!important;padding:0!important;width:100%}
+  .nbtn{flex-direction:row!important;justify-content:flex-start!important;gap:10px!important;padding:11px 12px!important;border-radius:12px!important;color:#fff;opacity:.82}
+  .nbtn.on{background:rgba(255,255,255,.18);opacity:1}
+  .nbtn.on::before{display:none}
+  .nic,.nbtn.on .nic,.nlbl,.nbtn.on .nlbl{color:#fff!important}
+  .nlbl{font-size:13px!important;text-align:left!important;width:auto!important;font-weight:700!important}
+  .card,.stcard,.cat-hdr{box-shadow:0 1px 2px rgba(0,0,0,.06),0 8px 24px rgba(15,23,42,.04)}
+  .stk{top:0;border-radius:16px;margin-bottom:16px;box-shadow:var(--sh);position:sticky}
+  .msheet{max-width:min(1120px,calc(100vw - var(--side-w) - 80px));border-radius:20px;margin-bottom:24px}
+  .mbg{align-items:center}
+  .toast{bottom:32px}
+  .ptab{flex-wrap:wrap;overflow:visible}
+}
+@media (min-width:1100px){
+  .page>div[style*="grid-template-columns: 1fr 1fr"]{grid-template-columns:repeat(4,1fr)!important}
+}
+
+
+@media (min-width:900px){
+  .stk{border-radius:16px;margin-bottom:16px;box-shadow:0 1px 2px rgba(0,0,0,.05);top:0}
+  .ilist{border-radius:0 0 16px 16px}
+  details{break-inside:avoid}
+  .irow{grid-auto-rows:minmax(44px,auto)}
+}
+
+
+.gsearch-fab{position:fixed;left:18px;bottom:22px;z-index:90;width:48px;height:48px;border-radius:999px;padding:0;box-shadow:var(--shm);background:#fff;border:1.5px solid var(--bd);color:var(--ink)}
+.gsearch-fab:hover{border-color:var(--or);color:var(--or)}
+.gsearch-tip{position:absolute;left:58px;bottom:8px;background:#111827;color:#fff;border-radius:8px;padding:7px 10px;font-size:12px;font-weight:700;white-space:nowrap;opacity:0;pointer-events:none;transform:translateX(-6px);transition:all .15s ease;box-shadow:var(--sh)}
+.gsearch-fab:hover .gsearch-tip,.gsearch-fab:focus-visible .gsearch-tip{opacity:1;transform:translateX(0)}
+@media(max-width:760px){.gsearch-fab{left:14px;bottom:78px}.gsearch-tip{display:none}}
+
+</style></div></div>
+
+<script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+<script src="https://cdn.jsdelivr.net/npm/htm@3/dist/htm.js" crossorigin></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" crossorigin></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js" crossorigin></script>
+<script>
+// Wait for all scripts
+window.addEventListener('load', function() {
+  if (typeof React === 'undefined' || typeof htm === 'undefined') {
+    document.getElementById('root').innerHTML = '<div style="padding:40px;text-align:center"><h2 style="color:#DC2626">Erro ao carregar</h2><p style="color:#6B7280;margin-top:8px">Verifique sua conexão e recarregue.</p><button onclick="location.reload()" style="margin-top:16px;background:#F59500;color:white;border:none;padding:12px 24px;border-radius:10px;font-size:14px;cursor:pointer;font-weight:600">Recarregar</button></div>';
+    return;
+  }
+  initApp();
+});
+
+function initApp() {
+const { useState, useEffect, useMemo, useRef, useCallback, createContext, useContext } = React;
+const html = htm.bind(React.createElement);
+
+/* ══════════════════════════════════════
+   UTILS
+══════════════════════════════════════ */
+function getWeekId(d = new Date()) {
+  const dt = new Date(d); dt.setHours(0,0,0,0);
+  dt.setDate(dt.getDate() + 3 - (dt.getDay() + 6) % 7);
+  const w1 = new Date(dt.getFullYear(), 0, 4);
+  return `${dt.getFullYear()}-W${String(1 + Math.round(((dt - w1) / 86400000 - 3 + (w1.getDay() + 6) % 7) / 7)).padStart(2, '0')}`;
+}
+function wLbl(w) { if (!w) return ''; const [y, n] = w.split('-W'); return `Semana ${parseInt(n)} · ${y}`; }
+function todayISO() { const d = new Date(); d.setMinutes(d.getMinutes() - d.getTimezoneOffset()); return d.toISOString().split('T')[0]; }
+function dateToWeek(s) { return getWeekId(s ? new Date(s + 'T12:00:00') : new Date()); }
+function weekFromDateLabel(s) { return wLbl(dateToWeek(s)); }
+function recordLabel(type, rec) {
+  const map = { pedido:'Pedido', orcamento:'Orçamento', inventario:'Inventário', rnc:'RNC', recebimento:'Recebimento' };
+  const base = map[type] || type || 'Registro';
+  const sem = rec?.semana ? wLbl(rec.semana) : '';
+  const cat = rec?.categoria ? ` · ${rec.categoria}` : '';
+  const orig = rec?.origem ? ` · ${rec.origem}` : '';
+  return `${base}${sem ? ' ' + sem : ''}${orig}${cat}`.trim();
+}
+function fDate(s) { if (!s) return ''; try { return new Date(s).toLocaleDateString('pt-BR'); } catch { return ''; } }
+function fMoeda(v) { return Number(v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }); }
+function ultimoPrecoGlobal(nome) {
+  const t = LS.get('tabPrecos') || {};
+  const sems = Object.keys(t).sort().reverse();
+  for (const w of sems) {
+    const n = parseFloat((t[w] || {})[nome] || 0);
+    if (n > 0) return n;
+  }
+  const orcs = LS.get('orcamentos') || [];
+  for (const o of [...orcs].sort((a,b)=>String(b.criadoEm||'').localeCompare(String(a.criadoEm||'')))) {
+    const it = (o.itens || []).find(i => i.nome === nome);
+    const n = parseFloat(it?.precoUnit || 0);
+    if (n > 0) return n;
+  }
+  return 0;
+}
+function uid() { return Math.random().toString(36).slice(2) + Date.now().toString(36); }
+function genSems() {
+  const [ay, aw] = getWeekId().split('-W').map(Number);
+  const o = [];
+  for (let i = -8; i <= 104; i++) { let s = aw + i, a = ay; while (s > 52) { s -= 52; a++; } while (s < 1) { s += 52; a--; } o.push(`${a}-W${String(s).padStart(2, '0')}`); }
+  return [...new Set(o)].sort();
+}
+
+/* ══════════════════════════════════════
+   STORAGE
+══════════════════════════════════════ */
+const LS = {
+  get: k => { try { const v = localStorage.getItem('nx:' + k); return v ? JSON.parse(v) : null; } catch { return null; } },
+  set: (k, v) => { try { localStorage.setItem('nx:' + k, JSON.stringify(v)); } catch {} },
+  del: k => { try { localStorage.removeItem('nx:' + k); } catch {} },
+};
+function isWeekClosed(sem) { return !!(sem && (LS.get('closedWeeks') || []).includes(sem)); }
+function closeWeek(sem) { if (!sem) return; const a = LS.get('closedWeeks') || []; if (!a.includes(sem)) LS.set('closedWeeks', [...a, sem].sort()); auditLog('Fechamento semanal', wLbl(sem)); }
+function reopenWeek(sem) { const a = (LS.get('closedWeeks') || []).filter(x => x !== sem); LS.set('closedWeeks', a); auditLog('Reabertura semanal', wLbl(sem)); }
+function isInactiveItem(name) { return (LS.get('inactiveItems') || []).includes(name); }
+function toggleInactiveItem(name) { const a = LS.get('inactiveItems') || []; LS.set('inactiveItems', a.includes(name) ? a.filter(x => x !== name) : [...a, name]); auditLog(a.includes(name) ? 'Item reativado' : 'Item inativado', name); }
+function clearDraft(k) { LS.del('draft_' + k); }
+function hydratePedidoDraft(d) { return d ? { origem:d.origem, semana:d.semana || dateToWeek(d.data), data:d.data, responsavel:d.responsavel, notas:d.notas, itens:Object.entries(d.qtds||{}).filter(([_,v])=>parseFloat(v||0)>0).map(([nome,qtd])=>({nome,qtd:parseFloat(qtd)})) } : null; }
+function hydrateInvDraft(d) { return d ? { origem:d.origem, categoria:d.categoria, semana:d.semana || dateToWeek(d.data), data:d.data, responsavel:d.responsavel, observacoes:d.observacoes, itens:Object.entries(d.qtds||{}).map(([nome,qtd])=>({nome,qtd:parseFloat(qtd||0)})) } : null; }
+
+function auditLog(action, detail) {
+  const logs = LS.get('audit') || [];
+  // Compatível com versões anteriores: algumas telas antigas liam acao/det, outras action/detail.
+  logs.unshift({ id: uid(), data: new Date().toISOString(), action, detail, acao: action, det: detail });
+  LS.set('audit', logs.slice(0, 500));
+}
+function stockLog(item, before, after, origem, motivo, extra = {}) {
+  const movs = LS.get('stockMovs') || [];
+  const delta = Number(after || 0) - Number(before || 0);
+  movs.unshift({ id: uid(), data: new Date().toISOString(), item, before, after, delta, origem, motivo, ...extra });
+  LS.set('stockMovs', movs.slice(0, 1500));
+  auditLog('Movimentação de estoque', `${item}: ${before} → ${after}. ${motivo || ''}`);
+}
+function formatMov(m) {
+  const d = fDate(m.data);
+  const tipo = m.tipo || m.origem || 'Movimentação';
+  const delta = Number(m.delta || 0);
+  const sinal = delta > 0 ? '+' : '';
+  const ref = m.refLabel || m.motivo || '';
+  return {
+    titulo: `${d} - ${tipo}`,
+    linha: `${m.item} · ${sinal}${Number(delta.toFixed ? delta.toFixed(2) : delta)} · ${m.before} → ${m.after}`,
+    detalhe: ref
+  };
+}
+function moveToTrash(type, record, motivo='Exclusão administrativa') {
+  const trash = LS.get('trash') || [];
+  trash.unshift({ id: uid(), type, record, motivo, apagadoEm: new Date().toISOString() });
+  LS.set('trash', trash.slice(0, 300));
+  auditLog('Exclusão enviada para lixeira', `${type}: ${record?.numero || record?.semana || record?.id || ''}. ${motivo}`);
+}
+function strongConfirm(msg) {
+  const r = prompt(msg + '\n\nDigite EXCLUIR para confirmar.');
+  return r === 'EXCLUIR';
+}
+
+
+/* ══════════════════════════════════════
+   CATÁLOGO BASE
+══════════════════════════════════════ */
+const CAT_BASE = {
+  CD: {
+    label: 'Centro de Distribuição',
+    cats: {
+      'Peixaria': { unit: 'UND', items: ['PORÇÃO: BADEJO MOQ (550G)','PORÇÃO: CAÇÃO POSTA (700G)','PORÇÃO: CAM CINZA (11.5KG)','PORÇÃO: CAM VG (8 UND) +OU- 300G','PORÇÃO: CAM VM C/ RABO (250G)','PORÇÃO: CAM VM C/ RABO (500G)','PORÇÃO: FILE PEIXE (500G)','PORÇÃO: GORJAO (1KG)','PORÇÃO: LAGOSTA (400G)','PORÇÃO: LULA (200G)','PORÇÃO: MIX DE MARISCO','PORÇÃO: PEROA POSTAS (700G)','PORÇÃO: PEROA POSTINHA (400G)','PORÇÃO: SURURU (250G)'] },
+      'Açougue': { unit: 'UND', items: ['MINI HAMBURGUER (60G)','PORÇÃO: CARNE DE SOL (350G)','PORÇÃO: CARNE MOIDA (1KG)','PORÇÃO: FILE MIGNON CUBO (350G)','PORÇÃO: FILE MIGNON KIDS (150G)','PORÇÃO: FILE MIGNON TORNEDOR (300G)'] },
+      'Frutos do Mar': { unit: 'KG', items: ['SIRI / ARATU'] },
+      'Camarão (KG)': { unit: 'KG', items: ['CAMARÃO MOLHO 7B','CAMARÃO PAULISTINHA'] },
+    }
+  },
+  CP: {
+    label: 'Cozinha de Produção',
+    cats: {
+      'Bases da Cozinha': { unit: 'UND', items: ['MOLHO BRANCO - 2KG','MOLHO DE COCO - 2KG','RECHEIO DE CAMARÃO - 2KG','RECHEIO DE CARNE SECA - 2KG'] },
+      'Insumos Processados': { unit: 'UND', items: ['BADEJO/ARRAIA DESFIADO (1KG)','BATATA PALHA DA CASA (3KG)','CARNE SECA COZIDA E DESFIADA (1KG)','CREME DE AIPIM COM LEITE DE COCO (2KG)','FAROFA DA CASA (2KG)','MIX DE MAIONESE (UND)','ÓLEO DE URUCUM (5L)','PAIO EM CUBOS (1KG)','PRESUNTO EM CUBOS (1KG)'] },
+      'Petiscos e Bolinhos': { unit: 'UND', items: ['BASE CROQUETE SALMÃO - 5KG','CAMARÃO VM RECHEADO - 12 UND'] },
+      'Proteínas': { unit: 'UND', items: ['BACALHAU SAITH (60GR)','POLACA DESSALGADA (1KG)','POLVO COZIDO (400GR)'] },
+      'Sobremesas': { unit: 'KG', items: ['ORGULHO DA NUTRI','PUDINZIM DE LEITE','RAINHA DA COCADA'] },
+    }
+  }
+};
+
+function getCatalog() {
+  const custom = LS.get('catalog') || { added: [], removed: [], addedCats: [] };
+  const m = JSON.parse(JSON.stringify(CAT_BASE));
+  for (const c of (custom.addedCats || [])) { if (m[c.orig] && !m[c.orig].cats[c.cat]) m[c.orig].cats[c.cat] = { unit: c.unit || 'UND', items: [] }; }
+  for (const a of (custom.added || [])) { if (m[a.orig]?.cats[a.cat] && !m[a.orig].cats[a.cat].items.includes(a.name)) m[a.orig].cats[a.cat].items.push(a.name); }
+  for (const r of (custom.removed || [])) { if (m[r.orig]?.cats[r.cat]) m[r.orig].cats[r.cat].items = m[r.orig].cats[r.cat].items.filter(i => i !== r.name); }
+  return m;
+}
+
+function flatCatalog(cat, opts = {}) {
+  const all = [];
+  const inactive = LS.get('inactiveItems') || [];
+  for (const [orig, o] of Object.entries(cat)) {
+    for (const [c, cv] of Object.entries(o.cats)) {
+      for (const item of cv.items) {
+        if (!opts.includeInactive && inactive.includes(item)) continue;
+        all.push({ name: item, unit: cv.unit, orig, cat: c, inactive: inactive.includes(item) });
+      }
+    }
+  }
+  return all;
+}
+
+/* ══════════════════════════════════════
+   TOAST
+══════════════════════════════════════ */
+function useToast() {
+  const [m, setM] = useState(null); const t = useRef();
+  const show = useCallback((msg, dur = 2600) => { setM(msg); clearTimeout(t.current); t.current = setTimeout(() => setM(null), dur); }, []);
+  return { show, ui: m ? html`<div class="toast">${m}</div>` : null };
+}
+
+/* ══════════════════════════════════════
+   ICONS
+══════════════════════════════════════ */
+const PATHS = {
+  home: 'M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z M9 22V12h6v10',
+  orc: 'M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2z M12 6v6l4 2',
+  orders: 'M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2 M9 3h6v4H9z M9 12h6 M9 16h3',
+  box: 'M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z M3.27 6.96L12 12.01 20.73 6.96 M12 22.08V12',
+  handbox: 'M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8 M3.27 6.96L12 12.01 20.73 6.96 M12 22.08V12 M2 17h5l2 2h5a2 2 0 0 0 2-2v0 M2 21h10a4 4 0 0 0 4-4 M16 17h3a2 2 0 0 0 2-2',
+  users: 'M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2 M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8 M23 21v-2a4 4 0 0 0-3-3.87 M16 3.13a4 4 0 0 1 0 7.75',
+  recv: 'M20 12v10H4V12 M22 7H2v5h20z M12 22V7 M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z',
+  rnc: 'M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z M12 9v4 M12 17h.01',
+  rep: 'M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z M14 2v6h6 M16 13H8 M16 17H8',
+  chart: 'M18 20V10 M12 20V4 M6 20v-6',
+  gear: 'M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z',
+  plus: 'M12 5v14 M5 12h14',
+  x: 'M18 6L6 18 M6 6l12 12',
+  chk: 'M20 6L9 17l-5-5',
+  cr: 'M9 18l6-6-6-6',
+  cl: 'M15 18l-6-6 6-6',
+  left: 'M19 12H5 M12 19l-7-7 7-7',
+  trash: 'M3 6h18 M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6 M10 11v6 M14 11v6 M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2',
+  pdf: 'M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z M14 2v6h6 M9 13h6 M9 17h4',
+  save: 'M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z M17 21v-8H7v8 M7 3v5h8',
+  img: 'M21 19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h4l2 3h4a2 2 0 0 1 2 2z M12 13a3 3 0 1 0 0-6 3 3 0 0 0 0 6',
+  pen: 'M12 20h9 M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4z',
+  info: 'M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20z M12 16v-4 M12 8h.01',
+  ref: 'M23 4v6h-6 M1 20v-6h6 M3.51 9a9 9 0 0 1 14.85-3.36L23 10 M1 14l4.64 4.36A9 9 0 0 0 20.49 15',
+  money: 'M12 1v22 M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6',
+};
+function Ic({ n, s = 20, c = '', style = {} }) {
+  return html`<svg class=${c} viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style=${{ width: s, height: s, flexShrink: 0, ...style }}><path d=${PATHS[n] || ''}/></svg>`;
+}
+function Spin({ s = 28 }) { return html`<div class="spin" style=${{ width: s, height: s }}/>`; }
+
+/* ══════════════════════════════════════
+   LOGO
+══════════════════════════════════════ */
+function Logo({ size = 118 }) {
+  return html`<div class="nx-logo-wrap" style=${{ width: size, height: Math.round(size * 0.68), flexShrink: 0 }}>
+    <img class="nx-logo-img" src="logo-ilha-clean.png" alt="Grupo Ilha" onError=${e => { e.target.src = 'logo-ilha.png'; }} style=${{ width: '100%', height: '100%', objectFit: 'contain', display: 'block' }}/>
+  </div>`;
+}
+
+/* ══════════════════════════════════════
+   HEADER + NAV
+══════════════════════════════════════ */
+const TABS = [
+  { id: 'inicio', l: 'Início', ic: 'home' },
+  { id: 'orcamento', l: 'Orçamento', ic: 'money' },
+  { id: 'pedidos', l: 'Pedidos', ic: 'orders' },
+  { id: 'recebimento', l: 'Recebimento', ic: 'recv' },
+  { id: 'inventario', l: 'Inventário', ic: 'box' },
+  { id: 'estoque', l: 'Estoque', ic: 'handbox' },
+  { id: 'rnc', l: 'RNC', ic: 'rnc' },
+  { id: 'relatorios', l: 'Relatórios', ic: 'rep' },
+  { id: 'analise', l: 'Análise', ic: 'chart' },
+  { id: 'admin', l: 'Administração', ic: 'users' },
+  { id: 'config', l: 'Configurações', ic: 'gear' },
+];
+const TAB_NAMES = Object.fromEntries(TABS.map(t => [t.id, t.l]));
+
+function Header({ tab, setTab }) {
+  return html`<header>
+    <div style=${{ maxWidth: 'none', margin: '0 auto', padding: '18px 18px', display: 'flex', alignItems: 'center', gap: 12 }}>
+      <button class="nx-brand" onClick=${() => { LS.set('tabAtual','inicio'); location.reload(); }} title="Recarregar e ir para início" style=${{ background: 'transparent', border: 0, padding: 0, cursor: 'pointer', textAlign: 'left' }}>
+        <${Logo} size=${118}/>
+        <div class="nx-brand-kicker" style=${{ fontSize: 9, fontWeight: 700, letterSpacing: '.16em', color: 'rgba(255,255,255,.75)', textTransform: 'uppercase' }}>NEXUS · GRUPO ILHA</div>
+        <div class="nx-brand-title" style=${{ fontSize: 17, fontWeight: 800, color: '#fff', fontFamily: "'Plus Jakarta Sans',sans-serif", lineHeight: 1.2 }}>${TAB_NAMES[tab] || 'NEXUS'}</div>
+      </button>
+    </div>
+  </header>`;
+}
+
+function BottomNav({ tab, setTab }) {
+  return html`<nav class="bnav">
+    <div style=${{ maxWidth: 'none', margin: '0 auto', display: 'flex', padding: '2px 0' }}>
+      ${TABS.map(t => html`
+        <button key=${t.id} class=${`nbtn ${tab === t.id ? 'on' : ''}`} onClick=${() => setTab(t.id)} style=${{ minWidth: 0, flex: 1 }}>
+          <${Ic} n=${t.ic} s=${19} c="nic"/>
+          <span class="nlbl">${t.l}</span>
+        </button>`)}
+    </div>
+  </nav>`;
+}
+
+/* ══════════════════════════════════════
+   STATUS MAPS
+══════════════════════════════════════ */
+const ST_PED = { pendente: { l: 'Aguardando', c: 'bgy' }, recebido: { l: 'Recebido', c: 'bgr2' }, parcial: { l: 'Parcial', c: 'bam' }, cancelado: { l: 'Cancelado', c: 'brd2' } };
+const ST_RNC = { aberta: { l: 'Aberta', c: 'brd2' }, analise: { l: 'Em análise', c: 'bam' }, resolvida: { l: 'Resolvida', c: 'bgr2' }, cancelada: { l: 'Cancelada', c: 'bgy' } };
+const ST_INV = { rascunho: { l: 'Rascunho', c: 'bam' }, finalizado: { l: 'Finalizado', c: 'bgr2' } };
+
+/* ══════════════════════════════════════
+   INÍCIO
+══════════════════════════════════════ */
+function InicioTab({ setTab }) {
+  const pedidos = LS.get('pedidos') || [];
+  const rncs = LS.get('rncs') || [];
+  const inventarios = LS.get('inventarios') || [];
+  const estoque = LS.get('estoque') || {};
+  const pend = pedidos.filter(p => p.status === 'pendente').length;
+  const rncA = rncs.filter(r => r.status === 'aberta' || r.status === 'analise').length;
+  const invPend = inventarios.filter(i => i.status === 'rascunho').length;
+  const estBaixo = Object.values(estoque).filter(q => parseFloat(q) <= 2).length;
+  const recentes = [...pedidos].sort((a, b) => new Date(b.criadoEm || 0) - new Date(a.criadoEm || 0)).slice(0, 4);
+  return html`<div class="page">
+    <div class="card" style=${{ padding: 20, marginBottom: 16, background: 'linear-gradient(135deg,var(--or) 0%,var(--or2) 100%)', color: '#fff', boxShadow: '0 4px 20px rgba(245,149,0,.3)' }}>
+      <div style=${{ fontSize: 9, fontWeight: 700, opacity: .75, letterSpacing: '.12em', textTransform: 'uppercase', marginBottom: 4 }}>Semana atual</div>
+      <div style=${{ fontSize: 21, fontWeight: 800, fontFamily: "'Plus Jakarta Sans',sans-serif" }}>${wLbl(getWeekId())}</div>
+      <div style=${{ fontSize: 12, opacity: .8, marginTop: 4 }}>${new Date().toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' })}</div>
+    </div>
+    <div style=${{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 16 }}>
+      ${[[`Pedidos pendentes`, pend, pend > 0 ? 'var(--or)' : 'var(--ink)', 'recebimento'],
+        [`RNCs abertas`, rncA, rncA > 0 ? 'var(--rd)' : 'var(--ink)', 'rnc'],
+        [`Inventários em rascunho`, invPend, invPend > 0 ? 'var(--am)' : 'var(--ink)', 'inventario'],
+        [`Estoque baixo/zerado`, estBaixo, estBaixo > 0 ? 'var(--rd)' : 'var(--ink)', 'estoque'],
+      ].map(([l, v, c, t]) => html`
+        <button class="stcard" key=${l} onClick=${() => setTab(t)}>
+          <div style=${{ fontSize: 10, fontWeight: 700, color: 'var(--s3)', textTransform: 'uppercase', letterSpacing: '.05em', marginBottom: 8 }}>${l}</div>
+          <div style=${{ fontSize: 30, fontWeight: 800, color: c, fontFamily: "'Plus Jakarta Sans',sans-serif" }}>${v}</div>
+        </button>`)}
+    </div>
+    <button class="btn bp" style=${{ width: '100%', padding: 14, fontSize: 15, borderRadius: 12, marginBottom: 20 }} onClick=${() => setTab('pedidos')}>
+      <${Ic} n="plus" s=${20}/>Novo Pedido
+    </button>
+    ${recentes.length > 0 && html`
+      <span class="slbl">Atividade recente</span>
+      <div style=${{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        ${recentes.map(p => { const st = ST_PED[p.status] || { l: p.status, c: 'bgy' }; return html`
+          <button key=${p.id} class="card" style=${{ padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 12, border: 'none', textAlign: 'left', width: '100%', cursor: 'pointer' }} onClick=${() => setTab('pedidos')}>
+            <div style=${{ flex: 1, minWidth: 0 }}>
+              <div class="row" style=${{ gap: 6, marginBottom: 4 }}><span class=${`badge ${st.c}`}>${st.l}</span><span class="badge bor">${p.origem}</span></div>
+              <div style=${{ fontWeight: 700, fontSize: 14 }}>${wLbl(p.semana)}</div>
+              <div style=${{ fontSize: 12, color: 'var(--s2)', marginTop: 2 }}>${(p.itens || []).length} itens · ${fDate(p.criadoEm)}</div>
+            </div>
+            <${Ic} n="cr" s=${16} style=${{ color: 'var(--s3)' }}/>
+          </button>`; })}
+      </div>`}
+  </div>`;
+}
+
+/* ══════════════════════════════════════
+   ORÇAMENTO
+══════════════════════════════════════ */
+function OrcamentoTab({ toast }) {
+  const [view, setView] = useState('lista');
+  const [orcamentos, setOrcamentos] = useState(() => LS.get('orcamentos') || []);
+  const [editing, setEditing] = useState(null);
+  const cat = useMemo(getCatalog, []);
+  const allItems = useMemo(() => flatCatalog(cat), [cat]);
+  const tPrecos = useMemo(() => LS.get('tabPrecos') || {}, []);
+
+  const save = orc => { const upd = orcamentos.find(o => o.id === orc.id) ? orcamentos.map(o => o.id === orc.id ? orc : o) : [orc, ...orcamentos]; setOrcamentos(upd); LS.set('orcamentos', upd); };
+  const del = id => {
+    const rec = orcamentos.find(o => o.id === id || (!o.id && (o.semana === id || o.semana + o.origem === id)));
+    if (!rec) return;
+    const pedidos = LS.get('pedidos') || [];
+    const vinculados = pedidos.filter(p => p.orcamentoId === id);
+    const recebeu = vinculados.some(p => p.recebimento);
+    if (recebeu) {
+      const itensAfetados = vinculados.flatMap(p => (p.recebimento?.itens || p.itens || []).map(i => `${i.nome} (${i.qtdRecebida ?? i.qtd} ${i.unit || 'UND'})`)).join(', ');
+      if (!strongConfirm(`ATENÇÃO: Este orçamento gerou pedido(s) que já foram RECEBIDOS. O estoque NÃO será revertido automaticamente — verifique manualmente se necessário.\n\nItens recebidos: ${itensAfetados || 'ver pedido'}\n\nDigite EXCLUIR para confirmar.`)) return;
+      vinculados.forEach(p => moveToTrash('pedido', p, 'Pedido com recebimento removido por exclusão do orçamento vinculado'));
+    } else {
+      if (vinculados.length && !strongConfirm(`Este orçamento gerou ${vinculados.length} pedido(s). Ao excluir, os pedidos vinculados também irão para a lixeira.`)) return;
+      vinculados.forEach(p => moveToTrash('pedido', p, 'Pedido removido por exclusão do orçamento vinculado'));
+    }
+    moveToTrash('orcamento', rec, recebeu ? 'Exclusão de orçamento com recebimento vinculado' : vinculados.length ? 'Exclusão de orçamento com pedidos vinculados' : 'Exclusão de orçamento');
+    const pedidosUpd = pedidos.filter(p => p.orcamentoId !== id && p.orcamentoId !== rec.id);
+    LS.set('pedidos', pedidosUpd);
+    const upd = orcamentos.filter(o => o !== rec); setOrcamentos(upd); LS.set('orcamentos', upd);
+  };
+  const autorizar = orc => {
+    const orcUp = { ...orc, status: 'autorizado', autorizadoEm: new Date().toISOString() };
+    save(orcUp);
+    // Criar pedido automático
+    const pedidos = LS.get('pedidos') || [];
+    const newPed = {
+      id: uid(), origem: orc.origem, semana: orc.semana, status: 'pendente',
+      itens: orc.itens.filter(i => parseFloat(i.qtd) > 0),
+      notas: `Gerado via Orçamento · Total: ${fMoeda(orc.total || 0)}`,
+      criadoEm: new Date().toISOString(), orcamentoId: orc.id,
+    };
+    LS.set('pedidos', [newPed, ...pedidos]);
+    toast.show('Autorizado! Pedido criado automaticamente.');
+    setView('lista');
+  };
+
+  if (view === 'precos') return html`<${TabelaPrecos} cat=${cat} allItems=${allItems} toast=${toast} onBack=${() => setView('lista')}/>`;
+  if (view === 'editor') return html`<${OrcEditor} orc=${editing} cat=${cat} allItems=${allItems} tPrecos=${tPrecos} toast=${toast}
+    onBack=${() => { setView('lista'); setEditing(null); }}
+    onSave=${orc => { save(orc); clearDraft('orcamento'); toast.show('Orçamento salvo'); setView('lista'); setEditing(null); }}
+    onDelete=${id => { del(id); toast.show('Excluído'); setView('lista'); setEditing(null); }}
+    onAutorizar=${autorizar}/>`;
+
+  const pend = orcamentos.filter(o => o.status === 'rascunho' || o.status === 'pendente');
+  const aut = orcamentos.filter(o => o.status === 'autorizado');
+  return html`<div class="page">
+    <div class="row" style=${{ justifyContent: 'space-between', marginBottom: 16 }}>
+      <div><h2 style=${{ fontSize: 20, fontWeight: 800, fontFamily: "'Plus Jakarta Sans',sans-serif", margin: 0 }}>Orçamentos</h2></div>
+      <div class="row"><button class="btn bs bsm" onClick=${() => setView('precos')}><${Ic} n="money" s=${14}/>Preços</button><button class="btn bp bsm" onClick=${() => { setEditing(null); setView('editor'); }}><${Ic} n="plus" s=${14}/>Novo</button></div>
+    </div>
+    ${orcamentos.length === 0 && html`<div class="empty"><${Ic} n="money" s=${40} style=${{ color: 'var(--s3)' }}/><p>Nenhum orçamento.<br/>Crie um para começar.</p><button class="btn bp" style=${{ marginTop: 8 }} onClick=${() => setView('editor')}><${Ic} n="plus" s=${16}/>Criar orçamento</button></div>`}
+    ${pend.length > 0 && html`<span class="slbl">Pendentes (${pend.length})</span><div style=${{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 16 }}>${pend.map(o => html`<${OrcCard} key=${o.id} orc=${o} onClick=${() => { setEditing(o); setView('editor'); }}/>`)}</div>`}
+    ${aut.length > 0 && html`<span class="slbl">Autorizados (${aut.length})</span><div style=${{ display: 'flex', flexDirection: 'column', gap: 8 }}>${aut.map(o => html`<${OrcCard} key=${o.id} orc=${o} onClick=${() => { setEditing(o); setView('editor'); }}/>`)}</div>`}
+  </div>`;
+}
+
+function OrcCard({ orc, onClick }) {
+  return html`<button class="card" style=${{ padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 12, border: 'none', textAlign: 'left', width: '100%', cursor: 'pointer' }} onClick=${onClick}>
+    <div style=${{ flex: 1, minWidth: 0 }}>
+      <div class="row" style=${{ gap: 6, marginBottom: 4 }}><span class=${`badge ${orc.status === 'autorizado' ? 'bgr2' : 'bam'}`}>${orc.status === 'autorizado' ? 'Autorizado' : 'Pendente'}</span><span class="badge bor">${orc.origem}</span></div>
+      <div style=${{ fontWeight: 700, fontSize: 14 }}>${wLbl(orc.semana)}</div>
+      <div style=${{ fontSize: 12, color: 'var(--s2)', marginTop: 2 }}>${(orc.itens || []).filter(i => parseFloat(i.qtd) > 0).length} itens · ${fMoeda(orc.total || 0)}${orc.data ? ' · ' + fDate(orc.data) : ''}</div>
+    </div>
+    <${Ic} n="cr" s=${16} style=${{ color: 'var(--s3)' }}/>
+  </button>`;
+}
+
+function OrcEditor({ orc, cat, allItems, tPrecos, toast, onBack, onSave, onDelete, onAutorizar }) {
+  const isEdit = !!orc?.id; const autorizado = orc?.status === 'autorizado'; const locked = false;
+  const sems = useMemo(genSems, []);
+  const [orig, setOrig] = useState(orc?.origem || 'CD');
+  const [data, setData] = useState(orc?.data || todayISO());
+  const [sem, setSem] = useState(orc?.semana || dateToWeek(data));
+  const [resp, setResp] = useState(orc?.responsavel || (LS.get('config') || {}).responsavel || '');
+  const [qtds, setQtds] = useState(() => { const m = {}; (orc?.itens || []).forEach(i => m[i.nome] = String(i.qtd)); return m; });
+  const [precos, setPrecos] = useState(() => {
+    if (orc?.precos && Object.keys(orc.precos).length > 0) return orc.precos;
+    const sems2 = Object.keys(tPrecos).sort().reverse();
+    return sems2.length > 0 ? { ...(tPrecos[sems2[0]] || {}) } : {};
+  });
+  const itemsOrig = allItems.filter(i => i.orig === orig);
+  useEffect(() => { const w = dateToWeek(data); if (w !== sem) setSem(w); }, [data]);
+  const byC = useMemo(() => { const m = {}; itemsOrig.forEach(i => { if (!m[i.cat]) m[i.cat] = []; m[i.cat].push(i); }); return m; }, [itemsOrig]);
+  const total = itemsOrig.reduce((s, i) => s + (parseFloat(qtds[i.name] || 0)) * (parseFloat(precos[i.name] || 0)), 0);
+  const sel = itemsOrig.filter(i => parseFloat(qtds[i.name] || 0) > 0).length;
+  const carregarSemanaAnterior = () => {
+    const ants = Object.keys(tPrecos).filter(w => w < sem).sort();
+    const ant = ants[ants.length - 1];
+    if (!ant) { toast.show('Não encontrei preços de semana anterior'); return; }
+    setPrecos({ ...(tPrecos[ant] || {}) });
+    toast.show('Preços carregados de ' + wLbl(ant));
+  };
+  const doSave = () => {
+    const itens = itemsOrig.filter(i => parseFloat(qtds[i.name] || 0) > 0).map(i => ({ nome: i.name, cat: i.cat, unit: i.unit, qtd: parseFloat(qtds[i.name] || 0), precoUnit: parseFloat(precos[i.name] || 0) }));
+    onSave({ id: orc?.id || uid(), origem: orig, semana: sem, data, responsavel: resp, status: orc?.status || 'pendente', itens, precos, total, criadoEm: orc?.criadoEm || new Date().toISOString() });
+  };
+  return html`<div style=${{ maxWidth: 'none', margin: '0 auto' }}>
+    <div class="stk" style=${{ padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 12 }}>
+      <button class="btn bg0 bic" onClick=${onBack}><${Ic} n="left" s=${20}/></button>
+      <div style=${{ flex: 1 }}><div style=${{ fontWeight: 800, fontSize: 15, fontFamily: "'Plus Jakarta Sans',sans-serif" }}>${orc ? (autorizado ? 'Editar Orçamento Autorizado' : 'Editar Orçamento') : 'Novo Orçamento'}</div><div style=${{ fontSize: 12, color: 'var(--s2)' }}>${sel} itens · ${fMoeda(total)}</div></div>
+      ${orc && html`<button class="btn bg0 bic" style=${{ color: 'var(--rd)' }} onClick=${() => { if (strongConfirm('Excluir orçamento')) onDelete(orc.id || orc.semana); }}><${Ic} n="trash" s=${18}/></button>`}
+    </div>
+    <div class="page" style=${{ paddingBottom: locked ? 24 : 140 }}>
+      <div class="card" style=${{ padding: 16, marginBottom: 12 }}>
+        <div style=${{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 12 }}>
+          ${['CD', 'CP'].map(o => html`<button key=${o} onClick=${() => { if (!locked) { setOrig(o); setQtds({}); } }} style=${{ padding: 10, borderRadius: 10, border: `2px solid ${orig === o ? 'var(--or)' : 'var(--bd)'}`, background: orig === o ? 'var(--or3)' : '#fff', fontWeight: 700, fontSize: 13, cursor: 'pointer' }}><div style=${{ color: orig === o ? 'var(--or2)' : 'var(--ink)' }}>${o}</div><div style=${{ fontSize: 11, color: orig === o ? 'var(--or)' : 'var(--s2)', marginTop: 2 }}>${cat[o].label}</div></button>`)}
+        </div>
+        <div style=${{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 8 }}>
+          <div><label style=${{ fontSize: 11, fontWeight: 700, color: 'var(--s2)', textTransform: 'uppercase', letterSpacing: '.06em', display: 'block', marginBottom: 6 }}>Semana de referência</label><select class="inp" value=${sem} onChange=${e => setSem(e.target.value)} disabled=${locked}>${sems.map(s => html`<option key=${s} value=${s}>${wLbl(s)}</option>`)}</select></div>
+          <div><label style=${{ fontSize: 11, fontWeight: 700, color: 'var(--s2)', textTransform: 'uppercase', letterSpacing: '.06em', display: 'block', marginBottom: 6 }}>Responsável</label><input class="inp" value=${resp} onInput=${e => setResp(e.target.value)} placeholder="Nome do responsável" disabled=${locked}/></div>
+        </div>
+        ${!locked && html`<button class="btn bs bsm" onClick=${carregarSemanaAnterior}><${Ic} n="ref" s=${14}/>Usar preços da semana anterior</button>`}
+      </div>
+      ${Object.entries(byC).map(([catN, items]) => {
+        const catTotal = items.reduce((s, i) => s + (parseFloat(qtds[i.name] || 0)) * (parseFloat(precos[i.name] || 0)), 0);
+        return html`<details key=${catN + orig} open style=${{ marginBottom: 8 }}>
+          <summary class="cat-hdr"><${Ic} n="cr" s=${14} c="chv" style=${{ color: 'var(--s3)' }}/><span style=${{ fontWeight: 700, fontSize: 14, flex: 1 }}>${catN}</span>${catTotal > 0 && html`<span class="badge bor">${fMoeda(catTotal)}</span>`}</summary>
+          <div class="ilist">
+            <div class="ghdr" style=${{ gridTemplateColumns: '1fr 88px 70px 76px' }}><span>Produto</span><span style=${{ textAlign: 'center' }}>Estoque atual</span><span style=${{ textAlign: 'center' }}>Qtd.</span><span style=${{ textAlign: 'right' }}>Preço</span></div>
+            ${items.map((item, idx) => { const qtd = parseFloat(qtds[item.name] || 0), preco = parseFloat(precos[item.name] || 0), sub = qtd * preco; return html`
+              <div key=${item.name} class="irow" style=${{ gridTemplateColumns: '1fr 88px 70px 76px', background: qtd > 0 ? 'var(--or3)' : '#fff' }}>
+                <div><div style=${{ fontSize: 13, fontWeight: qtd > 0 ? 600 : 400 }}>${item.name}</div><div style=${{ fontSize: 11, color: 'var(--s3)' }}>${item.unit}${sub > 0 ? ` · ${fMoeda(sub)}` : ''}</div></div>
+                <div style=${{ textAlign:'center', fontSize:12, fontWeight:800, color: parseFloat((LS.get('estoque') || {})[item.name] || 0) <= 0 ? 'var(--rd)' : 'var(--s2)' }}>${parseFloat((LS.get('estoque') || {})[item.name] || 0)} ${item.unit}</div>
+                <div style=${{ display: 'flex', justifyContent: 'center' }}><input type="number" min="0" class="inp-n" value=${qtds[item.name] || ''} onInput=${e => setQtds(p => ({ ...p, [item.name]: e.target.value }))} disabled=${locked} placeholder="0" style=${{ borderColor: qtd > 0 ? 'var(--or)' : undefined }}/></div>
+                <div style=${{ display: 'flex', justifyContent: 'flex-end' }}><input type="number" min="0" step="0.01" class="inp-n" value=${precos[item.name] || ''} onInput=${e => setPrecos(p => ({ ...p, [item.name]: e.target.value }))} disabled=${locked} placeholder="0,00" style=${{ width: 72, fontSize: 12, borderColor: preco > 0 ? 'var(--or)' : undefined }}/></div>
+              </div>`; })}
+          </div>
+        </details>`; })}
+    </div>
+    ${!locked && html`<div style=${{ position: 'sticky', bottom: 72, background: '#fff', borderTop: '1px solid var(--bd)', padding: '12px 16px' }}>
+      <div class="row" style=${{ justifyContent: 'space-between', marginBottom: 10 }}><span style=${{ fontSize: 13, color: 'var(--s2)' }}>Total estimado</span><span style=${{ fontSize: 20, fontWeight: 800, color: 'var(--or)', fontFamily: "'Plus Jakarta Sans',sans-serif" }}>${fMoeda(total)}</span></div>
+      <div class="row" style=${{ gap: 8 }}>
+        <button class="btn bs" style=${{ flex: 1 }} onClick=${doSave}><${Ic} n="save" s=${15}/>Rascunho</button>
+        <button class="btn bp" style=${{ flex: 1 }} onClick=${() => {
+          const itens = itemsOrig.filter(i => parseFloat(qtds[i.name] || 0) > 0).map(i => ({ nome: i.name, cat: i.cat, unit: i.unit, qtd: parseFloat(qtds[i.name] || 0), precoUnit: parseFloat(precos[i.name] || 0) }));
+          const orcAtual = { ...(orc || {}), id: orc?.id || uid(), origem: orig, semana: sem, data, responsavel: resp, status: 'autorizado', itens, precos, total, criadoEm: orc?.criadoEm || new Date().toISOString() };
+          if (autorizado) {
+            onSave(orcAtual);
+            const pedidos = LS.get('pedidos') || [];
+            const upd = pedidos.map(p => p.orcamentoId === orcAtual.id ? { ...p, origem: orig, semana: sem, itens, notas: `Gerado via Orçamento · Total: ${fMoeda(total)}` } : p);
+            LS.set('pedidos', upd);
+            auditLog('Orçamento autorizado atualizado', `${wLbl(sem)} · ${orig} · ${fMoeda(total)}`);
+          } else {
+            onAutorizar(orcAtual);
+          }
+        }}>
+          <${Ic} n="chk" s=${15}/>${autorizado ? 'Atualizar pedido' : 'Autorizar'}
+        </button>
+      </div>
+    </div>`}
+    ${locked && html`<div style=${{ padding: '12px 16px 24px', textAlign: 'center' }}><span class="badge bgr2" style=${{ fontSize: 13, padding: '6px 16px' }}>✓ Autorizado — pedido gerado</span></div>`}
+  </div>`;
+}
+
+/* ══════════════════════════════════════
+   TABELA DE PREÇOS
+══════════════════════════════════════ */
+function TabelaPrecos({ cat, allItems, toast, onBack }) {
+  const cur = getWeekId();
+  const [tPrecos, setTPrecos] = useState(() => LS.get('tabPrecos') || {});
+  const sems = useMemo(() => { const saved = Object.keys(tPrecos).sort().reverse(); return [...new Set([...saved, ...genSems()])].sort().reverse(); }, [tPrecos]);
+  const [orig, setOrig] = useState('CD'); const [sem, setSem] = useState(cur); const [ed, setEd] = useState({});
+  useEffect(() => { setEd({ ...((tPrecos)[sem] || {}) }); }, [sem]);
+  const items = allItems.filter(i => i.orig === orig);
+  const semAnt = Object.keys(tPrecos).sort().reverse().find(s => s < sem);
+  const antP = semAnt ? (tPrecos[semAnt] || {}) : {};
+  const byC = useMemo(() => { const m = {}; items.forEach(i => { if (!m[i.cat]) m[i.cat] = []; m[i.cat].push(i); }); return m; }, [items]);
+  const salvar = () => { const l = {}; Object.entries(ed).forEach(([k, v]) => { const n = parseFloat(v); if (!isNaN(n) && n > 0) l[k] = n; }); const upd = { ...tPrecos, [sem]: l }; setTPrecos(upd); LS.set('tabPrecos', upd); toast.show(`Preços de ${wLbl(sem)} salvos`); };
+  const preenchidos = items.filter(i => parseFloat(ed[i.name] || 0) > 0).length;
+  return html`<div style=${{ maxWidth: 'none', margin: '0 auto' }}>
+    <div class="stk" style=${{ padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 12 }}>
+      <button class="btn bg0 bic" onClick=${onBack}><${Ic} n="left" s=${20}/></button>
+      <div style=${{ flex: 1 }}><div style=${{ fontWeight: 800, fontSize: 15, fontFamily: "'Plus Jakarta Sans',sans-serif" }}>Tabela de Preços</div><div style=${{ fontSize: 12, color: 'var(--s2)' }}>${preenchidos}/${items.length} preenchidos</div></div>
+      <button class="btn bp bsm" onClick=${salvar}><${Ic} n="save" s=${14}/>Salvar</button>
+    </div>
+    <div class="page">
+      <div class="card" style=${{ padding: 16, marginBottom: 12 }}>
+        <div style=${{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 12 }}>
+          ${['CD', 'CP'].map(o => html`<button key=${o} onClick=${() => setOrig(o)} style=${{ padding: 10, borderRadius: 10, border: `2px solid ${orig === o ? 'var(--or)' : 'var(--bd)'}`, background: orig === o ? 'var(--or3)' : '#fff', fontWeight: 700, fontSize: 13, cursor: 'pointer' }}><span style=${{ color: orig === o ? 'var(--or2)' : 'var(--ink)' }}>${o}</span></button>`)}
+        </div>
+        <label style=${{ fontSize: 11, fontWeight: 700, color: 'var(--s2)', textTransform: 'uppercase', letterSpacing: '.06em', display: 'block', marginBottom: 6 }}>Semana</label>
+        <select class="inp" value=${sem} onChange=${e => setSem(e.target.value)} style=${{ marginBottom: 10 }}>${sems.map(s => html`<option key=${s} value=${s}>${wLbl(s)}${s === cur ? ' (atual)' : ''}</option>`)}</select>
+        <div style=${{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+          <button class="btn bs bsm" onClick=${() => { if (!semAnt) { toast.show('Nenhuma semana anterior'); return; } const ant = tPrecos[semAnt] || {}; setEd(prev => { const m = { ...ant }; Object.entries(prev).forEach(([k, v]) => { if (v && parseFloat(v) > 0) m[k] = v; }); return m; }); toast.show('Vazios copiados'); }}><${Ic} n="ref" s=${12}/>Copiar vazios</button>
+          <button class="btn bs bsm" onClick=${() => { if (!semAnt) { toast.show('Nenhuma semana anterior'); return; } setEd({ ...(tPrecos[semAnt] || {}) }); toast.show('Tudo copiado'); }}><${Ic} n="ref" s=${12}/>Copiar tudo</button>
+        </div>
+      </div>
+      ${Object.entries(byC).map(([catN, itens]) => html`
+        <details key=${catN + orig} open style=${{ marginBottom: 8 }}>
+          <summary class="cat-hdr"><${Ic} n="cr" s=${14} c="chv" style=${{ color: 'var(--s3)' }}/><span style=${{ fontWeight: 700, fontSize: 14, flex: 1 }}>${catN}</span><span style=${{ fontSize: 12, color: 'var(--s2)' }}>${itens.filter(i => parseFloat(ed[i.name] || 0) > 0).length}/${itens.length}</span></summary>
+          <div class="ilist">
+            <div class="ghdr" style=${{ gridTemplateColumns: '1fr 76px 76px 56px' }}><span>Produto</span><span style=${{ textAlign: 'right' }}>Ant.</span><span style=${{ textAlign: 'center' }}>Atual</span><span style=${{ textAlign: 'right' }}>Var.</span></div>
+            ${itens.map(item => { const atual = parseFloat(ed[item.name] || 0), ant = parseFloat(antP[item.name] || 0), vr = ant && atual ? ((atual - ant) / ant * 100) : null; return html`
+              <div key=${item.name} class="irow" style=${{ gridTemplateColumns: '1fr 76px 76px 56px' }}>
+                <div style=${{ fontSize: 12, fontWeight: 500 }}>${item.name}</div>
+                <div style=${{ textAlign: 'right', fontSize: 11, color: 'var(--s2)' }}>${ant ? fMoeda(ant) : '—'}</div>
+                <div style=${{ display: 'flex', justifyContent: 'center' }}><input type="number" min="0" step="0.01" class="inp-n" value=${ed[item.name] || ''} onInput=${e => setEd(p => ({ ...p, [item.name]: e.target.value }))} placeholder="0,00" style=${{ width: 72, fontSize: 12, borderColor: atual > 0 ? 'var(--or)' : undefined }}/></div>
+                <div style=${{ textAlign: 'right', fontSize: 11, fontWeight: 700, color: vr === null ? 'var(--s3)' : vr > 0 ? 'var(--rd)' : vr < 0 ? 'var(--gr)' : 'var(--s2)' }}>${vr === null ? '—' : vr > 0 ? `▲${vr.toFixed(0)}%` : `▼${Math.abs(vr).toFixed(0)}%`}</div>
+              </div>`; })}
+          </div>
+        </details>`)}
+      <button class="btn bp" style=${{ width: '100%', padding: 14, borderRadius: 12, fontSize: 15, marginTop: 4 }} onClick=${salvar}><${Ic} n="save" s=${16}/>Salvar preços</button>
+    </div>
+  </div>`;
+}
+
+/* ══════════════════════════════════════
+   PEDIDOS
+══════════════════════════════════════ */
+function PedidosTab({ toast }) {
+  const [view, setView] = useState('lista');
+  const [pedidos, setPedidos] = useState(() => LS.get('pedidos') || []);
+  const [editing, setEditing] = useState(null);
+  const cat = useMemo(getCatalog, []);
+  const allItems = useMemo(() => flatCatalog(cat), [cat]);
+  const estoque = useMemo(() => LS.get('estoque') || {}, []);
+
+  const savePed = p => { const upd = pedidos.find(x => x.id === p.id) ? pedidos.map(x => x.id === p.id ? p : x) : [p, ...pedidos]; setPedidos(upd); LS.set('pedidos', upd); };
+  const delPed = id => { const rec = pedidos.find(p => p.id === id); if (rec) moveToTrash('pedido', rec); const upd = pedidos.filter(p => p.id !== id); setPedidos(upd); LS.set('pedidos', upd); };
+
+  if (view === 'editor') return html`<${PedidoEditor} pedido=${editing} cat=${cat} allItems=${allItems} estoque=${estoque} toast=${toast}
+    onBack=${() => { setView('lista'); setEditing(null); }}
+    onSave=${p => { savePed(p); clearDraft('pedido'); toast.show(editing ? 'Pedido salvo' : 'Pedido criado'); setView('lista'); setEditing(null); }}
+    onDelete=${id => { delPed(id); toast.show('Pedido excluído'); setView('lista'); setEditing(null); }}/>`;
+
+  const pend = pedidos.filter(p => p.status === 'pendente');
+  const outros = pedidos.filter(p => p.status !== 'pendente').sort((a, b) => new Date(b.criadoEm || 0) - new Date(a.criadoEm || 0));
+  return html`<div class="page">
+    <div class="row" style=${{ justifyContent: 'space-between', marginBottom: 16 }}>
+      <div><h2 style=${{ fontSize: 20, fontWeight: 800, fontFamily: "'Plus Jakarta Sans',sans-serif", margin: 0 }}>Pedidos</h2><p style=${{ fontSize: 13, color: 'var(--s2)', margin: '2px 0 0' }}>${pedidos.length} pedido${pedidos.length !== 1 ? 's' : ''}</p></div>
+      <button class="btn bp bsm" onClick=${() => { const d=LS.get('draft_pedido'); if(d && confirm('Continuar rascunho automático do pedido?')) setEditing(hydratePedidoDraft(d)); else setEditing(null); setView('editor'); }}><${Ic} n="plus" s=${14}/>Novo</button>
+    </div>
+    ${pedidos.length === 0 && html`<div class="empty"><${Ic} n="orders" s=${40} style=${{ color: 'var(--s3)' }}/><p>Nenhum pedido ainda.</p></div>`}
+    ${pend.length > 0 && html`<span class="slbl">Aguardando recebimento (${pend.length})</span><div style=${{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 16 }}>${pend.map(p => html`<${PCard} key=${p.id} p=${p} onClick=${() => { setEditing(p); setView('editor'); }} toast=${toast}/>`)}</div>`}
+    ${outros.length > 0 && html`<span class="slbl">Histórico</span><div style=${{ display: 'flex', flexDirection: 'column', gap: 8 }}>${outros.slice(0, 15).map(p => html`<${PCard} key=${p.id} p=${p} onClick=${() => { setEditing(p); setView('editor'); }} toast=${toast}/>`)}</div>`}
+  </div>`;
+}
+
+function PCard({ p, onClick, toast }) {
+  const st = ST_PED[p.status] || { l: p.status, c: 'bgy' };
+  return html`<div class="card" style=${{ padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 12 }}>
+    <div style=${{ flex: 1, minWidth: 0, cursor: 'pointer' }} onClick=${onClick}>
+      <div class="row" style=${{ gap: 6, marginBottom: 4 }}><span class=${`badge ${st.c}`}>${st.l}</span><span class="badge bor">${p.origem}</span></div>
+      <div style=${{ fontWeight: 700, fontSize: 14 }}>${wLbl(p.semana)}</div>
+      <div style=${{ fontSize: 12, color: 'var(--s2)', marginTop: 2 }}>${(p.itens || []).length} itens · ${fDate(p.criadoEm)}</div>
+    </div>
+    <div class="row" style=${{ gap: 6 }}>
+      <${Ic} n="cr" s=${16} style=${{ color: 'var(--s3)', cursor: 'pointer' }} onClick=${onClick}/>
+    </div>
+  </div>`;
+}
+
+function PedidoEditor({ pedido, cat, allItems, estoque, toast, onBack, onSave, onDelete }) {
+  const isEdit = !!pedido?.id; const locked = false; const hasRecebimento = pedido?.recebimento != null;
+  const sems = useMemo(genSems, []);
+  const [orig, setOrig] = useState(pedido?.origem || 'CD');
+  const [sem, setSem] = useState(pedido?.semana || getWeekId());
+  const [data, setData] = useState(pedido?.data || new Date().toISOString().split('T')[0]);
+  const [resp, setResp] = useState(pedido?.responsavel || (LS.get('config') || {}).responsavel || '');
+  const [notas, setNotas] = useState(pedido?.notas || '');
+  const [qtds, setQtds] = useState(() => { const m = {}; (pedido?.itens || []).forEach(i => m[i.nome] = String(i.qtd)); return m; });
+  const [showEst, setShowEst] = useState(true);
+  const [busca, setBusca] = useState('');
+  const [marcados, setMarcados] = useState([]);
+  const itemsOrig = useMemo(() => allItems.filter(i => i.orig === orig && (!busca || i.name.toLowerCase().includes(busca.toLowerCase()) || i.cat.toLowerCase().includes(busca.toLowerCase()))), [allItems, orig, busca]);
+  const byC = useMemo(() => { const m = {}; itemsOrig.forEach(i => { if (!m[i.cat]) m[i.cat] = []; m[i.cat].push(i); }); return m; }, [itemsOrig]);
+  const sel = itemsOrig.filter(i => parseFloat(qtds[i.name] || 0) > 0).length;
+  const salvar = () => {
+    if (isWeekClosed(sem)) { toast.show('Semana fechada. Reabra em Configurações para editar.'); return; }
+    const itens = itemsOrig.filter(i => parseFloat(qtds[i.name] || 0) > 0).map(i => ({ nome: i.name, cat: i.cat, unit: i.unit, qtd: parseFloat(qtds[i.name] || 0) }));
+    onSave({ id: pedido?.id || uid(), origem: orig, semana: sem, data, responsavel: resp, notas, status: pedido?.status || 'pendente', itens, recebimento: pedido?.recebimento || null, criadoEm: pedido?.criadoEm || new Date().toISOString() });
+  };
+  useEffect(() => { if (locked) return; const draft = { origem: orig, semana: sem, data, responsavel: resp, notas, qtds, atualizadoEm: new Date().toISOString() }; LS.set('draft_pedido', draft); }, [orig, sem, data, resp, notas, JSON.stringify(qtds)]);
+  // Estoque atual dos itens desta origem
+  const estItems = Object.entries(estoque).filter(([k]) => itemsOrig.some(i => i.name === k));
+  return html`<div style=${{ maxWidth: 'none', margin: '0 auto' }}>
+    <div class="stk" style=${{ padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 12 }}>
+      <button class="btn bg0 bic" onClick=${onBack}><${Ic} n="left" s=${20}/></button>
+      <div style=${{ flex: 1 }}><div style=${{ fontWeight: 800, fontSize: 15, fontFamily: "'Plus Jakarta Sans',sans-serif" }}>${isEdit ? 'Editar Pedido' : 'Novo Pedido'}</div><div style=${{ fontSize: 12, color: 'var(--s2)' }}>${sel} itens selecionados</div></div>
+      ${isEdit && !locked && html`<button class="btn bg0 bic" style=${{ color: 'var(--rd)' }} onClick=${() => { if (strongConfirm('Excluir pedido')) onDelete(pedido.id); }}><${Ic} n="trash" s=${18}/></button>`}
+    </div>
+    <div class="page" style=${{ paddingBottom: locked ? 24 : 100 }}>
+      <div class="card" style=${{ padding: 16, marginBottom: 12 }}>
+        <div style=${{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 12 }}>
+          ${['CD', 'CP'].map(o => html`<button key=${o} onClick=${() => { if (!locked) { setOrig(o); setQtds({}); } }} style=${{ padding: 10, borderRadius: 10, border: `2px solid ${orig === o ? 'var(--or)' : 'var(--bd)'}`, background: orig === o ? 'var(--or3)' : '#fff', fontWeight: 700, fontSize: 13, cursor: 'pointer' }}><div style=${{ color: orig === o ? 'var(--or2)' : 'var(--ink)' }}>${o}</div><div style=${{ fontSize: 11, color: orig === o ? 'var(--or)' : 'var(--s2)', marginTop: 2 }}>${cat[o].label}</div></button>`)}
+        </div>
+        <div style=${{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 8 }}>
+          <div><label style=${{ fontSize: 11, fontWeight: 700, color: 'var(--s2)', textTransform: 'uppercase', letterSpacing: '.06em', display: 'block', marginBottom: 6 }}>Data</label><input type="date" class="inp" value=${data} onInput=${e => { setData(e.target.value); setSem(getWeekId(new Date(e.target.value + 'T12:00:00'))); }} disabled=${locked}/></div>
+          <div><label style=${{ fontSize: 11, fontWeight: 700, color: 'var(--s2)', textTransform: 'uppercase', letterSpacing: '.06em', display: 'block', marginBottom: 6 }}>Semana</label><select class="inp" value=${sem} onChange=${e => setSem(e.target.value)} disabled=${locked}>${sems.map(s => html`<option key=${s} value=${s}>${wLbl(s)}</option>`)}</select></div>
+        </div>
+        <label style=${{ fontSize: 11, fontWeight: 700, color: 'var(--s2)', textTransform: 'uppercase', letterSpacing: '.06em', display: 'block', marginBottom: 6 }}>Responsável</label>
+        <input class="inp" value=${resp} onInput=${e => setResp(e.target.value)} placeholder="Nome de quem está solicitando" disabled=${locked} style=${{ marginBottom: 8 }}/>
+        <label style=${{ fontSize: 11, fontWeight: 700, color: 'var(--s2)', textTransform: 'uppercase', letterSpacing: '.06em', display: 'block', marginBottom: 6 }}>Observações</label>
+        <textarea class="inp" value=${notas} onInput=${e => setNotas(e.target.value)} rows="2" placeholder="Observações opcionais..." disabled=${locked}/>
+        <div style=${{ marginTop: 12, display:'grid', gridTemplateColumns:'1fr auto auto', gap:8 }}>
+          <input class="inp" value=${busca} onInput=${e=>setBusca(e.target.value)} placeholder="Buscar item ou categoria..."/>
+          <button class="btn bs bsm" onClick=${()=>setMarcados(itemsOrig.map(i=>i.name))}>Marcar todos</button>
+          <button class="btn bs bsm" onClick=${()=>setQtds(p=>{const n={...p}; (marcados.length?marcados:itemsOrig.map(i=>i.name)).forEach(k=>n[k]=''); return n;})}>Zerar</button>
+          <button class="btn bs bsm" onClick=${()=>setQtds(p=>{const n={...p}; (marcados.length?marcados:itemsOrig.map(i=>i.name)).forEach(k=>n[k]=String(estoque[k] || 0)); return n;})}>Copiar estoque</button>
+        </div>
+      </div>
+      ${showEst && estItems.length > 0 && html`
+        <div class="card" style=${{ padding: 12, marginBottom: 12, background: 'var(--bl3)', border: '1px solid rgba(37,99,235,.15)' }}>
+          <div class="row" style=${{ justifyContent: 'space-between', marginBottom: 8 }}>
+            <div class="row" style=${{ gap: 6 }}><${Ic} n="info" s=${14} style=${{ color: 'var(--bl)' }}/><span style=${{ fontSize: 12, fontWeight: 700, color: 'var(--bl)' }}>Estoque atual — orientação de compra</span></div>
+            <button class="btn bg0" style=${{ padding: '2px 6px', fontSize: 11 }} onClick=${() => setShowEst(false)}>×</button>
+          </div>
+          <div style=${{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
+            ${estItems.map(([k, v]) => html`<span key=${k} style=${{ fontSize: 11, background: '#fff', borderRadius: 6, padding: '3px 8px', border: '1px solid rgba(37,99,235,.2)', color: parseFloat(v) <= 0 ? 'var(--rd)' : parseFloat(v) < 3 ? 'var(--am)' : 'var(--ink)', fontWeight: parseFloat(v) <= 2 ? 700 : 400 }}>${k.split(':').pop().trim().split('(')[0].trim()}: <b>${v}</b></span>`)}
+          </div>
+        </div>`}
+      ${Object.entries(byC).map(([catN, prods]) => html`
+        <details key=${catN + orig} open style=${{ marginBottom: 8 }}>
+          <summary class="cat-hdr"><${Ic} n="cr" s=${14} c="chv" style=${{ color: 'var(--s3)' }}/><span style=${{ fontWeight: 700, fontSize: 14, flex: 1 }}>${catN}</span><span style=${{ fontSize: 12, color: 'var(--s2)' }}>${prods.filter(p => parseFloat(qtds[p.name] || 0) > 0).length}/${prods.length}</span></summary>
+          <div class="ilist">
+            <div class="ghdr" style=${{ gridTemplateColumns: '1fr 56px 60px' }}><span>Produto</span><span style=${{ textAlign: 'center' }}>Estq.</span><span style=${{ textAlign: 'center' }}>Qtd.</span></div>
+            ${prods.map(prod => { const qtd = parseFloat(qtds[prod.name] || 0), estQ = estoque[prod.name]; return html`
+              <div key=${prod.name} class="irow" style=${{ gridTemplateColumns: '1fr 56px 60px', background: qtd > 0 ? 'var(--or3)' : '#fff' }}>
+                <div><div style=${{ fontSize: 13, fontWeight: qtd > 0 ? 600 : 400 }}>${prod.name}</div><div style=${{ fontSize: 11, color: 'var(--s3)' }}>${prod.unit}</div></div>
+                <div style=${{ textAlign: 'center', fontSize: 13, fontWeight: 600, color: estQ === undefined ? 'var(--s3)' : parseFloat(estQ) <= 0 ? 'var(--rd)' : parseFloat(estQ) < 3 ? 'var(--am)' : 'var(--gr)' }}>${estQ !== undefined ? estQ : '—'}</div>
+                <div style=${{ display: 'flex', justifyContent: 'center' }}><input type="number" min="0" class="inp-n" value=${qtds[prod.name] || ''} onInput=${e => setQtds(p => ({ ...p, [prod.name]: e.target.value }))} disabled=${locked} placeholder="0" style=${{ borderColor: qtd > 0 ? 'var(--or)' : undefined }}/></div>
+              </div>`; })}
+          </div>
+        </details>`)}
+    </div>
+    ${!locked && html`<div style=${{ position: 'sticky', bottom: 72, background: '#fff', borderTop: '1px solid var(--bd)', padding: '12px 16px' }}>
+      <button class="btn bp" style=${{ width: '100%', padding: 14, borderRadius: 12, fontSize: 15 }} onClick=${salvar} disabled=${sel === 0}><${Ic} n="save" s=${16}/>${isEdit ? 'Salvar alterações' : 'Criar pedido'}</button>
+    </div>`}
+  </div>`;
+}
+
+/* ══════════════════════════════════════
+   RECEBIMENTO
+══════════════════════════════════════ */
+function RecebimentoTab({ toast }) {
+  const [view, setView] = useState('lista');
+  const [pedidos, setPedidos] = useState(() => LS.get('pedidos') || []);
+  const [editing, setEditing] = useState(null);
+  const savePed = p => { const upd = pedidos.map(x => x.id === p.id ? p : x); setPedidos(upd); LS.set('pedidos', upd); };
+  if (view === 'editor') return html`<${RecEditor} pedido=${editing} toast=${toast}
+    onBack=${() => { setView('lista'); setEditing(null); setPedidos(LS.get('pedidos') || []); }}
+    onSave=${p => { savePed(p); toast.show('Recebimento finalizado! Estoque atualizado.'); setView('lista'); setEditing(null); setPedidos(LS.get('pedidos') || []); }}/>`;
+  const pend = pedidos.filter(p => p.status === 'pendente');
+  const rec = pedidos.filter(p => ['recebido', 'parcial'].includes(p.status)).sort((a, b) => new Date(b.recebimento?.finalizadoEm || 0) - new Date(a.recebimento?.finalizadoEm || 0));
+  return html`<div class="page">
+    <div style=${{ marginBottom: 16 }}><h2 style=${{ fontSize: 20, fontWeight: 800, fontFamily: "'Plus Jakarta Sans',sans-serif", margin: 0 }}>Recebimento</h2><p style=${{ fontSize: 13, color: 'var(--s2)', margin: '2px 0 0' }}>Confirme os itens recebidos</p></div>
+    ${pend.length === 0 && html`<div class="empty"><${Ic} n="recv" s=${40} style=${{ color: 'var(--s3)' }}/><p>Nenhum pedido aguardando recebimento.</p></div>`}
+    ${pend.length > 0 && html`<span class="slbl">Aguardando (${pend.length})</span><div style=${{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 16 }}>${pend.map(p => html`<${RCard} key=${p.id} p=${p} onClick=${() => { setEditing(p); setView('editor'); }}/>`)}</div>`}
+    ${rec.length > 0 && html`<span class="slbl">Finalizados recentemente</span><div style=${{ display: 'flex', flexDirection: 'column', gap: 8 }}>${rec.slice(0, 8).map(p => html`<${RCard} key=${p.id} p=${p} onClick=${() => { setEditing(p); setView('editor'); }}/>`)}</div>`}
+  </div>`;
+}
+
+function RCard({ p, onClick }) {
+  const st = ST_PED[p.status] || { l: p.status, c: 'bgy' };
+  return html`<button class="card" style=${{ padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 12, border: 'none', textAlign: 'left', width: '100%', cursor: 'pointer' }} onClick=${onClick}>
+    <div style=${{ flex: 1, minWidth: 0 }}><div class="row" style=${{ gap: 6, marginBottom: 4 }}><span class=${`badge ${st.c}`}>${st.l}</span><span class="badge bor">${p.origem}</span></div><div style=${{ fontWeight: 700, fontSize: 14 }}>${wLbl(p.semana)}</div><div style=${{ fontSize: 12, color: 'var(--s2)', marginTop: 2 }}>${(p.itens || []).length} itens · ${fDate(p.criadoEm)}</div></div>
+    <${Ic} n="cr" s=${16} style=${{ color: 'var(--s3)' }}/>
+  </button>`;
+}
+
+function RecEditor({ pedido, toast, onBack, onSave }) {
+  const finalizado = ['recebido', 'parcial'].includes(pedido.status);
+  const rec = pedido.recebimento || {};
+  const [resp, setResp] = useState(rec.responsavel || (LS.get('config') || {}).responsavel || '');
+  const [obs, setObs] = useState(rec.observacoes || '');
+  const [qtdsR, setQtdsR] = useState(() => { const m = {}; (pedido.itens || []).forEach(i => { const ri = (rec.itens || []).find(r => r.nome === i.nome); m[i.nome] = ri ? String(ri.qtdRecebida) : ''; }); return m; });
+  const [abrirRncAuto, setAbrirRncAuto] = useState((LS.get('config') || {}).abrirRncDivergencia || 'perguntar');
+  const itens = pedido.itens || [];
+  const tPed = itens.reduce((s, i) => s + (i.qtd || 0), 0);
+  const tRec = itens.reduce((s, i) => s + (parseFloat(qtdsR[i.nome] || 0) || 0), 0);
+  const finalizar = () => {
+    const iL = itens.map(i => ({ ...i, qtdRecebida: parseFloat(qtdsR[i.nome] || 0) || 0 }));
+    const hasPend = iL.some(i => i.qtdRecebida < i.qtd);
+    // Atualizar estoque por diferença: se já havia recebimento, estorna/aplica apenas a diferença
+    const estoque = LS.get('estoque') || {};
+    const oldMap = {};
+    (rec.itens || []).forEach(r => { oldMap[r.nome] = parseFloat(r.qtdRecebida || 0) || 0; });
+    const refLabel = `Pedido ${wLbl(pedido.semana)} · ${pedido.origem}`;
+    iL.forEach(i => {
+      const anteriorRecebido = oldMap[i.nome] || 0;
+      const novoRecebido = parseFloat(i.qtdRecebida || 0) || 0;
+      const delta = novoRecebido - anteriorRecebido;
+      if (!delta) return;
+      const cur = parseFloat(estoque[i.nome] || 0);
+      const prox = cur + delta;
+      estoque[i.nome] = prox;
+      stockLog(i.nome, cur, prox, delta >= 0 ? 'Compra' : 'Correção de compra', refLabel, { tipo: delta >= 0 ? 'Compra' : 'Correção de compra', refId: pedido.id, refLabel });
+    });
+    LS.set('estoque', estoque);
+    const ped = { ...pedido, status: hasPend ? 'parcial' : 'recebido', recebimento: { responsavel: resp, observacoes: obs, itens: iL, finalizadoEm: rec.finalizadoEm || new Date().toISOString(), atualizadoEm: new Date().toISOString(), status: hasPend ? 'parcial' : 'completo' } };
+    if (hasPend && abrirRncAuto !== 'nunca') {
+      const shouldOpen = abrirRncAuto === 'sempre' || confirm('Houve divergência no recebimento. Deseja abrir uma RNC automaticamente?');
+      if (shouldOpen) {
+        const rncs = LS.get('rncs') || [];
+        const divergentes = iL.filter(i => i.qtdRecebida < i.qtd);
+        const max = rncs.reduce((m, r) => { const mat = r.numero?.match(/(\d{4})$/); return mat ? Math.max(m, parseInt(mat[1])) : m; }, 0);
+        rncs.unshift({ id: uid(), numero: `RNC-${pedido.origem}-${new Date().getFullYear()}-${String(max+1).padStart(4,'0')}`, data: new Date().toISOString().split('T')[0], origem: pedido.origem, produto: divergentes.map(d=>d.nome).join(', '), quantidade: divergentes.length, unidade: 'REG', tipo: 'Quantidade incorreta', descricao: 'RNC aberta automaticamente por divergência no recebimento. Pedido: ' + (pedido.semana || '') + '. Itens divergentes: ' + divergentes.map(d=>`${d.nome} pedido ${d.qtd}, recebido ${d.qtdRecebida}`).join('; '), acao: 'Apenas registrar ocorrência', status: 'aberta', fotos: [], criadoEm: new Date().toISOString() });
+        LS.set('rncs', rncs); auditLog('RNC automática', 'Aberta por divergência de recebimento');
+      }
+    }
+    onSave(ped);
+  };
+  return html`<div style=${{ maxWidth: 'none', margin: '0 auto' }}>
+    <div class="stk" style=${{ padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 12 }}>
+      <button class="btn bg0 bic" onClick=${onBack}><${Ic} n="left" s=${20}/></button>
+      <div style=${{ flex: 1 }}><div style=${{ fontWeight: 800, fontSize: 15, fontFamily: "'Plus Jakarta Sans',sans-serif" }}>Recebimento · ${pedido.origem}</div><div style=${{ fontSize: 12, color: 'var(--s2)' }}>${wLbl(pedido.semana)}</div></div>
+      ${finalizado && html`<button class="btn brd bsm" onClick=${() => { if (strongConfirm('Excluir recebimento')) { const estoque=LS.get('estoque')||{}; const refLabel=`Estorno do pedido ${wLbl(pedido.semana)} · ${pedido.origem}`; (rec.itens||[]).forEach(i=>{ const qtd=parseFloat(i.qtdRecebida||0)||0; if(!qtd) return; const cur=parseFloat(estoque[i.nome]||0); const prox=cur-qtd; estoque[i.nome]=prox; stockLog(i.nome, cur, prox, 'Estorno de compra', refLabel, { tipo:'Estorno de compra', refId:pedido.id, refLabel }); }); LS.set('estoque',estoque); moveToTrash('recebimento', { pedidoId: pedido.id, recebimento: pedido.recebimento, semana: pedido.semana, origem: pedido.origem }); onSave({ ...pedido, status:'pendente', recebimento:null }); } }}>Excluir recebimento</button>`}
+    </div>
+    <div class="page" style=${{ paddingBottom: 110 }}>
+      <div class="card" style=${{ padding: 16, marginBottom: 12 }}>
+        <label style=${{ fontSize: 11, fontWeight: 700, color: 'var(--s2)', textTransform: 'uppercase', letterSpacing: '.06em', display: 'block', marginBottom: 6 }}>Responsável</label>
+        <input class="inp" value=${resp} onInput=${e => setResp(e.target.value)} placeholder="Seu nome"/>
+      </div>
+      <div style=${{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: 12 }}>
+        ${[['Pedido', tPed, 'var(--ink)'], ['Recebido', tRec, tRec === tPed ? 'var(--gr)' : 'var(--am)'], ['Diferença', +(tRec - tPed).toFixed(2), tRec === tPed ? 'var(--gr)' : 'var(--rd)']].map(([l, v, c]) => html`
+          <div key=${l} class="card" style=${{ padding: '12px', textAlign: 'center' }}>
+            <div style=${{ fontSize: 10, fontWeight: 700, color: 'var(--s3)', textTransform: 'uppercase', letterSpacing: '.05em', marginBottom: 4 }}>${l}</div>
+            <div style=${{ fontSize: 22, fontWeight: 800, color: c, fontFamily: "'Plus Jakarta Sans',sans-serif" }}>${v > 0 && l === 'Diferença' ? '+' : ''}${v}</div>
+          </div>`)}
+      </div>
+      <div class="card" style=${{ overflow: 'hidden', marginBottom: 12 }}>
+        <div class="ghdr" style=${{ gridTemplateColumns: '1fr 64px 150px' }}><span>Produto</span><span style=${{ textAlign: 'center' }}>Ped.</span><span style=${{ textAlign: 'center' }}>Recebido</span></div>
+        ${itens.map((item, idx) => { const qR = parseFloat(qtdsR[item.nome] || 0) || 0, diff = qR - item.qtd; return html`
+          <div key=${item.nome} class="irow" style=${{ gridTemplateColumns: '1fr 64px 150px', borderTop: idx > 0 ? '1px solid var(--bd)' : 'none', background: diff < 0 ? 'var(--rd3)' : diff > 0 ? 'var(--gr3)' : '#fff' }}>
+            <div><div style=${{ fontSize: 13, fontWeight: 500 }}>${item.nome}</div><div style=${{ fontSize: 11, color: 'var(--s3)' }}>${item.unit}${diff !== 0 ? html` · <span style=${{ fontWeight: 700, color: diff < 0 ? 'var(--rd)' : 'var(--gr)' }}>${diff > 0 ? '+' : ''}${diff}</span>` : ''}</div></div>
+            <div style=${{ textAlign: 'center', fontWeight: 600, color: 'var(--s2)' }}>${item.qtd}</div>
+            <div style=${{ display: 'flex', justifyContent: 'center', gap:6, alignItems:'center' }}><button class="btn bs bsm" style=${{ padding:'7px 9px' }} onClick=${()=>setQtdsR(p=>({ ...p, [item.nome]: String(item.qtd) }))}>Tudo</button><input type="number" min="0" class="inp-n" value=${qtdsR[item.nome] ?? ''} onInput=${e => setQtdsR(p => ({ ...p, [item.nome]: e.target.value }))} style=${{ borderColor: diff !== 0 ? (diff < 0 ? 'var(--rd)' : 'var(--gr)') : undefined }}/></div>
+          </div>`; })}
+      </div>
+      <div class="card" style=${{ padding: 16, marginBottom: 12 }}>
+        <label style=${{ fontSize: 11, fontWeight: 700, color: 'var(--s2)', textTransform: 'uppercase', letterSpacing: '.06em', display: 'block', marginBottom: 6 }}>RNC em caso de divergência</label>
+        <select class="inp" value=${abrirRncAuto} onChange=${e => { setAbrirRncAuto(e.target.value); const c = LS.get('config') || {}; LS.set('config', { ...c, abrirRncDivergencia: e.target.value }); }} style=${{ marginBottom: 10 }}>
+          <option value="perguntar">Perguntar ao finalizar</option><option value="sempre">Abrir automaticamente</option><option value="nunca">Não abrir automaticamente</option>
+        </select>
+        <label style=${{ fontSize: 11, fontWeight: 700, color: 'var(--s2)', textTransform: 'uppercase', letterSpacing: '.06em', display: 'block', marginBottom: 6 }}>Observações</label>
+        <textarea class="inp" value=${obs} onInput=${e => setObs(e.target.value)} rows="3" placeholder="Divergências, ocorrências, observações importantes..."/>
+      </div>
+      <div class="card" style=${{ padding: 16, marginBottom: 12 }}>
+
+      </div>
+    </div>
+    <div style=${{ position: 'sticky', bottom: 72, background: '#fff', borderTop: '1px solid var(--bd)', padding: '12px 16px' }}>
+      <button class="btn bgr" style=${{ width: '100%', padding: 14, borderRadius: 12, fontSize: 15 }} onClick=${finalizar}><${Ic} n="chk" s=${16}/>${finalizado ? 'Salvar alterações do recebimento' : 'Finalizar recebimento'}</button>
+    </div>
+    
+  </div>`;
+}
+
+/* ══════════════════════════════════════
+   ESTOQUE / INVENTÁRIO
+══════════════════════════════════════ */
+function EstoqueTab({ toast }) {
+  const [view, setView] = useState('lista');
+  const cat = useMemo(getCatalog, []);
+  const allItems = useMemo(() => flatCatalog(cat), [cat]);
+  const estoque = LS.get('estoque') || {};
+  const valorEstoqueAtual = allItems.reduce((soma, it) => soma + (parseFloat(estoque[it.name] || 0) * ultimoPrecoGlobal(it.name)), 0);
+
+  if (view === 'operacao') return html`<${OperacaoEstoque} allItems=${allItems} onBack=${() => setView('lista')}/>`;
+
+  return html`<div class="page">
+    <div class="row" style=${{ justifyContent: 'space-between', marginBottom: 16 }}>
+      <div><h2 style=${{ fontSize: 20, fontWeight: 800, fontFamily: "'Plus Jakarta Sans',sans-serif", margin: 0 }}>Estoque</h2><p style=${{ fontSize: 13, color: 'var(--s2)', margin: '2px 0 0' }}>Saldo atual, movimentações e ajustes manuais</p></div>
+      <button class="btn bs bsm" onClick=${() => setView('operacao')}><${Ic} n="box" s=${14}/>Operação</button>
+    </div>
+
+    <div class="card" style=${{ padding: 16, marginBottom: 14 }}><div style=${{ fontSize:10,fontWeight:800,color:'var(--s3)',textTransform:'uppercase',letterSpacing:'.06em',marginBottom:6 }}>Valor estimado em estoque</div><div style=${{ fontSize:26,fontWeight:800,fontFamily:"'Plus Jakarta Sans',sans-serif" }}>${fMoeda(valorEstoqueAtual)}</div><div style=${{ fontSize:12,color:'var(--s2)',marginTop:4 }}>calculado ao vivo pelo estoque atual e último preço cadastrado</div></div>
+
+    ${allItems.length > 0 ? html`
+      <div style=${{ marginBottom: 16 }}>
+        <span class="slbl">Estoque atual</span>
+        ${['CD', 'CP'].map(o => {
+          const itensO = allItems.filter(i => i.orig === o);
+          if (!itensO.length) return null;
+          const byC = {};
+          itensO.forEach(i => { if (!byC[i.cat]) byC[i.cat] = []; byC[i.cat].push(i); });
+          return html`<details key=${o} open style=${{ marginBottom: 8 }}>
+            <summary class="cat-hdr"><${Ic} n="cr" s=${14} c="chv" style=${{ color: 'var(--s3)' }}/><span style=${{ fontWeight: 700, fontSize: 14, flex: 1 }}>${o} · ${cat[o].label}</span><span class="badge bor">${itensO.length} itens</span></summary>
+            <div class="ilist">
+              ${Object.entries(byC).map(([catN, prods]) => html`
+                <div key=${catN} style=${{ padding: '8px 16px 4px', background: '#F9FAFB', fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.06em', color: 'var(--s3)', borderTop: '1px solid var(--bd)' }}>${catN}</div>
+                <div class="ghdr" style=${{ gridTemplateColumns: '1fr 80px 60px' }}><span>Produto</span><span style=${{ textAlign: 'center' }}>Qtd.</span><span style=${{ textAlign: 'center' }}>Un.</span></div>
+                ${prods.map(prod => { const q = parseFloat(estoque[prod.name] || 0); return html`
+                  <div key=${prod.name} class="irow" style=${{ gridTemplateColumns: '1fr 80px 60px', background: q <= 0 ? 'var(--rd3)' : '#fff' }}>
+                    <div style=${{ fontSize: 13, fontWeight: 500 }}>${prod.name}</div>
+                    <div style=${{ textAlign: 'center', fontWeight: 700, color: q <= 0 ? 'var(--rd)' : q < 3 ? 'var(--am)' : 'var(--gr)' }}>${q}</div>
+                    <div style=${{ textAlign: 'center', fontSize: 12, color: 'var(--s2)' }}>${prod.unit}</div>
+                  </div>`; })}
+              `)}
+            </div>
+          </details>`;
+        })}
+      </div>` : html`<div class="empty"><${Ic} n="box" s=${40} style=${{ color: 'var(--s3)' }}/><p>Nenhum item cadastrado para exibir no estoque.</p></div>`}
+  </div>`;
+}
+
+function InventarioTab({ toast }) {
+  const [view, setView] = useState('lista');
+  const [inventarios, setInventarios] = useState(() => LS.get('inventarios') || []);
+  const [editing, setEditing] = useState(null);
+  const estoque = LS.get('estoque') || {};
+  const cat = useMemo(getCatalog, []);
+  const allItems = useMemo(() => flatCatalog(cat), [cat]);
+
+  const saveInv = inv => { const upd = inventarios.find(x => x.id === inv.id) ? inventarios.map(x => x.id === inv.id ? inv : x) : [inv, ...inventarios]; setInventarios(upd); LS.set('inventarios', upd); };
+  const delInv = id => { const rec = inventarios.find(i => i.id === id); if (rec) moveToTrash('inventario', rec); const upd = inventarios.filter(i => i.id !== id); setInventarios(upd); LS.set('inventarios', upd); };
+
+  if (view === 'editor') return html`<${InvEditor} inv=${editing} cat=${cat} allItems=${allItems} estoque=${estoque} toast=${toast}
+    onBack=${() => { setView('lista'); setEditing(null); setInventarios(LS.get('inventarios') || []); }}
+    onSave=${inv => { saveInv(inv); toast.show(inv.status === 'finalizado' ? 'Inventário finalizado! Estoque atualizado.' : 'Rascunho salvo'); setView('lista'); setEditing(null); setInventarios(LS.get('inventarios') || []); }}
+    onDelete=${id => { delInv(id); toast.show('Excluído'); setView('lista'); setEditing(null); }}/>`;
+
+  const rascunhos = inventarios.filter(i => i.status === 'rascunho');
+  const finalizados = inventarios.filter(i => i.status === 'finalizado').sort((a, b) => new Date(b.finalizadoEm || 0) - new Date(a.finalizadoEm || 0));
+  const ultima = finalizados[0];
+
+  return html`<div class="page">
+    <div class="row" style=${{ justifyContent: 'space-between', marginBottom: 16 }}>
+      <div><h2 style=${{ fontSize: 20, fontWeight: 800, fontFamily: "'Plus Jakarta Sans',sans-serif", margin: 0 }}>Inventário</h2><p style=${{ fontSize: 13, color: 'var(--s2)', margin: '2px 0 0' }}>Contagens, rascunhos, finalização e histórico</p></div>
+      <button class="btn bp bsm" onClick=${() => { const d=LS.get('draft_inventario'); if(d && confirm('Continuar rascunho automático do inventário?')) setEditing(hydrateInvDraft(d)); else setEditing(null); setView('editor'); }}><${Ic} n="plus" s=${14}/>Novo</button>
+    </div>
+
+    <div style=${{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 16 }}>
+      <div class="stcard" style=${{ cursor: 'default' }}><div style=${{ fontSize: 10, fontWeight: 700, color: 'var(--s3)', textTransform: 'uppercase', letterSpacing: '.05em', marginBottom: 8 }}>Rascunhos</div><div style=${{ fontSize: 30, fontWeight: 800, color: rascunhos.length ? 'var(--am)' : 'var(--ink)', fontFamily: "'Plus Jakarta Sans',sans-serif" }}>${rascunhos.length}</div></div>
+      <div class="stcard" style=${{ cursor: 'default' }}><div style=${{ fontSize: 10, fontWeight: 700, color: 'var(--s3)', textTransform: 'uppercase', letterSpacing: '.05em', marginBottom: 8 }}>Finalizados</div><div style=${{ fontSize: 30, fontWeight: 800, fontFamily: "'Plus Jakarta Sans',sans-serif" }}>${finalizados.length}</div></div>
+    </div>
+
+    ${ultima && html`<div class="card" style=${{ padding: 14, marginBottom: 16 }}><div style=${{ fontSize:10,fontWeight:800,color:'var(--s3)',textTransform:'uppercase',letterSpacing:'.06em',marginBottom:5 }}>Última contagem finalizada</div><div style=${{ fontWeight:800, fontSize:14 }}>${wLbl(ultima.semana)} · ${ultima.origem}</div><div style=${{ fontSize:12, color:'var(--s2)', marginTop:3 }}>${fDate(ultima.finalizadoEm || ultima.data || ultima.criadoEm)} · ${(ultima.itens || []).length} itens</div></div>`}
+
+    ${inventarios.length === 0 && html`<div class="empty"><${Ic} n="box" s=${40} style=${{ color: 'var(--s3)' }}/><p>Nenhum inventário realizado.<br/>Inicie uma nova contagem.</p><button class="btn bp" style=${{ marginTop: 8 }} onClick=${() => setView('editor')}><${Ic} n="plus" s=${16}/>Iniciar contagem</button></div>`}
+    ${rascunhos.length > 0 && html`<span class="slbl">Rascunhos (${rascunhos.length})</span><div style=${{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 16 }}>${rascunhos.map(i => html`<${InvCard} key=${i.id} inv=${i} onClick=${() => { setEditing(i); setView('editor'); }}/>` )}</div>`}
+    ${finalizados.length > 0 && html`<span class="slbl">Histórico (${finalizados.length})</span><div style=${{ display: 'flex', flexDirection: 'column', gap: 8 }}>${finalizados.slice(0, 20).map(i => html`<${InvCard} key=${i.id} inv=${i} onClick=${() => { setEditing(i); setView('editor'); }}/>` )}</div>`}
+  </div>`;
+}
+
+function OperacaoEstoque({ allItems, onBack }) {
+  const [movs, setMovs] = useState(() => LS.get('stockMovs') || []);
+  const [estoqueState, setEstoqueState] = useState(() => LS.get('estoque') || {});
+  const [busca, setBusca] = useState('');
+  const [tipo, setTipo] = useState('todos');
+  const [origem, setOrigem] = useState('todos');
+  const [ini, setIni] = useState('');
+  const [fim, setFim] = useState('');
+  const [manualBusca, setManualBusca] = useState('');
+  const [manualItem, setManualItem] = useState('');
+  const [manualTipo, setManualTipo] = useState('entrada');
+  const [manualQtd, setManualQtd] = useState('');
+  const [manualMotivo, setManualMotivo] = useState('');
+  const itemMap = useMemo(() => Object.fromEntries((allItems || []).map(i => [i.name, i])), [allItems]);
+  const manualSug = useMemo(() => {
+    const q = manualBusca.trim().toLowerCase();
+    if (!q) return [];
+    return (allItems || []).filter(i => `${i.name} ${i.cat} ${i.orig}`.toLowerCase().includes(q)).slice(0, 8);
+  }, [manualBusca, allItems]);
+  const tipos = useMemo(() => ['todos', ...Array.from(new Set((movs || []).map(m => m.tipo || m.origem || 'Movimentação'))).sort()], [movs]);
+  const filtradas = useMemo(() => {
+    const q = busca.trim().toLowerCase();
+    return (movs || []).filter(m => {
+      const info = itemMap[m.item] || {};
+      const dt = (m.data || '').slice(0, 10);
+      if (q && !`${m.item || ''} ${info.cat || ''} ${info.orig || ''} ${m.tipo || ''} ${m.origem || ''} ${m.motivo || ''} ${m.refLabel || ''} ${fDate(m.data)}`.toLowerCase().includes(q)) return false;
+      if (tipo !== 'todos' && (m.tipo || m.origem || 'Movimentação') !== tipo) return false;
+      if (origem !== 'todos' && (info.orig || m.local || '') !== origem) return false;
+      if (ini && dt < ini) return false;
+      if (fim && dt > fim) return false;
+      return true;
+    });
+  }, [movs, busca, tipo, origem, ini, fim, itemMap]);
+  const totalEntrada = filtradas.reduce((s, m) => s + Math.max(0, Number(m.delta || 0)), 0);
+  const totalSaida = filtradas.reduce((s, m) => s + Math.min(0, Number(m.delta || 0)), 0);
+  const compras = filtradas.filter(m => String(m.tipo || m.origem || '').toLowerCase().includes('receb')).reduce((s, m) => s + Math.max(0, Number(m.delta || 0)), 0);
+  const limpar = () => { setBusca(''); setTipo('todos'); setOrigem('todos'); setIni(''); setFim(''); };
+  const aplicarManual = () => {
+    if (!manualItem) { alert('Selecione um item.'); return; }
+    const qtd = parseFloat(manualQtd || 0);
+    if (!qtd || qtd <= 0) { alert('Informe uma quantidade válida.'); return; }
+    if (!manualMotivo.trim()) { alert('Informe a justificativa da operação.'); return; }
+    const estoque = LS.get('estoque') || {};
+    const before = parseFloat(estoque[manualItem] || 0);
+    const after = manualTipo === 'entrada' ? before + qtd : before - qtd;
+    if (after < 0 && !confirm('A saída deixará o estoque negativo. Deseja continuar?')) return;
+    estoque[manualItem] = Number(after.toFixed(4));
+    LS.set('estoque', estoque);
+    stockLog(manualItem, before, estoque[manualItem], manualTipo === 'entrada' ? 'Entrada manual' : 'Saída manual', manualMotivo.trim(), { tipo: manualTipo === 'entrada' ? 'Entrada manual' : 'Saída manual', refLabel: manualMotivo.trim() });
+    setEstoqueState(estoque);
+    setMovs(LS.get('stockMovs') || []);
+    setManualQtd(''); setManualMotivo('');
+    alert('Operação registrada e estoque atualizado.');
+  };
+  return html`<div style=${{ maxWidth: 'none', margin: '0 auto' }}>
+    <div class="stk" style=${{ padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 12 }}>
+      <button class="btn bg0 bic" onClick=${onBack}><${Ic} n="left" s=${20}/></button>
+      <div style=${{ flex: 1 }}><div style=${{ fontWeight: 800, fontSize: 16, fontFamily: "'Plus Jakarta Sans',sans-serif" }}>Operação de estoque</div><div style=${{ fontSize: 12, color: 'var(--s2)' }}>Entrada, saída e extrato de movimentações por item</div></div>
+      <button class="btn bs bsm" onClick=${limpar}>Limpar filtros</button>
+    </div>
+    <div class="page">
+      <div class="card" style=${{ padding: 16, marginBottom: 14 }}>
+        <div style=${{ fontWeight:800, fontSize:15, marginBottom:12 }}>Entrada / saída manual</div>
+        <div style=${{ display:'grid', gridTemplateColumns:'minmax(260px,2fr) 150px 120px 2fr auto', gap:10, alignItems:'end' }}>
+          <div style=${{ position:'relative' }}><label style=${{ fontSize:10,fontWeight:800,color:'var(--s3)',textTransform:'uppercase',letterSpacing:'.06em',display:'block',marginBottom:6 }}>Item</label><input class="inp" value=${manualBusca} onInput=${e=>{setManualBusca(e.target.value); setManualItem('');}} placeholder="Buscar item para movimentar..."/>${manualSug.length>0 && !manualItem && html`<div class="card" style=${{ position:'absolute', zIndex:20, left:0, right:0, top:'64px', maxHeight:240, overflow:'auto', border:'1px solid var(--bd)' }}>${manualSug.map(i=>html`<button key=${i.name} onClick=${()=>{setManualItem(i.name); setManualBusca(i.name);}} style=${{ display:'block', width:'100%', border:0, background:'#fff', textAlign:'left', padding:'10px 12px', cursor:'pointer', borderBottom:'1px solid var(--bd)' }}><div style=${{ fontWeight:700, fontSize:13 }}>${i.name}</div><div style=${{ fontSize:11, color:'var(--s2)' }}>${i.orig} · ${i.cat} · estoque atual: ${estoqueState[i.name] || 0}</div></button>`)}</div>`}</div>
+          <div><label style=${{ fontSize:10,fontWeight:800,color:'var(--s3)',textTransform:'uppercase',letterSpacing:'.06em',display:'block',marginBottom:6 }}>Tipo</label><select class="inp" value=${manualTipo} onChange=${e=>setManualTipo(e.target.value)}><option value="entrada">Entrada</option><option value="saida">Saída</option></select></div>
+          <div><label style=${{ fontSize:10,fontWeight:800,color:'var(--s3)',textTransform:'uppercase',letterSpacing:'.06em',display:'block',marginBottom:6 }}>Qtd.</label><input type="number" min="0" step="0.5" class="inp" value=${manualQtd} onInput=${e=>setManualQtd(e.target.value)} placeholder="0"/></div>
+          <div><label style=${{ fontSize:10,fontWeight:800,color:'var(--s3)',textTransform:'uppercase',letterSpacing:'.06em',display:'block',marginBottom:6 }}>Justificativa obrigatória</label><input class="inp" value=${manualMotivo} onInput=${e=>setManualMotivo(e.target.value)} placeholder="Ex: ajuste operacional, perda, transferência, correção..."/></div>
+          <button class="btn bp" onClick=${aplicarManual}>Registrar</button>
+        </div>
+      </div>
+      <div class="card" style=${{ padding: 16, marginBottom: 14 }}>
+        <div style=${{ display: 'grid', gridTemplateColumns: 'minmax(260px,2fr) 170px 120px 150px 150px', gap: 10, alignItems:'end' }}>
+          <div><label style=${{ fontSize:10,fontWeight:800,color:'var(--s3)',textTransform:'uppercase',letterSpacing:'.06em',display:'block',marginBottom:6 }}>Buscar item ou referência</label><input class="inp" value=${busca} onInput=${e=>setBusca(e.target.value)} placeholder="Ex: polvo, compra, inventário, data..."/></div>
+          <div><label style=${{ fontSize:10,fontWeight:800,color:'var(--s3)',textTransform:'uppercase',letterSpacing:'.06em',display:'block',marginBottom:6 }}>Tipo</label><select class="inp" value=${tipo} onChange=${e=>setTipo(e.target.value)}>${tipos.map(t=>html`<option key=${t} value=${t}>${t === 'todos' ? 'Todos' : t}</option>`)}</select></div>
+          <div><label style=${{ fontSize:10,fontWeight:800,color:'var(--s3)',textTransform:'uppercase',letterSpacing:'.06em',display:'block',marginBottom:6 }}>Origem</label><select class="inp" value=${origem} onChange=${e=>setOrigem(e.target.value)}><option value="todos">Todas</option><option value="CD">CD</option><option value="CP">CP</option></select></div>
+          <div><label style=${{ fontSize:10,fontWeight:800,color:'var(--s3)',textTransform:'uppercase',letterSpacing:'.06em',display:'block',marginBottom:6 }}>De</label><input type="date" class="inp" value=${ini} onInput=${e=>setIni(e.target.value)}/></div>
+          <div><label style=${{ fontSize:10,fontWeight:800,color:'var(--s3)',textTransform:'uppercase',letterSpacing:'.06em',display:'block',marginBottom:6 }}>Até</label><input type="date" class="inp" value=${fim} onInput=${e=>setFim(e.target.value)}/></div>
+        </div>
+      </div>
+      <div style=${{ display:'grid', gridTemplateColumns:'repeat(4, minmax(160px, 1fr))', gap:10, marginBottom:14 }}>
+        ${[['Movimentações', filtradas.length], ['Entradas', `+${Number(totalEntrada.toFixed(2))}`], ['Saídas', Number(totalSaida.toFixed(2))], ['Compras recebidas', `+${Number(compras.toFixed(2))}`]].map(([l,v])=>html`<div class="card" style=${{ padding:14 }}><div style=${{ fontSize:10,fontWeight:800,color:'var(--s3)',textTransform:'uppercase',letterSpacing:'.06em',marginBottom:6 }}>${l}</div><div style=${{ fontSize:22,fontWeight:800,fontFamily:"'Plus Jakarta Sans',sans-serif" }}>${v}</div></div>`)}
+      </div>
+      <div class="card" style=${{ padding: 0, overflow:'hidden' }}>
+        <div class="ghdr" style=${{ gridTemplateColumns:'150px 160px 1fr 120px 220px' }}><span>Data / tipo</span><span>Origem</span><span>Item</span><span style=${{ textAlign:'right' }}>Movimento</span><span>Referência</span></div>
+        <div style=${{ maxHeight:'calc(100vh - 500px)', overflow:'auto' }}>
+          ${filtradas.length === 0 && html`<div style=${{ padding:24, textAlign:'center', color:'var(--s2)', fontSize:13 }}>Nenhuma movimentação encontrada com os filtros selecionados.</div>`}
+          ${filtradas.map((m,i)=>{ const info=itemMap[m.item]||{}; const delta=Number(m.delta||0); return html`<div key=${m.id||i} class="irow" style=${{ gridTemplateColumns:'150px 160px 1fr 120px 220px', alignItems:'center' }}>
+            <div><div style=${{ fontWeight:800,fontSize:12 }}>${fDate(m.data)}</div><div style=${{ fontSize:11,color:'var(--s2)' }}>${m.tipo || m.origem || 'Movimentação'}</div></div>
+            <div><span class="badge bor">${info.orig || m.local || '—'}</span><div style=${{ fontSize:11,color:'var(--s2)',marginTop:4,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap' }}>${info.cat || ''}</div></div>
+            <div><div style=${{ fontWeight:700,fontSize:13 }}>${m.item}</div><div style=${{ fontSize:11,color:'var(--s2)' }}>Estoque: ${m.before} → ${m.after}</div></div>
+            <div style=${{ textAlign:'right' }}><span class=${`badge ${delta>=0?'bgr2':'brd2'}`}>${delta>=0?'+':''}${Number(delta.toFixed ? delta.toFixed(2) : delta)}</span></div>
+            <div style=${{ fontSize:12,color:'var(--s2)' }}>${m.refLabel || m.motivo || '—'}</div>
+          </div>`; })}
+        </div>
+      </div>
+    </div>
+  </div>`;
+}
+
+function InvCard({ inv, onClick }) {
+  const st = ST_INV[inv.status] || { l: inv.status, c: 'bgy' };
+  return html`<button class="card" style=${{ padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 12, border: 'none', textAlign: 'left', width: '100%', cursor: 'pointer' }} onClick=${onClick}>
+    <div style=${{ flex: 1, minWidth: 0 }}><div class="row" style=${{ gap: 6, marginBottom: 4 }}><span class=${`badge ${st.c}`}>${st.l}</span><span class="badge bor">${inv.origem}</span>${inv.categoria && html`<span class="badge bbl">${inv.categoria}</span>`}</div><div style=${{ fontWeight: 700, fontSize: 14 }}>${wLbl(inv.semana)}</div><div style=${{ fontSize: 12, color: 'var(--s2)', marginTop: 2 }}>${fDate(inv.data)} · ${inv.responsavel || '—'}</div></div>
+    <${Ic} n="cr" s=${16} style=${{ color: 'var(--s3)' }}/>
+  </button>`;
+}
+
+function InvEditor({ inv, cat, allItems, estoque: estoqueInit, toast, onBack, onSave, onDelete }) {
+  const isEdit = !!inv?.id; const finalizado = inv?.status === 'finalizado';
+  const sems = useMemo(genSems, []);
+  const [orig, setOrig] = useState(inv?.origem || 'CD');
+  const [data, setData] = useState(inv?.data || todayISO());
+  const [sem, setSem] = useState(inv?.semana || dateToWeek(data));
+  const [resp, setResp] = useState(inv?.responsavel || (LS.get('config') || {}).responsavel || '');
+  const [obs, setObs] = useState(inv?.observacoes || '');
+  const [qtds, setQtds] = useState(() => { const m = {}; (inv?.itens || []).forEach(i => m[i.nome] = String(i.qtd)); return m; });
+  const categoriasOrig = useMemo(() => Object.keys(cat[orig]?.cats || {}), [cat, orig]);
+  const [catInv, setCatInv] = useState(inv?.categoria || categoriasOrig[0] || '');
+  const [busca, setBusca] = useState('');
+  useEffect(() => { const w = dateToWeek(data); if (w !== sem) setSem(w); }, [data]);
+  useEffect(() => { if (!categoriasOrig.includes(catInv)) setCatInv(categoriasOrig[0] || ''); }, [orig, categoriasOrig.join('|')]);
+
+  const itemsOrig = useMemo(() => allItems.filter(i => i.orig === orig && (!catInv || i.cat === catInv) && (!busca || i.name.toLowerCase().includes(busca.toLowerCase()))), [allItems, orig, catInv, busca]);
+  const byC = useMemo(() => { const m = {}; itemsOrig.forEach(i => { if (!m[i.cat]) m[i.cat] = []; m[i.cat].push(i); }); return m; }, [itemsOrig]);
+  const lancados = itemsOrig.filter(i => qtds[i.name] !== '' && qtds[i.name] !== undefined).length;
+
+  const buildInv = (status) => ({
+    id: inv?.id || uid(), origem: orig, categoria: catInv, semana: sem, data, status,
+    responsavel: resp, observacoes: obs,
+    itens: itemsOrig.map(i => ({ nome: i.name, cat: i.cat, unit: i.unit, qtd: parseFloat(qtds[i.name] || 0) })),
+    criadoEm: inv?.criadoEm || new Date().toISOString(),
+    finalizadoEm: status === 'finalizado' ? new Date().toISOString() : inv?.finalizadoEm,
+  });
+
+  const salvarRascunho = () => onSave(buildInv('rascunho'));
+
+  const finalizar = () => {
+    if (isWeekClosed(sem)) { toast.show('Semana fechada. Reabra em Configurações para editar.'); return; }
+    if (!resp.trim()) { toast.show('Informe o responsável'); return; }
+    const invFinal = buildInv('finalizado');
+    // INVENTÁRIO SOBREPÕE o estoque
+    const estoque = LS.get('estoque') || {};
+    invFinal.itens.forEach(i => { const before = parseFloat(estoque[i.nome] || 0); estoque[i.nome] = i.qtd; if (before !== i.qtd) stockLog(i.nome, before, i.qtd, 'Inventário', `Inventário ${wLbl(invFinal.semana)} · ${invFinal.origem}`, { tipo:'Inventário', refId: invFinal.id, refLabel:`Inventário ${wLbl(invFinal.semana)} · ${invFinal.origem}` }); });
+    LS.set('estoque', estoque);
+    onSave(invFinal);
+  };
+
+  useEffect(() => { if (finalizado) return; LS.set('draft_inventario', { origem:orig, categoria:catInv, semana:sem, data, responsavel:resp, observacoes:obs, qtds, atualizadoEm:new Date().toISOString() }); }, [orig, catInv, sem, data, resp, obs, JSON.stringify(qtds)]);
+
+  return html`<div style=${{ maxWidth: 'none', margin: '0 auto' }}>
+    <div class="stk" style=${{ padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 12 }}>
+      <button class="btn bg0 bic" onClick=${onBack}><${Ic} n="left" s=${20}/></button>
+      <div style=${{ flex: 1 }}><div style=${{ fontWeight: 800, fontSize: 15, fontFamily: "'Plus Jakarta Sans',sans-serif" }}>${isEdit ? 'Editar Inventário' : 'Novo Inventário'}</div><div style=${{ fontSize: 12, color: 'var(--s2)' }}>${lancados}/${itemsOrig.length} itens lançados</div></div>
+      ${isEdit && html`<button class="btn bg0 bic" style=${{ color: 'var(--rd)' }} onClick=${() => { if (strongConfirm('Excluir registro')) onDelete(inv.id); }}><${Ic} n="trash" s=${18}/></button>`}
+      ${!finalizado && html`<button class="btn bs bsm" onClick=${salvarRascunho}><${Ic} n="save" s=${14}/>Rascunho</button>`}
+    </div>
+    <div class="page" style=${{ paddingBottom: finalizado ? 24 : 120 }}>
+      <div class="card" style=${{ padding: 16, marginBottom: 12 }}>
+        <div style=${{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 12 }}>
+          ${['CD', 'CP'].map(o => html`<button key=${o} onClick=${() => { if (!finalizado) setOrig(o); }} style=${{ padding: 10, borderRadius: 10, border: `2px solid ${orig === o ? 'var(--or)' : 'var(--bd)'}`, background: orig === o ? 'var(--or3)' : '#fff', fontWeight: 700, fontSize: 13, cursor: 'pointer' }}><div style=${{ color: orig === o ? 'var(--or2)' : 'var(--ink)' }}>${o}</div><div style=${{ fontSize: 11, color: orig === o ? 'var(--or)' : 'var(--s2)', marginTop: 2 }}>${cat[o].label}</div></button>`)}
+        </div>
+        <label style=${{ fontSize: 11, fontWeight: 700, color: 'var(--s2)', textTransform: 'uppercase', letterSpacing: '.06em', display: 'block', marginBottom: 6 }}>Categoria do inventário</label>
+        <select class="inp" value=${catInv} onChange=${e => { setCatInv(e.target.value); setQtds({}); }} disabled=${false} style=${{ marginBottom: 12 }}>${categoriasOrig.map(c => html`<option key=${c} value=${c}>${c}</option>`)}</select>
+        <div style=${{ display:'grid', gridTemplateColumns:'1fr auto auto', gap:8, marginBottom:12 }}>
+          <input class="inp" value=${busca} onInput=${e=>setBusca(e.target.value)} placeholder="Buscar item nesta categoria..."/>
+          <button class="btn bs bsm" onClick=${()=>setQtds(Object.fromEntries(itemsOrig.map(i=>[i.name, String(estoqueInit[i.name] || 0)])))}>Copiar estoque</button>
+          <button class="btn bs bsm" onClick=${()=>setQtds(Object.fromEntries(itemsOrig.map(i=>[i.name, '0'])))}>Zerar</button>
+        </div>
+        <div style=${{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 8 }}>
+          <div><label style=${{ fontSize: 11, fontWeight: 700, color: 'var(--s2)', textTransform: 'uppercase', letterSpacing: '.06em', display: 'block', marginBottom: 6 }}>Data da contagem</label><input type="date" class="inp" value=${data} onInput=${e => setData(e.target.value)} disabled=${false}/></div>
+          <div><label style=${{ fontSize: 11, fontWeight: 700, color: 'var(--s2)', textTransform: 'uppercase', letterSpacing: '.06em', display: 'block', marginBottom: 6 }}>Semana automática</label><input class="inp" value=${weekFromDateLabel(data)} disabled=${true}/></div>
+        </div>
+        <label style=${{ fontSize: 11, fontWeight: 700, color: 'var(--s2)', textTransform: 'uppercase', letterSpacing: '.06em', display: 'block', marginBottom: 6 }}>Responsável</label>
+        <input class="inp" value=${resp} onInput=${e => setResp(e.target.value)} disabled=${false} placeholder="Nome do responsável"/>
+      </div>
+
+      ${Object.entries(byC).map(([catN, prods]) => html`
+        <details key=${catN + orig} open style=${{ marginBottom: 8 }}>
+          <summary class="cat-hdr"><${Ic} n="cr" s=${14} c="chv" style=${{ color: 'var(--s3)' }}/><span style=${{ fontWeight: 700, fontSize: 14, flex: 1 }}>${catN}</span><span style=${{ fontSize: 12, color: 'var(--s2)' }}>${prods.filter(p => qtds[p.name] !== '' && qtds[p.name] !== undefined).length}/${prods.length}</span></summary>
+          <div class="ilist">
+            <div class="ghdr" style=${{ gridTemplateColumns: '1fr 72px 72px' }}><span>Produto</span><span style=${{ textAlign: 'center' }}>Estq. ant.</span><span style=${{ textAlign: 'center' }}>Contagem</span></div>
+            ${prods.map(prod => { const estAtual = parseFloat(estoqueInit[prod.name] || 0), contagem = parseFloat(qtds[prod.name] || 0), lançado = qtds[prod.name] !== '' && qtds[prod.name] !== undefined; return html`
+              <div key=${prod.name} class="irow" style=${{ gridTemplateColumns: '1fr 72px 72px', background: lançado ? 'var(--or3)' : '#fff' }}>
+                <div><div style=${{ fontSize: 13, fontWeight: lançado ? 600 : 400 }}>${prod.name}</div><div style=${{ fontSize: 11, color: lançado && Math.abs(contagem - estAtual) > 0 ? (Math.abs(contagem - estAtual) >= 5 ? 'var(--rd)' : 'var(--am)') : 'var(--s3)', fontWeight: lançado && Math.abs(contagem - estAtual) > 0 ? 700 : 400 }}>${prod.unit}${lançado ? ` · Dif.: ${Number((contagem-estAtual).toFixed(2))} · ${Math.abs(contagem-estAtual)>=5?'Crítica':Math.abs(contagem-estAtual)>=2?'Média':Math.abs(contagem-estAtual)>0?'Baixa':'Sem divergência'}` : ''}</div></div>
+                <div style=${{ textAlign: 'center', fontSize: 13, fontWeight: 600, color: estAtual <= 0 ? 'var(--s3)' : 'var(--s2)' }}>${estoqueInit[prod.name] !== undefined ? estAtual : '—'}</div>
+                <div style=${{ display: 'flex', justifyContent: 'center' }}><input type="number" min="0" step="0.5" class="inp-n" value=${qtds[prod.name] || ''} onInput=${e => setQtds(p => ({ ...p, [prod.name]: e.target.value }))} disabled=${false} placeholder="0" style=${{ borderColor: lançado ? 'var(--or)' : undefined }}/></div>
+              </div>`; })}
+          </div>
+        </details>`)}
+
+      <div class="card" style=${{ padding: 16, marginBottom: 12 }}>
+        <label style=${{ fontSize: 11, fontWeight: 700, color: 'var(--s2)', textTransform: 'uppercase', letterSpacing: '.06em', display: 'block', marginBottom: 6 }}>Observações</label>
+        <textarea class="inp" value=${obs} onInput=${e => setObs(e.target.value)} disabled=${false} rows="2" placeholder="Observações sobre a contagem..."/>
+      </div>
+      <div class="card" style=${{ padding: 16 }}>
+
+      </div>
+    </div>
+    ${html`<div style=${{ position: 'sticky', bottom: 72, background: '#fff', borderTop: '1px solid var(--bd)', padding: '12px 16px' }}>
+      <button class="btn bgr" style=${{ width: '100%', padding: 14, borderRadius: 12, fontSize: 15 }} onClick=${finalizar}><${Ic} n="chk" s=${16}/>${finalizado ? 'Salvar alterações e atualizar estoque' : 'Finalizar inventário e atualizar estoque'}</button>
+    </div>`}
+    
+  </div>`;
+}
+
+/* ══════════════════════════════════════
+   RNC
+══════════════════════════════════════ */
+function RncTab({ toast }) {
+  const [view, setView] = useState('lista');
+  const [rncs, setRncs] = useState(() => LS.get('rncs') || []);
+  const [editing, setEditing] = useState(null);
+  const cat = useMemo(getCatalog, []);
+  const allItems = useMemo(() => flatCatalog(cat), [cat]);
+  const save = r => { const upd = rncs.find(x => x.id === r.id) ? rncs.map(x => x.id === r.id ? r : x) : [r, ...rncs]; setRncs(upd); LS.set('rncs', upd); };
+  const del = id => { const rec = rncs.find(r => r.id === id); if (rec) moveToTrash('rnc', rec); const upd = rncs.filter(r => r.id !== id); setRncs(upd); LS.set('rncs', upd); };
+  const genNum = (orig) => { const max = rncs.reduce((m, r) => { const mat = r.numero?.match(/(\d{4})$/); return mat ? Math.max(m, parseInt(mat[1])) : m; }, 0); return `RNC-${orig}-${new Date().getFullYear()}-${String(max + 1).padStart(4, '0')}`; };
+  if (view === 'editor') return html`<${RncEditor} rnc=${editing} allItems=${allItems} toast=${toast} genNum=${genNum}
+    onBack=${() => { setView('lista'); setEditing(null); }}
+    onSave=${r => { save(r); toast.show('RNC salva'); setView('lista'); setEditing(null); }}
+    onDelete=${id => { del(id); toast.show('Excluída'); setView('lista'); setEditing(null); }}/>`;
+  const abertas = rncs.filter(r => r.status === 'aberta' || r.status === 'analise');
+  const res = rncs.filter(r => r.status === 'resolvida' || r.status === 'cancelada');
+  return html`<div class="page">
+    <div class="row" style=${{ justifyContent: 'space-between', marginBottom: 16 }}>
+      <div><h2 style=${{ fontSize: 20, fontWeight: 800, fontFamily: "'Plus Jakarta Sans',sans-serif", margin: 0 }}>RNC</h2><p style=${{ fontSize: 13, color: 'var(--s2)', margin: '2px 0 0' }}>Registros de Não Conformidade</p></div>
+      <button class="btn bp bsm" onClick=${() => { setEditing(null); setView('editor'); }}><${Ic} n="plus" s=${14}/>Nova RNC</button>
+    </div>
+    ${rncs.length === 0 && html`<div class="empty"><${Ic} n="rnc" s=${40} style=${{ color: 'var(--s3)' }}/><p>Nenhuma RNC registrada.</p><button class="btn bp" style=${{ marginTop: 8 }} onClick=${() => setView('editor')}><${Ic} n="plus" s=${16}/>Abrir RNC</button></div>`}
+    ${abertas.length > 0 && html`<span class="slbl">Em aberto (${abertas.length})</span><div style=${{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 16 }}>${abertas.map(r => html`<${RncCard} key=${r.id} rnc=${r} onClick=${() => { setEditing(r); setView('editor'); }}/>`)}</div>`}
+    ${res.length > 0 && html`<span class="slbl">Resolvidas / Canceladas</span><div style=${{ display: 'flex', flexDirection: 'column', gap: 8 }}>${res.map(r => html`<${RncCard} key=${r.id} rnc=${r} onClick=${() => { setEditing(r); setView('editor'); }}/>`)}</div>`}
+  </div>`;
+}
+
+function RncCard({ rnc, onClick }) {
+  const st = ST_RNC[rnc.status] || { l: rnc.status, c: 'bgy' };
+  return html`<button class="card" style=${{ padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 12, border: 'none', textAlign: 'left', width: '100%', cursor: 'pointer', opacity: ['resolvida','cancelada'].includes(rnc.status) ? .85 : 1 }} onClick=${onClick}>
+    <div style=${{ flex: 1, minWidth: 0 }}><div class="row" style=${{ gap: 6, marginBottom: 4 }}><span class=${`badge ${st.c}`}>${st.l}</span>${rnc.origem && html`<span class="badge bor">${rnc.origem}</span>`}</div><div style=${{ fontWeight: 700, fontSize: 14 }}>${rnc.numero}</div><div style=${{ fontSize: 12, color: 'var(--s2)', marginTop: 2 }}>${rnc.produto || '—'} · ${fDate(rnc.data)}</div></div>
+    <${Ic} n="cr" s=${16} style=${{ color: 'var(--s3)' }}/>
+  </button>`;
+}
+
+function RncEditor({ rnc, allItems, toast, genNum, onBack, onSave, onDelete }) {
+  const isEdit = !!rnc?.id;
+  const [orig, setOrig] = useState(rnc?.origem || 'CD');
+  const [produto, setProduto] = useState(rnc?.produto || '');
+  const [fornecedor, setFornecedor] = useState(rnc?.fornecedor || '');
+  const [unit, setUnit] = useState(rnc?.unidade || 'UND');
+  const [qtd, setQtd] = useState(String(rnc?.quantidade || ''));
+  const [data, setData] = useState(rnc?.data || new Date().toISOString().split('T')[0]);
+  const [resp, setResp] = useState(rnc?.responsavel || (LS.get('config') || {}).responsavel || '');
+  const [tipo, setTipo] = useState(rnc?.tipo || '');
+  const [tipoCustom, setTipoCustom] = useState(rnc?.tipoCustom || '');
+  const [desc, setDesc] = useState(rnc?.descricao || '');
+  const [acao, setAcao] = useState(rnc?.acao || '');
+  const [obsAcao, setObsAcao] = useState(rnc?.obsAcao || '');
+  const [status, setStatus] = useState(rnc?.status || 'aberta');
+  const [sig, setSig] = useState(rnc?.assinatura || null);
+  const [showSig, setShowSig] = useState(false);
+  const [fotos, setFotos] = useState(rnc?.fotos || []);
+  const fotoRef = useRef(null);
+
+  const TIPOS = ['Produto fora do prazo', 'Produto com avaria', 'Quantidade incorreta', 'Produto fora do padrão de qualidade', 'Temperatura inadequada', 'Embalagem danificada', 'Outro (descrever)'];
+  const ACOES = ['Devolução ao fornecedor', 'Substituição imediata', 'Crédito em nota', 'Desconto na próxima entrega', 'Apenas registrar ocorrência'];
+
+  const addFoto = file => {
+    if (!file) return;
+    const r = new FileReader();
+    r.onload = e => { const img = new Image(); img.onload = () => { const c = document.createElement('canvas'); const max = 1200; let w = img.width, h = img.height; if (w > max) { h = Math.round(h * max / w); w = max; } if (h > max) { w = Math.round(w * max / h); h = max; } c.width = w; c.height = h; c.getContext('2d').drawImage(img, 0, 0, w, h); setFotos(p => [...p, c.toDataURL('image/jpeg', .75)]); }; img.src = e.target.result; };
+    r.readAsDataURL(file);
+  };
+
+  const salvar = () => {
+    const tipoFinal = tipo === 'Outro (descrever)' && tipoCustom ? tipoCustom : tipo;
+    onSave({ id: rnc?.id || uid(), numero: rnc?.numero || genNum(orig), data, responsavel: resp, origem: orig, produto, fornecedor, unidade: unit, quantidade: parseFloat(qtd) || 0, tipo: tipoFinal, tipoCustom, descricao: desc, acao, obsAcao, status, fotos, criadoEm: rnc?.criadoEm || new Date().toISOString() });
+  };
+
+  const itemsOrig = allItems.filter(i => i.orig === orig);
+
+  return html`<div style=${{ maxWidth: 'none', margin: '0 auto' }}>
+    <div class="stk" style=${{ padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 12 }}>
+      <button class="btn bg0 bic" onClick=${onBack}><${Ic} n="left" s=${20}/></button>
+      <div style=${{ flex: 1 }}><div style=${{ fontWeight: 800, fontSize: 15, fontFamily: "'Plus Jakarta Sans',sans-serif" }}>${isEdit ? rnc.numero : 'Nova RNC'}</div><div style=${{ fontSize: 12, color: 'var(--s2)' }}>Registro de Não Conformidade</div></div>
+      ${isEdit && html`<button class="btn bg0 bic" style=${{ color: 'var(--rd)' }} onClick=${() => { if (strongConfirm('Excluir registro')) onDelete(rnc.id); }}><${Ic} n="trash" s=${18}/></button>`}
+    </div>
+    <div class="page" style=${{ paddingBottom: 120 }}>
+      <div class="card" style=${{ padding: 16, marginBottom: 12 }}>
+        <div style=${{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 12 }}>${['CD','CP'].map(o => html`<button key=${o} onClick=${() => setOrig(o)} style=${{ padding: 10, borderRadius: 10, border: `2px solid ${orig === o ? 'var(--or)' : 'var(--bd)'}`, background: orig === o ? 'var(--or3)' : '#fff', fontWeight: 700, fontSize: 13, cursor: 'pointer' }}><span style=${{ color: orig === o ? 'var(--or2)' : 'var(--ink)' }}>${o}</span></button>`)}</div>
+        <div style=${{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 8 }}>
+          <div><label style=${{ fontSize: 11, fontWeight: 700, color: 'var(--s2)', textTransform: 'uppercase', letterSpacing: '.06em', display: 'block', marginBottom: 6 }}>Data</label><input type="date" class="inp" value=${data} onInput=${e => setData(e.target.value)}/></div>
+          <div><label style=${{ fontSize: 11, fontWeight: 700, color: 'var(--s2)', textTransform: 'uppercase', letterSpacing: '.06em', display: 'block', marginBottom: 6 }}>Status</label><select class="inp" value=${status} onChange=${e => setStatus(e.target.value)}><option value="aberta">Aberta</option><option value="analise">Em análise</option><option value="resolvida">Resolvida</option><option value="cancelada">Cancelada</option></select></div>
+        </div>
+        <label style=${{ fontSize: 11, fontWeight: 700, color: 'var(--s2)', textTransform: 'uppercase', letterSpacing: '.06em', display: 'block', marginBottom: 6 }}>Responsável</label>
+        <input class="inp" value=${resp} onInput=${e => setResp(e.target.value)} placeholder="Nome do responsável pelo registro" style=${{ marginBottom: 8 }}/>
+        <label style=${{ fontSize: 11, fontWeight: 700, color: 'var(--s2)', textTransform: 'uppercase', letterSpacing: '.06em', display: 'block', marginBottom: 6 }}>Produto</label>
+        <select class="inp" value=${produto} onChange=${e => setProduto(e.target.value)} style=${{ marginBottom: 8 }}><option value="">Selecione ou descreva abaixo...</option>${itemsOrig.map(i => html`<option key=${i.name} value=${i.name}>${i.name}</option>`)}</select>
+        <input class="inp" value=${produto} onInput=${e => setProduto(e.target.value)} placeholder="Ou descreva livremente o produto" style=${{ marginBottom: 8 }}/>
+        <div style=${{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 8 }}>
+          <div><label style=${{ fontSize: 11, fontWeight: 700, color: 'var(--s2)', textTransform: 'uppercase', letterSpacing: '.06em', display: 'block', marginBottom: 6 }}>Qtd.</label><input type="number" min="0" class="inp" value=${qtd} onInput=${e => setQtd(e.target.value)} placeholder="0"/></div>
+          <div><label style=${{ fontSize: 11, fontWeight: 700, color: 'var(--s2)', textTransform: 'uppercase', letterSpacing: '.06em', display: 'block', marginBottom: 6 }}>Unidade</label><select class="inp" value=${unit} onChange=${e => setUnit(e.target.value)}>${['UND','KG','G','L','ML','PCT','CX'].map(u => html`<option key=${u} value=${u}>${u}</option>`)}</select></div>
+        </div>
+        <label style=${{ fontSize: 11, fontWeight: 700, color: 'var(--s2)', textTransform: 'uppercase', letterSpacing: '.06em', display: 'block', marginBottom: 6 }}>Fornecedor</label>
+        <input class="inp" value=${fornecedor} onInput=${e => setFornecedor(e.target.value)} placeholder="Nome do fornecedor"/>
+      </div>
+      <div class="card" style=${{ padding: 16, marginBottom: 12 }}>
+        <label style=${{ fontSize: 11, fontWeight: 700, color: 'var(--s2)', textTransform: 'uppercase', letterSpacing: '.06em', display: 'block', marginBottom: 8 }}>Tipo de problema</label>
+        <div style=${{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 12 }}>
+          ${TIPOS.map(t => html`<button key=${t} onClick=${() => setTipo(t)} style=${{ padding: '10px 14px', borderRadius: 10, border: `1.5px solid ${tipo === t ? 'var(--or)' : 'var(--bd)'}`, background: tipo === t ? 'var(--or3)' : '#fff', textAlign: 'left', fontSize: 13, fontWeight: tipo === t ? 700 : 400, color: tipo === t ? 'var(--or2)' : 'var(--ink)', cursor: 'pointer' }}>${t}</button>`)}
+        </div>
+        ${tipo === 'Outro (descrever)' && html`<input class="inp" value=${tipoCustom} onInput=${e => setTipoCustom(e.target.value)} placeholder="Descreva o problema..." style=${{ marginBottom: 12 }}/>`}
+        <label style=${{ fontSize: 11, fontWeight: 700, color: 'var(--s2)', textTransform: 'uppercase', letterSpacing: '.06em', display: 'block', marginBottom: 6 }}>Descrição detalhada</label>
+        <textarea class="inp" value=${desc} onInput=${e => setDesc(e.target.value)} rows="3" placeholder="Descreva o problema detalhadamente..."/>
+      </div>
+      <div class="card" style=${{ padding: 16, marginBottom: 12 }}>
+        <label style=${{ fontSize: 11, fontWeight: 700, color: 'var(--s2)', textTransform: 'uppercase', letterSpacing: '.06em', display: 'block', marginBottom: 8 }}>Ação solicitada</label>
+        <div style=${{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 12 }}>
+          ${ACOES.map(a => html`<button key=${a} onClick=${() => setAcao(a)} style=${{ padding: '10px 14px', borderRadius: 10, border: `1.5px solid ${acao === a ? 'var(--or)' : 'var(--bd)'}`, background: acao === a ? 'var(--or3)' : '#fff', textAlign: 'left', fontSize: 13, fontWeight: acao === a ? 700 : 400, color: acao === a ? 'var(--or2)' : 'var(--ink)', cursor: 'pointer' }}>${a}</button>`)}
+        </div>
+        <textarea class="inp" value=${obsAcao} onInput=${e => setObsAcao(e.target.value)} rows="2" placeholder="Observações sobre a ação..."/>
+      </div>
+      <div class="card" style=${{ padding: 16, marginBottom: 12 }}>
+        <div class="row" style=${{ justifyContent: 'space-between', marginBottom: 10 }}>
+          <label style=${{ fontSize: 11, fontWeight: 700, color: 'var(--s2)', textTransform: 'uppercase', letterSpacing: '.06em' }}>Fotos (${fotos.length})</label>
+          <button class="btn bs bsm" onClick=${() => fotoRef.current?.click()}><${Ic} n="img" s=${14}/>Adicionar</button>
+        </div>
+        <input ref=${fotoRef} type="file" accept="image/*" capture="environment" style=${{ display: 'none' }} onChange=${e => { addFoto(e.target.files[0]); e.target.value = ''; }}/>
+        ${fotos.length > 0 && html`<div style=${{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 8 }}>${fotos.map((f, i) => html`<div key=${i} style=${{ position: 'relative', aspectRatio: '1', borderRadius: 8, overflow: 'hidden' }}><img src=${f} style=${{ width: '100%', height: '100%', objectFit: 'cover' }}/><button onClick=${() => setFotos(p => p.filter((_, j) => j !== i))} style=${{ position: 'absolute', top: 4, right: 4, background: 'rgba(0,0,0,.6)', border: 'none', borderRadius: '50%', width: 24, height: 24, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#fff' }}><${Ic} n="x" s=${12}/></button></div>`)}</div>`}
+      </div>
+      <div class="card" style=${{ padding: 16 }}>
+
+      </div>
+    </div>
+    <div style=${{ position: 'sticky', bottom: 72, background: '#fff', borderTop: '1px solid var(--bd)', padding: '12px 16px', display: 'flex', gap: 8 }}>
+      <button class="btn bs" style=${{ flex: 1 }} onClick=${onBack}>Cancelar</button>
+      <button class="btn bp" style=${{ flex: 2, padding: 14, borderRadius: 12 }} onClick=${salvar}><${Ic} n="save" s=${16}/>${isEdit ? 'Salvar' : 'Registrar RNC'}</button>
+    </div>
+    
+  </div>`;
+}
+
+
+/* ══════════════════════════════════════
+   PDFS — geração segura local
+══════════════════════════════════════ */
+function getJsPDF() {
+  const jsPDF = window.jspdf?.jsPDF || window.jsPDF;
+  if (!jsPDF) throw new Error('Biblioteca jsPDF não carregada');
+  return jsPDF;
+}
+function pdfHeader(doc, titulo, subtitulo='') {
+  doc.setFillColor(245,149,0); doc.rect(0,0,210,24,'F');
+  doc.setTextColor(255,255,255); doc.setFontSize(15); doc.setFont(undefined,'bold'); doc.text('NEXUS — Grupo Ilha', 14, 10);
+  doc.setFontSize(10); doc.setFont(undefined,'normal'); doc.text(titulo, 14, 18);
+  doc.setTextColor(17,24,39); doc.setFontSize(13); doc.setFont(undefined,'bold'); doc.text(titulo, 14, 34);
+  if (subtitulo) { doc.setFontSize(9); doc.setFont(undefined,'normal'); doc.setTextColor(107,114,128); doc.text(String(subtitulo), 14, 40); }
+}
+function pdfTable(doc, head, body, startY=48) {
+  if (doc.autoTable) {
+    doc.autoTable({ startY, head:[head], body, styles:{ fontSize:8, cellPadding:2 }, headStyles:{ fillColor:[245,149,0], textColor:255 }, alternateRowStyles:{ fillColor:[249,250,251] }, margin:{ left:14, right:14 } });
+  } else {
+    let y=startY; doc.setFontSize(8); doc.setFont(undefined,'bold'); doc.text(head.join(' | '),14,y); y+=6; doc.setFont(undefined,'normal');
+    body.forEach(r=>{ if(y>280){doc.addPage(); y=18;} doc.text(r.map(x=>String(x??'')).join(' | ').slice(0,115),14,y); y+=5; });
+  }
+}
+function pdfFooter(doc) { const p=doc.internal.getNumberOfPages(); for(let i=1;i<=p;i++){ doc.setPage(i); doc.setFontSize(8); doc.setTextColor(156,163,175); doc.text(`Emitido em ${new Date().toLocaleString('pt-BR')} · Página ${i}/${p}`,14,290); } }
+function savePdf(doc, name) { pdfFooter(doc); doc.save(name.replace(/[\\/:*?"<>|]+/g,'_') + '.pdf'); }
+function pdfPedido(p) {
+  const Doc=getJsPDF(); const doc=new Doc({ orientation:'p', unit:'mm', format:'a4' });
+  pdfHeader(doc,'Pedido',`${p.origem || ''} · ${wLbl(p.semana)} · ${fDate(p.data || p.criadoEm)} · Status: ${p.status || ''}`);
+  if (p.responsavel) { doc.setFontSize(9); doc.setTextColor(107,114,128); doc.text(`Responsável: ${p.responsavel}`,14,45); }
+  pdfTable(doc,['Item','Categoria','Qtd. solicitada','Unid.'],(p.itens||[]).map(i=>[i.nome||'',i.cat||'',i.qtd??'',i.unit||'']), p.responsavel ? 52 : 48);
+  savePdf(doc,`NEXUS_Pedido_${p.origem||''}_${p.semana||''}`);
+}
+function pdfRecebimento(p) {
+  const Doc=getJsPDF(); const doc=new Doc({ orientation:'p', unit:'mm', format:'a4' });
+  const rec=p.recebimento || {}; pdfHeader(doc,'Recebimento',`${p.origem || ''} · ${wLbl(p.semana)} · ${fDate(rec.data || p.data || p.criadoEm)}`);
+  pdfTable(doc,['Item','Qtd. solicitada','Qtd. recebida','Diferença','Justificativa'],(rec.itens||p.itens||[]).map(i=>{ const sol=Number(i.qtd||0), ent=Number((i.qtdRecebida ?? i.qtd) || 0); return [i.nome||'',sol,ent,ent-sol,i.justificativa||'']; }),48);
+  savePdf(doc,`NEXUS_Recebimento_${p.origem||''}_${p.semana||''}`);
+}
+function pdfOrcamento(o) {
+  const Doc=getJsPDF(); const doc=new Doc({ orientation:'p', unit:'mm', format:'a4' });
+  pdfHeader(doc,'Orçamento',`${o.origem || ''} · ${wLbl(o.semana)} · Total: ${fMoeda(o.total || 0)} · Status: ${o.status || ''}`);
+  pdfTable(doc,['Item','Categoria','Qtd.','Preço unit.','Subtotal'],(o.itens||[]).map(i=>[i.nome||'',i.cat||'',i.qtd??'',fMoeda(i.precoUnit||0),fMoeda((Number(i.qtd||0)*Number(i.precoUnit||0)))]),48);
+  savePdf(doc,`NEXUS_Orcamento_${o.origem||''}_${o.semana||''}`);
+}
+function pdfRnc(r) {
+  const Doc=getJsPDF(); const doc=new Doc({ orientation:'p', unit:'mm', format:'a4' });
+  pdfHeader(doc,'RNC',`${r.numero || ''} · ${r.origem || ''} · ${fDate(r.data || r.criadoEm)} · Status: ${r.status || ''}`);
+  doc.setFontSize(9); doc.setTextColor(17,24,39);
+  [['Produto',r.produto],['Fornecedor',r.fornecedor],['Quantidade',r.quantidade],['Tipo',r.tipoCustom || r.tipo],['Responsável',r.responsavel],['Descrição',r.descricao],['Ação',r.acao],['Observações',r.obsAcao]].forEach(([k,v],idx)=>{ doc.setFont(undefined,'bold'); doc.text(`${k}:`,14,50+idx*8); doc.setFont(undefined,'normal'); doc.text(String(v||'-').slice(0,95),42,50+idx*8); });
+  savePdf(doc,`NEXUS_RNC_${r.numero||r.id||''}`);
+}
+function pdfInventario(i) {
+  const Doc=getJsPDF(); const doc=new Doc({ orientation:'p', unit:'mm', format:'a4' });
+  pdfHeader(doc,'Inventário',`${i.origem || ''} · ${wLbl(i.semana)} · ${i.categoria || ''} · Status: ${i.status || ''}`);
+  pdfTable(doc,['Item','Categoria','Qtd. contada','Unid.'],(i.itens||[]).map(x=>[x.nome||'',x.cat||i.categoria||'',x.qtd??'',x.unit||'']),48);
+  savePdf(doc,`NEXUS_Inventario_${i.origem||''}_${i.semana||''}`);
+}
+
+/* ══════════════════════════════════════
+   RELATÓRIOS
+══════════════════════════════════════ */
+function RelatoriosTab({ toast }) {
+  const [secao, setSecao] = useState('pedidos');
+  const pedidos = LS.get('pedidos') || [];
+  const rncs = LS.get('rncs') || [];
+  const orcamentos = LS.get('orcamentos') || [];
+  const inventarios = LS.get('inventarios') || [];
+  const SECS = [{ id: 'pedidos', l: 'Pedidos' }, { id: 'recebimento', l: 'Recebimento' }, { id: 'rnc', l: 'RNC' }, { id: 'orcamentos', l: 'Orçamentos' }, { id: 'inventarios', l: 'Inventários' }];
+  const recebimentos = pedidos.filter(p => p.recebimento);
+  return html`<div class="page">
+    <div style=${{ marginBottom: 16 }}><h2 style=${{ fontSize: 20, fontWeight: 800, fontFamily: "'Plus Jakarta Sans',sans-serif", margin: 0 }}>Relatórios</h2></div>
+    <div class="ptab" style=${{ marginBottom: 16 }}>${SECS.map(s => html`<button key=${s.id} class=${secao === s.id ? 'on' : ''} onClick=${() => setSecao(s.id)}>${s.l}</button>`)}</div>
+    ${secao === 'pedidos' && html`<div style=${{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+      ${pedidos.length === 0 && html`<div class="empty"><${Ic} n="orders" s=${32} style=${{ color: 'var(--s3)' }}/><p>Nenhum pedido.</p></div>`}
+      ${[...pedidos].sort((a,b)=>new Date(b.criadoEm||0)-new Date(a.criadoEm||0)).map(p => { const st = ST_PED[p.status] || { l: p.status, c: 'bgy' }; return html`
+        <div key=${p.id} class="card" style=${{ padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 12 }}>
+          <div style=${{ flex: 1, minWidth: 0 }}><div class="row" style=${{ gap: 6, marginBottom: 4 }}><span class=${`badge ${st.c}`}>${st.l}</span><span class="badge bor">${p.origem}</span></div><div style=${{ fontWeight: 700, fontSize: 14 }}>${wLbl(p.semana)}</div><div style=${{ fontSize: 12, color: 'var(--s2)' }}>${(p.itens||[]).length} itens · ${fDate(p.criadoEm)}</div></div>
+          <button class="btn bs bsm" onClick=${() => { try { pdfPedido(p); toast.show('PDF gerado'); } catch(e) { toast.show('Erro'); } }}><${Ic} n="pdf" s=${14}/>PDF</button>
+        </div>`; })}
+    </div>`}
+    ${secao === 'recebimento' && html`<div style=${{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+      ${recebimentos.length === 0 && html`<div class="empty"><${Ic} n="recv" s=${32} style=${{ color: 'var(--s3)' }}/><p>Nenhum recebimento.</p></div>`}
+      ${recebimentos.sort((a,b)=>new Date(b.recebimento?.finalizadoEm||0)-new Date(a.recebimento?.finalizadoEm||0)).map(p => { const st = ST_PED[p.status] || { l: p.status, c: 'bgy' }; return html`
+        <div key=${p.id} class="card" style=${{ padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 12 }}>
+          <div style=${{ flex: 1, minWidth: 0 }}><div class="row" style=${{ gap: 6, marginBottom: 4 }}><span class=${`badge ${st.c}`}>${st.l}</span><span class="badge bor">${p.origem}</span></div><div style=${{ fontWeight: 700, fontSize: 14 }}>${wLbl(p.semana)}</div><div style=${{ fontSize: 12, color: 'var(--s2)' }}>${p.recebimento?.responsavel||'—'} · ${fDate(p.recebimento?.finalizadoEm)}</div></div>
+          <button class="btn bs bsm" onClick=${() => { try { pdfRecebimento(p); toast.show('PDF gerado'); } catch(e) { toast.show('Erro'); } }}><${Ic} n="pdf" s=${14}/>PDF</button>
+        </div>`; })}
+    </div>`}
+    ${secao === 'rnc' && html`<div style=${{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+      ${rncs.length === 0 && html`<div class="empty"><${Ic} n="rnc" s=${32} style=${{ color: 'var(--s3)' }}/><p>Nenhuma RNC.</p></div>`}
+      ${[...rncs].sort((a,b)=>new Date(b.criadoEm||0)-new Date(a.criadoEm||0)).map(r => { const st = ST_RNC[r.status] || { l: r.status, c: 'bgy' }; return html`
+        <div key=${r.id} class="card" style=${{ padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 12 }}>
+          <div style=${{ flex: 1, minWidth: 0 }}><div class="row" style=${{ gap: 6, marginBottom: 4 }}><span class=${`badge ${st.c}`}>${st.l}</span>${r.origem&&html`<span class="badge bor">${r.origem}</span>`}</div><div style=${{ fontWeight: 700, fontSize: 14 }}>${r.numero}</div><div style=${{ fontSize: 12, color: 'var(--s2)' }}>${r.produto||'—'} · ${fDate(r.data)}</div></div>
+          <button class="btn bs bsm" onClick=${() => { try { pdfRnc(r); toast.show('PDF gerado'); } catch(e) { toast.show('Erro'); } }}><${Ic} n="pdf" s=${14}/>PDF</button>
+        </div>`; })}
+    </div>`}
+    ${secao === 'orcamentos' && html`<div style=${{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+      ${orcamentos.length === 0 && html`<div class="empty"><${Ic} n="money" s=${32} style=${{ color: 'var(--s3)' }}/><p>Nenhum orçamento.</p></div>`}
+      ${orcamentos.map(o => html`
+        <div key=${o.id} class="card" style=${{ padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 12 }}>
+          <div style=${{ flex: 1, minWidth: 0 }}><div class="row" style=${{ gap: 6, marginBottom: 4 }}><span class=${`badge ${o.status==='autorizado'?'bgr2':'bam'}`}>${o.status}</span><span class="badge bor">${o.origem}</span></div><div style=${{ fontWeight: 700, fontSize: 14 }}>${wLbl(o.semana)}</div><div style=${{ fontSize: 12, color: 'var(--s2)' }}>${fMoeda(o.total||0)}</div></div>
+          <button class="btn bs bsm" onClick=${() => { try { pdfOrcamento(o); toast.show('PDF gerado'); } catch(e) { toast.show('Erro'); } }}><${Ic} n="pdf" s=${14}/>PDF</button>
+        </div>`)}
+    </div>`}
+    ${secao === 'inventarios' && html`<div style=${{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+      ${inventarios.length === 0 && html`<div class="empty"><${Ic} n="box" s=${32} style=${{ color: 'var(--s3)' }}/><p>Nenhum inventário.</p></div>`}
+      ${[...inventarios].sort((a,b)=>new Date(b.finalizadoEm||b.criadoEm||0)-new Date(a.finalizadoEm||a.criadoEm||0)).map(i => { const st = ST_INV[i.status] || { l: i.status, c: 'bgy' }; return html`
+        <div key=${i.id} class="card" style=${{ padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 12 }}>
+          <div style=${{ flex: 1, minWidth: 0 }}>
+            <div class="row" style=${{ gap: 6, marginBottom: 4 }}><span class=${`badge ${st.c}`}>${st.l}</span><span class="badge bor">${i.origem}</span>${i.categoria && html`<span class="badge bbl">${i.categoria}</span>`}</div>
+            <div style=${{ fontWeight: 700, fontSize: 14 }}>${wLbl(i.semana)}</div>
+            <div style=${{ fontSize: 12, color: 'var(--s2)' }}>${i.responsavel||'—'} · ${fDate(i.data)}</div>
+          </div>
+          <button class="btn bs bsm" onClick=${() => { try { pdfInventario(i); toast.show('PDF gerado'); } catch(e) { toast.show('Erro'); } }}><${Ic} n="pdf" s=${14}/>PDF</button>
+        </div>`; })}
+    </div>`}
+  </div>`;
+}
+
+/* ══════════════════════════════════════
+   ANÁLISE
+══════════════════════════════════════ */
+
+function AnaliseTab() {
+  const pedidos = LS.get('pedidos') || [];
+  const inventarios = LS.get('inventarios') || [];
+  const tPrecos = LS.get('tabPrecos') || {};
+  const estoque = LS.get('estoque') || {};
+  const cat = useMemo(getCatalog, []);
+  const allItems = useMemo(() => flatCatalog(cat), [cat]);
+  const [view, setView] = useState('geral');
+  const semanas = useMemo(() => [...new Set([
+    ...pedidos.map(p => p.semana).filter(Boolean),
+    ...inventarios.map(i => i.semana).filter(Boolean),
+    ...Object.keys(tPrecos || {})
+  ])].sort(), [pedidos, inventarios, tPrecos]);
+  const [semIni, setSemIni] = useState(semanas.length > 4 ? semanas[semanas.length - 4] : (semanas[0] || ''));
+  const [semFim, setSemFim] = useState(semanas[semanas.length - 1] || '');
+  const [origem, setOrigem] = useState('TODOS');
+  const [categoria, setCategoria] = useState('TODAS');
+  const [buscaItem, setBuscaItem] = useState('');
+  const [itemSel, setItemSel] = useState('');
+
+  const inRange = w => (!semIni || w >= semIni) && (!semFim || w <= semFim);
+  const origemOk = o => origem === 'TODOS' || o === origem;
+  const meta = nome => allItems.find(i => i.name === nome) || {};
+  const categorias = useMemo(() => [...new Set(allItems.filter(i => origem === 'TODOS' || i.orig === origem).map(i => i.cat))].sort(), [allItems, origem]);
+  const itemOk = nome => {
+    const m = meta(nome);
+    return origemOk(m.orig) && (categoria === 'TODAS' || !categoria || m.cat === categoria);
+  };
+  const ultimoPreco = (nome, semanaRef = '') => {
+    const ws = Object.keys(tPrecos || {}).filter(w => !semanaRef || w <= semanaRef).sort().reverse();
+    for (const w of ws) if (tPrecos[w]?.[nome]) return parseFloat(tPrecos[w][nome]);
+    return 0;
+  };
+  const recebidosPedido = p => {
+    const rec = p.recebimento?.itens || [];
+    return (p.itens || []).map(i => {
+      const r = rec.find(x => x.nome === i.nome);
+      const qtd = p.recebimento ? parseFloat(r?.qtdRecebida ?? 0) : 0;
+      return { nome: i.nome, qtd, preco: parseFloat(i.precoUnit || 0), origem: p.origem, semana: p.semana, data: p.recebimento?.data || p.criadoEm, pedido: p };
+    }).filter(i => i.qtd > 0 && itemOk(i.nome));
+  };
+  const pedidosPeriodo = useMemo(() => pedidos.filter(p => p.semana && inRange(p.semana) && origemOk(p.origem)), [pedidos, semIni, semFim, origem]);
+  const comprasItens = useMemo(() => pedidosPeriodo.flatMap(recebidosPedido), [pedidosPeriodo, categoria, origem]);
+  const inventariosPeriodo = useMemo(() => inventarios.filter(i => i.semana && inRange(i.semana) && origemOk(i.origem)), [inventarios, semIni, semFim, origem]);
+  const consumo = useMemo(() => {
+    const lista = [...inventarios].filter(i => i.status === 'finalizado' && origemOk(i.origem)).sort((a,b) => `${a.origem}-${a.semana}`.localeCompare(`${b.origem}-${b.semana}`));
+    const grupos = {};
+    lista.forEach(inv => { const k = `${inv.origem}|${inv.categoria || 'geral'}`; if (!grupos[k]) grupos[k] = []; grupos[k].push(inv); });
+    const linhas = [];
+    Object.values(grupos).forEach(arr => {
+      arr.sort((a,b) => String(a.semana).localeCompare(String(b.semana)));
+      for (let idx = 1; idx < arr.length; idx++) {
+        const ant = arr[idx - 1], atual = arr[idx];
+        if (!inRange(atual.semana)) continue;
+        const recs = pedidos.filter(p => p.recebimento && p.origem === atual.origem && p.semana > ant.semana && p.semana <= atual.semana).flatMap(recebidosPedido);
+        const nomes = [...new Set([...(ant.itens || []).map(i => i.nome), ...(atual.itens || []).map(i => i.nome), ...recs.map(i => i.nome)])];
+        nomes.forEach(nome => {
+          if (!itemOk(nome)) return;
+          const qAnt = parseFloat((ant.itens || []).find(i => i.nome === nome)?.qtd || 0);
+          const qAtual = parseFloat((atual.itens || []).find(i => i.nome === nome)?.qtd || 0);
+          const qRec = recs.filter(r => r.nome === nome).reduce((s,r) => s + r.qtd, 0);
+          const qtd = qAnt + qRec - qAtual;
+          if (qtd > 0) {
+            const preco = recs.find(r => r.nome === nome)?.preco || ultimoPreco(nome, atual.semana);
+            linhas.push({ nome, origem: atual.origem, categoria: meta(nome).cat || atual.categoria || 'Geral', semana: atual.semana, qtd, custo: qtd * preco });
+          }
+        });
+      }
+    });
+    return linhas;
+  }, [inventarios, pedidos, semIni, semFim, origem, categoria]);
+
+  const ranking = useMemo(() => {
+    const m = {};
+    consumo.forEach(c => { if (!m[c.nome]) m[c.nome] = { nome: c.nome, origem: meta(c.nome).orig || c.origem, categoria: c.categoria, qtd: 0, custo: 0, semanas: new Set() }; m[c.nome].qtd += c.qtd; m[c.nome].custo += c.custo; m[c.nome].semanas.add(c.semana); });
+    return Object.values(m).map(x => ({ ...x, semanas: x.semanas.size })).sort((a,b) => b.qtd - a.qtd);
+  }, [consumo]);
+  const porSemana = useMemo(() => {
+    const m = {};
+    semanas.filter(inRange).forEach(w => m[w] = { semana: w, label: w.replace(/\d{4}-W/, 'W'), consumoQtd: 0, consumoCusto: 0, compraQtd: 0, compraCusto: 0, cd: 0, cp: 0 });
+    consumo.forEach(c => { if (!m[c.semana]) m[c.semana] = { semana: c.semana, label: c.semana.replace(/\d{4}-W/, 'W'), consumoQtd: 0, consumoCusto: 0, compraQtd: 0, compraCusto: 0, cd: 0, cp: 0 }; m[c.semana].consumoQtd += c.qtd; m[c.semana].consumoCusto += c.custo; });
+    comprasItens.forEach(i => { if (!m[i.semana]) m[i.semana] = { semana: i.semana, label: i.semana.replace(/\d{4}-W/, 'W'), consumoQtd: 0, consumoCusto: 0, compraQtd: 0, compraCusto: 0, cd: 0, cp: 0 }; m[i.semana].compraQtd += i.qtd; m[i.semana].compraCusto += i.qtd * i.preco; if (i.origem === 'CD') m[i.semana].cd += i.qtd * i.preco; if (i.origem === 'CP') m[i.semana].cp += i.qtd * i.preco; });
+    return Object.values(m).sort((a,b) => a.semana.localeCompare(b.semana));
+  }, [semanas, semIni, semFim, consumo, comprasItens]);
+  const compOrigem = useMemo(() => {
+    const b = { CD: { consumo: 0, custo: 0, compras: 0, compraCusto: 0, inventarios: 0 }, CP: { consumo: 0, custo: 0, compras: 0, compraCusto: 0, inventarios: 0 } };
+    consumo.forEach(c => { if (b[c.origem]) { b[c.origem].consumo += c.qtd; b[c.origem].custo += c.custo; } });
+    comprasItens.forEach(i => { if (b[i.origem]) { b[i.origem].compras += i.qtd; b[i.origem].compraCusto += i.qtd * i.preco; } });
+    inventariosPeriodo.forEach(i => { if (b[i.origem]) b[i.origem].inventarios += 1; });
+    return b;
+  }, [consumo, comprasItens, inventariosPeriodo]);
+  const itensLista = useMemo(() => allItems.filter(i => origemOk(i.orig) && (categoria === 'TODAS' || i.cat === categoria)).filter(i => !buscaItem || `${i.name} ${i.cat}`.toLowerCase().includes(buscaItem.toLowerCase())).slice(0, 40), [allItems, origem, categoria, buscaItem]);
+  const historicoItem = useMemo(() => {
+    if (!itemSel) return [];
+    const linhas = [];
+    inventarios.forEach(inv => { if (!inv.semana || !inRange(inv.semana) || !origemOk(inv.origem)) return; const it = (inv.itens || []).find(x => x.nome === itemSel); if (it) linhas.push({ data: inv.data || inv.finalizadoEm || inv.criadoEm, tipo: 'Inventário', origem: inv.origem, texto: `Contagem lançada: ${it.qtd} ${it.unit || meta(itemSel).unit || ''}`, semana: inv.semana }); });
+    pedidos.forEach(p => { if (!p.semana || !inRange(p.semana) || !origemOk(p.origem)) return; (p.itens || []).filter(i => i.nome === itemSel).forEach(i => linhas.push({ data: p.criadoEm, tipo: 'Pedido', origem: p.origem, texto: `Pedido: ${i.qtd} ${i.unit || meta(itemSel).unit || ''}`, semana: p.semana })); recebidosPedido(p).filter(i => i.nome === itemSel).forEach(i => linhas.push({ data: i.data, tipo: 'Compra recebida', origem: i.origem, texto: `Recebido: +${i.qtd} ${meta(itemSel).unit || ''} · ${fMoeda(i.qtd * i.preco)}`, semana: i.semana })); });
+    return linhas.sort((a,b) => new Date(a.data || 0) - new Date(b.data || 0));
+  }, [itemSel, inventarios, pedidos, semIni, semFim, origem]);
+  const totalCompra = comprasItens.reduce((s,i) => s + i.qtd * i.preco, 0);
+  const totalConsumo = consumo.reduce((s,i) => s + i.custo, 0);
+  const qtdConsumo = consumo.reduce((s,i) => s + i.qtd, 0);
+  const valorEstoque = Object.entries(estoque).filter(([nome]) => itemOk(nome)).reduce((s,[nome,q]) => s + parseFloat(q || 0) * ultimoPreco(nome), 0);
+  const fmtK = v => v >= 1000 ? 'R$' + (v / 1000).toFixed(1) + 'k' : 'R$' + Math.round(v || 0);
+
+  function Kpi({ label, value, sub }) {
+    return html`<div class="card" style=${{ padding: 16 }}><div style=${{ fontSize:10, fontWeight:800, color:'var(--s3)', textTransform:'uppercase', letterSpacing:'.06em', marginBottom:6 }}>${label}</div><div style=${{ fontSize:24, fontWeight:800, fontFamily:"'Plus Jakarta Sans',sans-serif" }}>${value}</div>${sub ? html`<div style=${{ fontSize:12, color:'var(--s2)', marginTop:4 }}>${sub}</div>` : null}</div>`;
+  }
+  function BarList({ rows, valueKey = 'qtd', money = false, maxRows = 10 }) {
+    const data = rows.slice(0, maxRows);
+    const max = Math.max(...data.map(r => Number(r[valueKey] || 0)), 1);
+    return html`<div style=${{ display:'flex', flexDirection:'column', gap:8 }}>${data.map((r,idx) => html`<div key=${r.nome || r.label || idx}><div class="row" style=${{ justifyContent:'space-between', gap:10, marginBottom:4 }}><div style=${{ fontSize:13, fontWeight:700, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>${idx + 1}. ${r.nome || r.label}</div><div style=${{ fontSize:12, fontWeight:800, color:'var(--or)', flexShrink:0 }}>${money ? fMoeda(r[valueKey] || 0) : Number(r[valueKey] || 0).toLocaleString('pt-BR')}</div></div><div style=${{ height:8, background:'var(--bd2)', borderRadius:20, overflow:'hidden' }}><div style=${{ width: Math.max(4, (Number(r[valueKey] || 0) / max) * 100) + '%', height:'100%', background:'var(--or)', borderRadius:20 }}></div></div></div>`)}</div>`;
+  }
+  function SemanaChart({ rows }) {
+    const max = Math.max(...rows.map(r => Math.max(r.compraCusto, r.consumoCusto)), 1);
+    return html`<div style=${{ display:'flex', alignItems:'end', gap:10, minHeight:210, paddingTop:8 }}>${rows.map(r => html`<div key=${r.semana} style=${{ flex:1, minWidth:46, display:'flex', flexDirection:'column', alignItems:'center', gap:6 }}><div style=${{ height:160, width:'100%', display:'flex', alignItems:'end', gap:4, justifyContent:'center' }}><div title="Recebido" style=${{ width:'42%', height: Math.max(4, r.compraCusto / max * 160) + 'px', background:'var(--or)', borderRadius:'8px 8px 2px 2px' }}></div><div title="Consumo" style=${{ width:'42%', height: Math.max(4, r.consumoCusto / max * 160) + 'px', background:'#2563EB', borderRadius:'8px 8px 2px 2px' }}></div></div><div style=${{ fontSize:11, fontWeight:800, color:'var(--s2)' }}>${r.label}</div></div>`)}</div>`;
+  }
+
+  return html`<div class="page" style=${{ maxWidth:'1440px' }}>
+    <div style=${{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', gap:16, marginBottom:16 }}><div><h2 style=${{ fontSize:22, fontWeight:800, fontFamily:"'Plus Jakarta Sans',sans-serif", margin:0 }}>Análise</h2><p style=${{ fontSize:13, color:'var(--s2)', margin:'4px 0 0' }}>Análise operacional: consumo em quantidade, valor consumido, compras e comparação por período.</p></div></div>
+    <div class="card" style=${{ padding:16, marginBottom:16 }}><div style=${{ display:'grid', gridTemplateColumns:'repeat(5, minmax(150px, 1fr))', gap:10, alignItems:'end' }}><div><label style=${{ fontSize:10, fontWeight:800, color:'var(--s3)', textTransform:'uppercase' }}>De</label><select class="inp" value=${semIni} onChange=${e => setSemIni(e.target.value)}><option value="">Primeira semana</option>${semanas.map(w => html`<option key=${w} value=${w}>${wLbl(w)}</option>`)}</select></div><div><label style=${{ fontSize:10, fontWeight:800, color:'var(--s3)', textTransform:'uppercase' }}>Até</label><select class="inp" value=${semFim} onChange=${e => setSemFim(e.target.value)}><option value="">Última semana</option>${semanas.map(w => html`<option key=${w} value=${w}>${wLbl(w)}</option>`)}</select></div><div><label style=${{ fontSize:10, fontWeight:800, color:'var(--s3)', textTransform:'uppercase' }}>Origem</label><select class="inp" value=${origem} onChange=${e => { setOrigem(e.target.value); setCategoria('TODAS'); }}><option value="TODOS">CD + CP</option><option value="CD">CD</option><option value="CP">CP</option></select></div><div><label style=${{ fontSize:10, fontWeight:800, color:'var(--s3)', textTransform:'uppercase' }}>Categoria</label><select class="inp" value=${categoria} onChange=${e => setCategoria(e.target.value)}><option value="TODAS">Todas</option>${categorias.map(c => html`<option key=${c} value=${c}>${c}</option>`)}</select></div><button class="btn bs" onClick=${() => { setSemIni(''); setSemFim(''); setOrigem('TODOS'); setCategoria('TODAS'); }}>Limpar filtros</button></div></div>
+    <div class="ptab" style=${{ marginBottom:16 }}>${[{id:'geral',l:'Visão geral'},{id:'consumo',l:'Ranking'},{id:'semanas',l:'Semanas'},{id:'origens',l:'CD x CP'},{id:'item',l:'Histórico por item'}].map(v => html`<button key=${v.id} class=${view === v.id ? 'on' : ''} onClick=${() => setView(v.id)}>${v.l}</button>`)}</div>
+    ${view === 'geral' ? html`<div><div style=${{ display:'grid', gridTemplateColumns:'repeat(4, minmax(180px, 1fr))', gap:12, marginBottom:16 }}><${Kpi} label="Custo recebido" value=${fMoeda(totalCompra)} sub=${`${comprasItens.length} itens recebidos`}/><${Kpi} label="Consumo calculado" value=${fMoeda(totalConsumo)} sub=${`${Number(qtdConsumo.toFixed(2)).toLocaleString('pt-BR')} unidades consumidas`}/><${Kpi} label="Valor estimado em estoque" value=${fMoeda(valorEstoque)} sub="baseado no último preço"/><${Kpi} label="Itens analisados" value=${ranking.length} sub="com consumo no período"/></div><div style=${{ display:'grid', gridTemplateColumns:'2fr 1fr', gap:12 }}><div class="card" style=${{ padding:16 }}><div style=${{ fontWeight:800, fontSize:15, marginBottom:4 }}>Recebido x consumo por semana</div><div style=${{ fontSize:12, color:'var(--s2)', marginBottom:12 }}>Laranja: recebido. Azul: consumo calculado.</div>${porSemana.length ? html`<${SemanaChart} rows=${porSemana}/>` : html`<p style=${{ fontSize:13, color:'var(--s2)' }}>Sem dados no período.</p>`}</div><div class="card" style=${{ padding:16 }}><div style=${{ fontWeight:800, fontSize:15, marginBottom:12 }}>Top consumo</div>${ranking.length ? html`<${BarList} rows=${ranking} valueKey="qtd" maxRows=${8}/>` : html`<p style=${{ fontSize:13, color:'var(--s2)' }}>Sem consumo calculado.</p>`}</div></div></div>` : null}
+    ${view === 'consumo' ? html`<div style=${{ display:'grid', gridTemplateColumns:'1.15fr .85fr', gap:12 }}><div class="card" style=${{ padding:16 }}><div style=${{ fontWeight:800, fontSize:15, marginBottom:12 }}>Ranking por quantidade</div>${ranking.length ? html`<${BarList} rows=${ranking} valueKey="qtd" maxRows=${20}/>` : html`<p style=${{ fontSize:13, color:'var(--s2)' }}>Sem dados.</p>`}</div><div class="card" style=${{ padding:16 }}><div style=${{ fontWeight:800, fontSize:15, marginBottom:12 }}>Ranking por custo</div>${ranking.length ? html`<${BarList} rows=${[...ranking].sort((a,b) => b.custo - a.custo)} valueKey="custo" money=${true} maxRows=${15}/>` : html`<p style=${{ fontSize:13, color:'var(--s2)' }}>Sem dados.</p>`}</div><div class="card" style=${{ padding:16, gridColumn:'1 / -1' }}><div style=${{ fontWeight:800, fontSize:15, marginBottom:12 }}>Tabela detalhada</div><div style=${{ overflowX:'auto' }}><table style=${{ width:'100%', borderCollapse:'collapse', fontSize:12 }}><thead><tr style=${{ borderBottom:'2px solid var(--bd)' }}>${['Item','Origem','Categoria','Qtd.','Custo','Semanas'].map((h,i) => html`<th key=${h} style=${{ textAlign:i<3?'left':'right', padding:'8px 6px', fontSize:10, textTransform:'uppercase', color:'var(--s3)' }}>${h}</th>`)}</tr></thead><tbody>${ranking.map((r,i) => html`<tr key=${r.nome} style=${{ borderBottom:'1px solid var(--bd)', background:i%2?'#FAFAFA':'#fff' }}><td style=${{ padding:'9px 6px', fontWeight:700 }}>${r.nome}</td><td style=${{ padding:'9px 6px' }}>${r.origem}</td><td style=${{ padding:'9px 6px' }}>${r.categoria}</td><td style=${{ padding:'9px 6px', textAlign:'right', fontWeight:800 }}>${Number(r.qtd.toFixed(2)).toLocaleString('pt-BR')}</td><td style=${{ padding:'9px 6px', textAlign:'right', fontWeight:800 }}>${fMoeda(r.custo)}</td><td style=${{ padding:'9px 6px', textAlign:'right' }}>${r.semanas}</td></tr>`)}</tbody></table></div></div></div>` : null}
+    ${view === 'semanas' ? html`<div><div class="card" style=${{ padding:16, marginBottom:12 }}><div style=${{ fontWeight:800, fontSize:15, marginBottom:12 }}>Comparação entre semanas</div><div style=${{ overflowX:'auto' }}><table style=${{ width:'100%', borderCollapse:'collapse', fontSize:12 }}><thead><tr style=${{ borderBottom:'2px solid var(--bd)' }}>${['Semana','Qtd. consumida','Custo consumo','Qtd. recebida','Custo recebido','Saldo custo'].map((h,i) => html`<th key=${h} style=${{ textAlign:i===0?'left':'right', padding:'8px 6px', fontSize:10, textTransform:'uppercase', color:'var(--s3)' }}>${h}</th>`)}</tr></thead><tbody>${porSemana.map((r,i) => html`<tr key=${r.semana} style=${{ borderBottom:'1px solid var(--bd)', background:i%2?'#FAFAFA':'#fff' }}><td style=${{ padding:'9px 6px', fontWeight:800 }}>${wLbl(r.semana)}</td><td style=${{ padding:'9px 6px', textAlign:'right' }}>${Number(r.consumoQtd.toFixed(2)).toLocaleString('pt-BR')}</td><td style=${{ padding:'9px 6px', textAlign:'right', fontWeight:700 }}>${fMoeda(r.consumoCusto)}</td><td style=${{ padding:'9px 6px', textAlign:'right' }}>${Number(r.compraQtd.toFixed(2)).toLocaleString('pt-BR')}</td><td style=${{ padding:'9px 6px', textAlign:'right', fontWeight:700 }}>${fMoeda(r.compraCusto)}</td><td style=${{ padding:'9px 6px', textAlign:'right', fontWeight:800, color:r.compraCusto-r.consumoCusto>=0?'var(--gr)':'var(--rd)' }}>${fMoeda(r.compraCusto-r.consumoCusto)}</td></tr>`)}</tbody></table></div></div><div class="card" style=${{ padding:16 }}><div style=${{ fontWeight:800, fontSize:15, marginBottom:12 }}>Gráfico semanal</div>${porSemana.length ? html`<${SemanaChart} rows=${porSemana}/>` : html`<p style=${{ fontSize:13, color:'var(--s2)' }}>Sem dados no período.</p>`}</div></div>` : null}
+    ${view === 'origens' ? html`<div style=${{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>${['CD','CP'].map(o => html`<div key=${o} class="card" style=${{ padding:16 }}><div style=${{ fontWeight:800, fontSize:18, marginBottom:12 }}>${o} · ${cat[o]?.label || ''}</div><div style=${{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}><${Kpi} label="Qtd. consumida" value=${Number(compOrigem[o].consumo.toFixed(2)).toLocaleString('pt-BR')}/><${Kpi} label="Custo consumo" value=${fMoeda(compOrigem[o].custo)}/><${Kpi} label="Qtd. recebida" value=${Number(compOrigem[o].compras.toFixed(2)).toLocaleString('pt-BR')}/><${Kpi} label="Custo recebido" value=${fMoeda(compOrigem[o].compraCusto)}/></div></div>`)}</div>` : null}
+    ${view === 'item' ? html`<div style=${{ display:'grid', gridTemplateColumns:'360px 1fr', gap:12 }}><div class="card" style=${{ padding:16 }}><div style=${{ fontWeight:800, fontSize:15, marginBottom:10 }}>Buscar item</div><input class="inp" value=${buscaItem} onInput=${e => setBuscaItem(e.target.value)} placeholder="Digite o nome do item..." style=${{ marginBottom:10 }}/><div style=${{ display:'flex', flexDirection:'column', gap:6, maxHeight:520, overflowY:'auto' }}>${itensLista.map(i => html`<button key=${i.name} onClick=${() => setItemSel(i.name)} style=${{ padding:'10px 12px', borderRadius:10, border:`1.5px solid ${itemSel===i.name?'var(--or)':'var(--bd)'}`, background:itemSel===i.name?'var(--or3)':'#fff', textAlign:'left', cursor:'pointer' }}><div style=${{ fontSize:13, fontWeight:700 }}>${i.name}</div><div style=${{ fontSize:11, color:'var(--s2)', marginTop:2 }}>${i.orig} · ${i.cat} · ${i.unit}</div></button>`)}</div></div><div class="card" style=${{ padding:16 }}>${!itemSel ? html`<div class="empty"><${Ic} n="info" s=${36} style=${{ color:'var(--s3)' }}/><p>Selecione um item para ver a linha do tempo analítica.</p></div>` : html`<div><div style=${{ fontWeight:800, fontSize:18, marginBottom:4 }}>${itemSel}</div><div style=${{ fontSize:12, color:'var(--s2)', marginBottom:16 }}>${meta(itemSel).orig || ''} · ${meta(itemSel).cat || ''} · Estoque atual: ${estoque[itemSel] ?? 0} ${meta(itemSel).unit || ''}</div>${historicoItem.length ? html`<div style=${{ display:'flex', flexDirection:'column', gap:10 }}>${historicoItem.map((h,i) => html`<div key=${i} style=${{ display:'grid', gridTemplateColumns:'110px 150px 1fr', gap:12, padding:'10px 0', borderTop:i?'1px solid var(--bd)':'none' }}><div style=${{ fontSize:12, fontWeight:800 }}>${fDate(h.data)}</div><div><span class="badge ${h.tipo.includes('Compra')?'bgr2':h.tipo.includes('Inventário')?'bor':'bbl'}">${h.tipo}</span></div><div><div style=${{ fontSize:13, fontWeight:700 }}>${h.texto}</div><div style=${{ fontSize:11, color:'var(--s2)', marginTop:2 }}>${h.origem} · ${wLbl(h.semana)}</div></div></div>`)}</div>` : html`<p style=${{ fontSize:13, color:'var(--s2)' }}>Nenhum histórico encontrado no período selecionado.</p>`}</div>`}</div></div>` : null}
+  </div>`;
+}
+
+
+/* ══════════════════════════════════════
+   CONFIG
+══════════════════════════════════════ */
+function ConfigTab({ toast }) {
+  const cat = useMemo(getCatalog, []);
+  const [custom, setCustom] = useState(() => LS.get('catalog') || { added: [], removed: [], addedCats: [] });
+  const [config, setConfig] = useState(() => LS.get('config') || { responsavel: '', empresa: 'Grupo Ilha' });
+  const [addingItem, setAddingItem] = useState(null);
+  const [addingCat, setAddingCat] = useState(null);
+  const [confirmDel, setConfirmDel] = useState(null);
+  const allItems = useMemo(() => flatCatalog(cat, { includeInactive: true }), [cat, custom]);
+
+  const saveCustom = c => { setCustom(c); LS.set('catalog', c); };
+  const saveConfig = c => { setConfig(c); LS.set('config', c); };
+
+  const isCustomItem = (orig, cat, name) => (custom.added || []).some(a => a.orig === orig && a.cat === cat && a.name === name);
+  const isRemoved = (orig, cat, name) => (custom.removed || []).some(r => r.orig === orig && r.cat === cat && r.name === name);
+  const isCustomCat = (orig, cat) => (custom.addedCats || []).some(c => c.orig === orig && c.cat === cat);
+
+  const addItem = ({ orig, cat, name, unit }) => { if (!name.trim()) return; const next = { ...custom, added: [...(custom.added || []), { orig, cat, name: name.trim(), unit }] }; saveCustom(next); toast.show('Item adicionado'); setAddingItem(null); };
+  const removeItem = ({ orig, cat, name }) => { const isCus = isCustomItem(orig, cat, name); const next = isCus ? { ...custom, added: (custom.added || []).filter(a => !(a.orig === orig && a.cat === cat && a.name === name)) } : { ...custom, removed: [...(custom.removed || []), { orig, cat, name }] }; saveCustom(next); toast.show('Removido'); setConfirmDel(null); };
+  const restoreItem = ({ orig, cat, name }) => { saveCustom({ ...custom, removed: (custom.removed || []).filter(r => !(r.orig === orig && r.cat === cat && r.name === name)) }); toast.show('Restaurado'); };
+  const addCat = ({ orig, cat, unit }) => { if (!cat.trim()) return; const next = { ...custom, addedCats: [...(custom.addedCats || []), { orig, cat: cat.trim(), unit }] }; saveCustom(next); toast.show('Categoria criada'); setAddingCat(null); };
+  const removeCat = (orig, cat) => { if (!confirm(`Excluir categoria "${cat}"?`)) return; const next = { ...custom, addedCats: (custom.addedCats || []).filter(c => !(c.orig === orig && c.cat === cat)), added: (custom.added || []).filter(a => !(a.orig === orig && a.cat === cat)) }; saveCustom(next); toast.show('Categoria excluída'); };
+
+  return html`<div class="page">
+    <div style=${{ marginBottom: 16 }}><h2 style=${{ fontSize: 20, fontWeight: 800, fontFamily: "'Plus Jakarta Sans',sans-serif", margin: 0 }}>Configurações</h2><p style=${{ fontSize: 13, color: "var(--s2)", margin: "4px 0 0" }}>Preferências, catálogo, itens inativos e padrões do sistema.</p></div>
+
+
+    <div class="card" style=${{ padding: 16, marginBottom: 12 }}>
+      <div style=${{ fontWeight: 800, fontSize: 14, marginBottom: 12 }}>Perfil padrão</div>
+      <label style=${{ fontSize: 11, fontWeight: 700, color: 'var(--s2)', textTransform: 'uppercase', letterSpacing: '.06em', display: 'block', marginBottom: 6 }}>Nome do responsável</label>
+      <input class="inp" value=${config.responsavel || ''} onInput=${e => saveConfig({ ...config, responsavel: e.target.value })} placeholder="Seu nome completo"/>
+      <p style=${{ fontSize: 12, color: 'var(--s2)', margin: '6px 0 0' }}>Preenchido automaticamente em RNCs, recebimentos e inventários</p>
+    </div>
+
+    <div style=${{ marginBottom: 12 }}>
+      <div class="row" style=${{ justifyContent: 'space-between', marginBottom: 8 }}>
+        <div style=${{ fontWeight: 800, fontSize: 14 }}>Catálogo de produtos</div>
+        <button class="btn bg0" style=${{ fontSize: 12, color: 'var(--rd)', padding: '6px 10px' }} onClick=${() => { if (confirm('Restaurar catálogo padrão? Customizações serão perdidas. Pedidos já feitos não serão afetados.')) { saveCustom({ added: [], removed: [], addedCats: [] }); toast.show('Catálogo restaurado'); } }}>Restaurar padrão</button>
+      </div>
+      <div class="card" style=${{ padding: 12, marginBottom: 8, background: 'var(--am3)', border: '1px solid rgba(217,119,6,.2)' }}>
+        <p style=${{ fontSize: 12, color: 'var(--am)', margin: 0, fontWeight: 600 }}>Alterar o catálogo não afeta pedidos, orçamentos, RNCs e inventários já criados.</p>
+      </div>
+    </div>
+
+    ${['CD', 'CP'].map(orig => html`
+      <div key=${orig} style=${{ marginBottom: 20 }}>
+        <div class="row" style=${{ justifyContent: 'space-between', marginBottom: 8 }}>
+          <div style=${{ fontSize: 12, fontWeight: 800, color: 'var(--or2)', textTransform: 'uppercase', letterSpacing: '.08em' }}>${orig} · ${cat[orig].label}</div>
+          <button class="btn bs bsm" onClick=${() => setAddingCat({ orig })}><${Ic} n="plus" s=${12}/>Nova categoria</button>
+        </div>
+        ${Object.entries(cat[orig].cats).map(([catN, catV]) => html`
+          <details key=${catN + orig} style=${{ marginBottom: 8 }}>
+            <summary class="cat-hdr">
+              <${Ic} n="cr" s=${14} c="chv" style=${{ color: 'var(--s3)' }}/>
+              <span style=${{ fontWeight: 700, fontSize: 14, flex: 1 }}>${catN}</span>
+              ${isCustomCat(orig, catN) && html`<span class="badge bor" style=${{ fontSize: 9 }}>NOVA</span>`}
+              <span style=${{ fontSize: 12, color: 'var(--s2)', marginRight: 6 }}>${catV.items.length}</span>
+              ${isCustomCat(orig, catN) && html`<button onClick=${e => { e.preventDefault(); e.stopPropagation(); removeCat(orig, catN); }} style=${{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--rd)', padding: 4 }}><${Ic} n="trash" s=${14}/></button>`}
+              <button onClick=${e => { e.preventDefault(); e.stopPropagation(); setAddingItem({ orig, cat: catN, unit: catV.unit || 'UND' }); }} style=${{ background: 'var(--or)', border: 'none', borderRadius: 8, padding: '4px 10px', cursor: 'pointer', color: '#fff', fontSize: 12, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 4 }}><${Ic} n="plus" s=${12}/>Item</button>
+            </summary>
+            <div class="ilist">
+              ${catV.items.length === 0 && html`<div style=${{ padding: 16, textAlign: 'center', fontSize: 13, color: 'var(--s3)' }}>Nenhum item. Adicione acima.</div>`}
+              ${catV.items.map((item, idx) => { const rem = isRemoved(orig, catN, item), cus = isCustomItem(orig, catN, item); return html`
+                <div key=${item} class="row" style=${{ padding: '10px 16px', borderTop: idx > 0 ? '1px solid var(--bd)' : 'none', justifyContent: 'space-between', opacity: rem ? .45 : 1 }}>
+                  <span style=${{ fontSize: 13, textDecoration: rem ? 'line-through' : 'none', fontWeight: cus ? 600 : 400, flex: 1 }}>${item}</span>
+                  ${cus && html`<span class="badge bor" style=${{ fontSize: 9, marginRight: 6 }}>NOVO</span>`}
+                  ${isInactiveItem(item) && html`<span class="badge bgy" style=${{ fontSize: 9, marginRight: 6 }}>INATIVO</span>`}
+                  ${rem
+                    ? html`<button class="btn bs bsm" onClick=${() => restoreItem({ orig, cat: catN, name: item })}>Restaurar</button>`
+                    : html`<div class="row" style=${{ gap: 6 }}><button class="btn bs bsm" onClick=${() => { const wasInactive = isInactiveItem(item); toggleInactiveItem(item); toast.show(wasInactive ? 'Item reativado' : 'Item inativado'); location.reload(); }}>${isInactiveItem(item) ? 'Reativar' : 'Inativar'}</button><button style=${{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--rd)', padding: 4 }} onClick=${() => setConfirmDel({ orig, cat: catN, name: item })}><${Ic} n="trash" s=${15}/></button></div>`}
+                </div>`; })}
+            </div>
+          </details>`)}
+      </div>`)}
+
+    <div style=${{ marginTop: 32, marginBottom: 24, textAlign: 'center', padding: '20px 0', borderTop: '1px solid var(--bd)' }}>
+      <div style=${{ fontSize: 10, fontWeight: 700, letterSpacing: '.12em', color: 'var(--s3)', textTransform: 'uppercase', marginBottom: 6 }}>Desenvolvido por</div>
+      <div style=${{ fontSize: 15, fontWeight: 800, color: 'var(--ink)', marginBottom: 2, fontFamily: "'Plus Jakarta Sans',sans-serif" }}>Vinicius Candido dos Santos</div>
+      <div style=${{ fontSize: 12, color: 'var(--s2)' }}>NEXUS · Grupo Ilha · ${new Date().getFullYear()}</div>
+    </div>
+
+    ${addingItem && html`<${AddItemModal} orig=${addingItem.orig} cat=${addingItem.cat} defUnit=${addingItem.unit} onClose=${() => setAddingItem(null)} onConfirm=${addItem}/>`}
+    ${addingCat && html`<${AddCatModal} orig=${addingCat.orig} onClose=${() => setAddingCat(null)} onConfirm=${addCat}/>`}
+    ${confirmDel && html`
+      <div class="mbg mcenter" onClick=${e => { if (e.target === e.currentTarget) setConfirmDel(null); }}>
+        <div class="mbox">
+          <h3 style=${{ margin: '0 0 8px', fontSize: 17, fontWeight: 800 }}>Remover item?</h3>
+          <p style=${{ fontSize: 14, color: 'var(--s2)', margin: '0 0 20px' }}><strong style=${{ color: 'var(--ink)' }}>${confirmDel.name}</strong> será removido do catálogo. Registros já criados não serão afetados.</p>
+          <div class="row" style=${{ gap: 8 }}>
+            <button class="btn bs" style=${{ flex: 1 }} onClick=${() => setConfirmDel(null)}>Cancelar</button>
+            <button class="btn brd" style=${{ flex: 1 }} onClick=${() => removeItem(confirmDel)}>Remover</button>
+          </div>
+        </div>
+      </div>`}
+  </div>`;
+}
+
+function AddItemModal({ orig, cat, defUnit, onClose, onConfirm }) {
+  const [name, setName] = useState(''); const [unit, setUnit] = useState(defUnit || 'UND'); const ref = useRef(null);
+  useEffect(() => { setTimeout(() => ref.current?.focus(), 100); }, []);
+  return html`<div class="mbg" onClick=${e => { if (e.target === e.currentTarget) onClose(); }}>
+    <div class="msheet">
+      <div style=${{ padding: '16px 16px 8px', borderBottom: '1px solid var(--bd)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div><div style=${{ fontWeight: 800, fontSize: 16 }}>Novo item em ${cat}</div><div style=${{ fontSize: 12, color: 'var(--s2)' }}>${orig}</div></div>
+        <button class="btn bg0 bic" onClick=${onClose}><${Ic} n="x" s=${20}/></button>
+      </div>
+      <div style=${{ padding: 16, display: 'flex', flexDirection: 'column', gap: 12, overflowY: 'auto' }}>
+        <div><label style=${{ fontSize: 11, fontWeight: 700, color: 'var(--s2)', textTransform: 'uppercase', letterSpacing: '.06em', display: 'block', marginBottom: 6 }}>Nome do produto</label><input ref=${ref} class="inp" value=${name} onInput=${e => setName(e.target.value)} onKeyDown=${e => { if (e.key === 'Enter') onConfirm({ orig, cat, name, unit }); }} placeholder="Ex: CARNE SECA 1KG"/></div>
+        <div><label style=${{ fontSize: 11, fontWeight: 700, color: 'var(--s2)', textTransform: 'uppercase', letterSpacing: '.06em', display: 'block', marginBottom: 6 }}>Unidade</label><div style=${{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>${['UND','KG','G','L','ML','PCT','CX','PCS'].map(u => html`<button key=${u} onClick=${() => setUnit(u)} style=${{ padding: '6px 14px', borderRadius: 8, border: `2px solid ${unit === u ? 'var(--or)' : 'var(--bd)'}`, background: unit === u ? 'var(--or)' : '#fff', color: unit === u ? '#fff' : 'var(--s2)', fontWeight: 700, fontSize: 12, cursor: 'pointer' }}>${u}</button>`)}</div></div>
+      </div>
+      <div style=${{ padding: '12px 16px', borderTop: '1px solid var(--bd)', display: 'flex', gap: 8 }}>
+        <button class="btn bs" style=${{ flex: 1 }} onClick=${onClose}>Cancelar</button>
+        <button class="btn bp" style=${{ flex: 1 }} disabled=${!name.trim()} onClick=${() => onConfirm({ orig, cat, name, unit })}>Adicionar</button>
+      </div>
+    </div>
+  </div>`;
+}
+
+function AddCatModal({ orig, onClose, onConfirm }) {
+  const [cat, setCat] = useState(''); const [unit, setUnit] = useState('UND'); const ref = useRef(null);
+  useEffect(() => { setTimeout(() => ref.current?.focus(), 100); }, []);
+  return html`<div class="mbg" onClick=${e => { if (e.target === e.currentTarget) onClose(); }}>
+    <div class="msheet">
+      <div style=${{ padding: '16px 16px 8px', borderBottom: '1px solid var(--bd)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div style=${{ fontWeight: 800, fontSize: 16 }}>Nova categoria em ${orig}</div>
+        <button class="btn bg0 bic" onClick=${onClose}><${Ic} n="x" s=${20}/></button>
+      </div>
+      <div style=${{ padding: 16, display: 'flex', flexDirection: 'column', gap: 12, overflowY: 'auto' }}>
+        <div><label style=${{ fontSize: 11, fontWeight: 700, color: 'var(--s2)', textTransform: 'uppercase', letterSpacing: '.06em', display: 'block', marginBottom: 6 }}>Nome da categoria</label><input ref=${ref} class="inp" value=${cat} onInput=${e => setCat(e.target.value)} onKeyDown=${e => { if (e.key === 'Enter') onConfirm({ orig, cat, unit }); }} placeholder="Ex: Bebidas, Descartáveis..."/></div>
+        <div><label style=${{ fontSize: 11, fontWeight: 700, color: 'var(--s2)', textTransform: 'uppercase', letterSpacing: '.06em', display: 'block', marginBottom: 6 }}>Unidade padrão</label><div style=${{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>${['UND','KG','G','L','ML','PCT','CX','PCS'].map(u => html`<button key=${u} onClick=${() => setUnit(u)} style=${{ padding: '6px 14px', borderRadius: 8, border: `2px solid ${unit === u ? 'var(--or)' : 'var(--bd)'}`, background: unit === u ? 'var(--or)' : '#fff', color: unit === u ? '#fff' : 'var(--s2)', fontWeight: 700, fontSize: 12, cursor: 'pointer' }}>${u}</button>`)}</div></div>
+      </div>
+      <div style=${{ padding: '12px 16px', borderTop: '1px solid var(--bd)', display: 'flex', gap: 8 }}>
+        <button class="btn bs" style=${{ flex: 1 }} onClick=${onClose}>Cancelar</button>
+        <button class="btn bp" style=${{ flex: 1 }} disabled=${!cat.trim()} onClick=${() => onConfirm({ orig, cat, unit })}>Criar categoria</button>
+      </div>
+    </div>
+  </div>`;
+}
+
+
+/* ══════════════════════════════════════
+   ADMINISTRAÇÃO LOCAL
+══════════════════════════════════════ */
+function AdminLocal({ toast }) {
+  const [trash, setTrash] = useState(() => LS.get('trash') || []);
+  const [logs, setLogs] = useState(() => LS.get('audit') || []);
+  const [logBusca, setLogBusca] = useState('');
+  const estoque = LS.get('estoque') || {};
+  const pedidos = LS.get('pedidos') || [];
+  const inventarios = LS.get('inventarios') || [];
+  const rncs = LS.get('rncs') || [];
+  const logsFiltrados = logs.filter(l => { const ac = l.acao || l.action || ''; const det = l.det || l.detail || ''; return !logBusca || `${ac} ${det} ${fDate(l.data)}`.toLowerCase().includes(logBusca.toLowerCase()); });
+  const restaurar = t => {
+    if (!t) return;
+    if (t.type === 'pedido') { const a=LS.get('pedidos')||[]; LS.set('pedidos',[t.record,...a]); }
+    if (t.type === 'orcamento') { const a=LS.get('orcamentos')||[]; LS.set('orcamentos',[t.record,...a]); }
+    if (t.type === 'recebimento') { const a=LS.get('pedidos')||[]; LS.set('pedidos', a.map(p => p.id === t.record?.pedidoId ? { ...p, status:'pendente', recebimento:null } : p)); }
+    if (t.type === 'inventario') { const a=LS.get('inventarios')||[]; LS.set('inventarios',[t.record,...a]); }
+    if (t.type === 'rnc') { const a=LS.get('rncs')||[]; LS.set('rncs',[t.record,...a]); }
+    const nt=trash.filter(x=>x.id!==t.id); LS.set('trash',nt); setTrash(nt); auditLog('Restauração de lixeira', `${t.type}: ${t.record?.numero || t.record?.semana || t.record?.id || ''}`); setLogs(LS.get('audit')||[]); toast.show('Registro restaurado');
+  };
+  const removerDef = t => {
+    if (!strongConfirm('Exclusão permanente')) return;
+    const nt=trash.filter(x=>x.id!==t.id); LS.set('trash',nt); setTrash(nt); auditLog('Exclusão permanente', `${t.type}: ${t.record?.numero || t.record?.semana || t.record?.id || ''}`); setLogs(LS.get('audit')||[]); toast.show('Excluído permanentemente');
+  };
+  return html`<div class="page" style=${{ maxWidth:'1440px' }}>
+    <div style=${{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', gap:16, marginBottom:16 }}>
+      <div><h2 style=${{ fontSize:22, fontWeight:800, fontFamily:"'Plus Jakarta Sans',sans-serif", margin:0 }}>Administração</h2><p style=${{ fontSize:13, color:'var(--s2)', margin:'4px 0 0' }}>Governança local, lixeira, auditoria e controle de semana.</p></div>
+      <span class="badge bor">Lixeira: ${trash.length}</span>
+    </div>
+    <div style=${{ display:'grid', gridTemplateColumns:'2fr 1fr', gap:14, marginBottom:14 }}>
+      <div class="card" style=${{ padding:16 }}>
+        <div style=${{ fontWeight:800, fontSize:16, marginBottom:10 }}>Lixeira administrativa</div>
+        <p style=${{ fontSize:12, color:'var(--s2)', margin:'0 0 12px' }}>Pedidos, orçamentos, inventários, recebimentos e RNCs excluídos ficam aqui para restauração ou exclusão definitiva.</p>
+        <div style=${{ display:'flex', flexDirection:'column', gap:8, maxHeight:360, overflow:'auto' }}>
+          ${trash.length===0 && html`<p style=${{ fontSize:13,color:'var(--s2)' }}>Nenhum item na lixeira.</p>`}
+          ${trash.map(t=>html`<div key=${t.id} style=${{ border:'1px solid var(--bd)',borderRadius:12,padding:12,background:'#fff', display:'grid', gridTemplateColumns:'1fr auto', gap:10, alignItems:'center' }}>
+            <div><div style=${{ fontWeight:800,fontSize:13 }}>${(t.type || '').toUpperCase()} · ${t.record?.numero || t.record?.semana || t.record?.id || 'registro'}</div><div style=${{ fontSize:12,color:'var(--s2)',marginTop:2 }}>${fDate(t.apagadoEm)} · ${t.motivo || 'Sem motivo informado'}</div></div>
+            <div class="row"><button class="btn bs bsm" onClick=${()=>restaurar(t)}>Restaurar</button><button class="btn brd bsm" onClick=${()=>removerDef(t)}>Excluir definitivo</button></div>
+          </div>`)}
+        </div>
+      </div>
+      <div class="card" style=${{ padding:16 }}>
+        <div style=${{ fontWeight:800, fontSize:16, marginBottom:10 }}>Painel de saúde operacional</div>
+        <div style=${{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
+          ${[['Pedidos pendentes',pedidos.filter(p=>p.status==='pendente').length],['Recebimentos parciais',pedidos.filter(p=>p.status==='parcial').length],['Inventários rascunho',inventarios.filter(i=>i.status==='rascunho').length],['RNCs abertas',rncs.filter(r=>r.status==='aberta'||r.status==='analise').length],['Estoque zerado',Object.values(estoque).filter(q=>parseFloat(q)<=0).length],['Estoque baixo',Object.values(estoque).filter(q=>parseFloat(q)>0&&parseFloat(q)<3).length]].map(([l,v])=>html`<div style=${{ padding:12, border:'1px solid var(--bd)', borderRadius:12, background:'#fff' }}><div style=${{ fontSize:10,color:'var(--s3)',fontWeight:800,textTransform:'uppercase',letterSpacing:'.06em' }}>${l}</div><div style=${{ fontSize:24,fontWeight:800,fontFamily:"'Plus Jakarta Sans',sans-serif" }}>${v}</div></div>`)}
+        </div>
+      </div>
+    </div>
+    <${WeekControl} toast=${toast}/>
+    <div class="card" style=${{ padding:16 }}>
+      <div style=${{ display:'flex', justifyContent:'space-between', alignItems:'center', gap:12, marginBottom:10 }}><div style=${{ fontWeight:800, fontSize:16 }}>Logs e auditoria</div><input class="inp" style=${{ maxWidth:360 }} value=${logBusca} onInput=${e=>setLogBusca(e.target.value)} placeholder="Buscar por ação, data ou detalhe..."/></div>
+      <div style=${{ display:'flex', flexDirection:'column', gap:8, maxHeight:380, overflow:'auto' }}>
+        ${logsFiltrados.length===0 && html`<p style=${{ fontSize:13,color:'var(--s2)' }}>Nenhum log encontrado.</p>`}
+        ${logsFiltrados.slice(0,120).map((l,i)=>html`<div key=${l.id||i} style=${{ border:'1px solid var(--bd)', borderRadius:12, padding:12, background:'#fff' }}><div style=${{ fontWeight:800, fontSize:13 }}>${fDate(l.data)} · ${l.acao || l.action || 'Ação'}</div><div style=${{ fontSize:12, color:'var(--s2)', marginTop:3 }}>${l.det || l.detail || 'Sem detalhe'}</div></div>`)}
+      </div>
+    </div>
+  </div>`;
+}
+
+
+/* ══════════════════════════════════════
+   GLOBAL SEARCH
+══════════════════════════════════════ */
+function GlobalSearch({ setTab }) {
+  const [open, setOpen] = useState(false);
+  const [q, setQ] = useState('');
+  const ref = useRef(null);
+  useEffect(() => { if (open) setTimeout(() => ref.current?.focus(), 80); }, [open]);
+  useEffect(() => { const fn = e => { if (e.key === 'Escape') setOpen(false); }; window.addEventListener('keydown', fn); return () => window.removeEventListener('keydown', fn); }, []);
+  const pedidos = LS.get('pedidos') || [];
+  const rncs = LS.get('rncs') || [];
+  const orcamentos = LS.get('orcamentos') || [];
+  const resultados = q.trim().length < 2 ? [] : [
+    ...pedidos.filter(p => wLbl(p.semana).toLowerCase().includes(q.toLowerCase()) || (p.origem||'').toLowerCase().includes(q.toLowerCase())).slice(0,3).map(p => ({ label: `Pedido · ${wLbl(p.semana)} · ${p.origem}`, tab: 'pedidos' })),
+    ...rncs.filter(r => (r.numero||'').toLowerCase().includes(q.toLowerCase()) || (r.produto||'').toLowerCase().includes(q.toLowerCase())).slice(0,3).map(r => ({ label: `RNC · ${r.numero} · ${r.produto||''}`, tab: 'rnc' })),
+    ...orcamentos.filter(o => wLbl(o.semana).toLowerCase().includes(q.toLowerCase()) || (o.origem||'').toLowerCase().includes(q.toLowerCase())).slice(0,3).map(o => ({ label: `Orçamento · ${wLbl(o.semana)} · ${o.origem}`, tab: 'orcamento' })),
+  ];
+  if (!open) return html`<button class="gsearch-fab btn" onClick=${() => setOpen(true)} title="Busca global"><${Ic} n="orders" s=${20}/><span class="gsearch-tip">Busca global</span></button>`;
+  return html`<div class="mbg mcenter" onClick=${e => { if (e.target === e.currentTarget) setOpen(false); }}>
+    <div class="mbox" style=${{ width: 'calc(100% - 32px)', maxWidth: 480 }}>
+      <div class="row" style=${{ marginBottom: 12 }}>
+        <input ref=${ref} class="inp" style=${{ flex: 1 }} value=${q} onInput=${e => setQ(e.target.value)} placeholder="Buscar pedido, RNC, orçamento..."/>
+        <button class="btn bg0 bic" onClick=${() => setOpen(false)}><${Ic} n="x" s=${20}/></button>
+      </div>
+      ${resultados.length === 0 && q.trim().length >= 2 && html`<p style=${{ fontSize:13, color:'var(--s2)', textAlign:'center', padding:'12px 0' }}>Nenhum resultado encontrado.</p>`}
+      ${resultados.map((r, i) => html`<button key=${i} class="card" style=${{ width:'100%', padding:'12px 16px', border:'none', textAlign:'left', cursor:'pointer', marginBottom:6, display:'block' }} onClick=${() => { setTab(r.tab); setOpen(false); setQ(''); }}><span style=${{ fontSize:13, fontWeight:600 }}>${r.label}</span></button>`)}
+    </div>
+  </div>`;
+}
+
+/* ══════════════════════════════════════
+   TAB ERROR BOUNDARY
+══════════════════════════════════════ */
+class TabErrorBoundary extends React.Component {
+  constructor(props) { super(props); this.state = { hasError: false, error: null }; }
+  static getDerivedStateFromError(error) { return { hasError: true, error }; }
+  componentDidCatch(error, info) { console.error('TabErrorBoundary:', error, info); }
+  componentDidUpdate(prev) { if (prev.tab !== this.props.tab) this.setState({ hasError: false, error: null }); }
+  render() {
+    if (this.state.hasError) {
+      return React.createElement('div', { className: 'page' },
+        React.createElement('div', { className: 'card', style: { padding: 24, textAlign: 'center' } },
+          React.createElement('div', { style: { fontSize: 32, marginBottom: 8 } }, '⚠️'),
+          React.createElement('div', { style: { fontWeight: 800, fontSize: 16, marginBottom: 8 } }, 'Erro nesta seção'),
+          React.createElement('div', { style: { fontSize: 13, color: '#6B7280', marginBottom: 16 } }, String(this.state.error?.message || 'Erro desconhecido')),
+          React.createElement('button', { className: 'btn bp', onClick: () => this.setState({ hasError: false, error: null }) }, 'Tentar novamente')
+        )
+      );
+    }
+    return this.props.children;
+  }
+}
+
+/* ══════════════════════════════════════
+   WEEK CONTROL
+══════════════════════════════════════ */
+function WeekControl({ toast }) {
+  const cur = getWeekId();
+  const sems = useMemo(genSems, []);
+  const [sel, setSel] = useState(cur);
+  const closed = LS.get('closedWeeks') || [];
+  const isClosed = closed.includes(sel);
+  return html`<div class="card" style=${{ padding: 16, marginBottom: 14 }}>
+    <div style=${{ fontWeight: 800, fontSize: 16, marginBottom: 10 }}>Controle de semana</div>
+    <div class="row" style=${{ gap: 8, marginBottom: 10 }}>
+      <select class="inp" value=${sel} onChange=${e => setSel(e.target.value)} style=${{ flex: 1 }}>
+        ${sems.map(s => html`<option key=${s} value=${s}>${wLbl(s)}${s === cur ? ' (atual)' : ''}</option>`)}
+      </select>
+      <span class=${`badge ${isClosed ? 'brd2' : 'bgr2'}`}>${isClosed ? 'Fechada' : 'Aberta'}</span>
+    </div>
+    <div class="row" style=${{ gap: 8 }}>
+      <button class="btn bs bsm" style=${{ flex: 1 }} disabled=${!isClosed} onClick=${() => { reopenWeek(sel); toast.show(`${wLbl(sel)} reaberta`); }}><${Ic} n="ref" s=${14}/>Reabrir</button>
+      <button class="btn bp bsm" style=${{ flex: 1 }} disabled=${isClosed} onClick=${() => { closeWeek(sel); toast.show(`${wLbl(sel)} fechada`); }}><${Ic} n="chk" s=${14}/>Fechar semana</button>
+    </div>
+  </div>`;
+}
+
+/* ══════════════════════════════════════
+   APP ROOT
+══════════════════════════════════════ */
+function App() {
+  const [tab, _setTab] = useState(LS.get('tabAtual') || 'inicio');
+  const setTab = t => { LS.set('tabAtual', t); _setTab(t); };
+  const toast = useToast();
+  return html`<div style=${{ minHeight: '100dvh' }}>
+    ${toast.ui}
+    <${GlobalSearch} setTab=${setTab}/>
+    <${Header} tab=${tab} setTab=${setTab}/>
+    <main>
+      <${TabErrorBoundary} tab=${tab}>
+        ${tab === 'inicio' && html`<${InicioTab} setTab=${setTab}/>`}
+        ${tab === 'orcamento' && html`<${OrcamentoTab} toast=${toast}/>`}
+        ${tab === 'pedidos' && html`<${PedidosTab} toast=${toast}/>`}
+        ${tab === 'recebimento' && html`<${RecebimentoTab} toast=${toast}/>`}
+        ${tab === 'inventario' && html`<${InventarioTab} toast=${toast}/>`}
+        ${tab === 'estoque' && html`<${EstoqueTab} toast=${toast}/>`}
+        ${tab === 'rnc' && html`<${RncTab} toast=${toast}/>`}
+        ${tab === 'relatorios' && html`<${RelatoriosTab} toast=${toast}/>`}
+        ${tab === 'analise' && html`<${AnaliseTab}/>`}
+        ${tab === 'admin' && html`<${AdminLocal} toast=${toast}/>`}
+        ${tab === 'config' && html`<${ConfigTab} toast=${toast}/>`}
+      </${TabErrorBoundary}>
+    </main>
+    <${BottomNav} tab=${tab} setTab=${setTab}/>
+  </div>`;
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(html`<${App}/>`);
+}
+</script>
+</body>
+</html>

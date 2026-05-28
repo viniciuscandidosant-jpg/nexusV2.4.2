@@ -1512,8 +1512,36 @@ function pdfPedido(p) {
 }
 function pdfRecebimento(p) {
   const Doc=getJsPDF(); const doc=new Doc({ orientation:'p', unit:'mm', format:'a4' });
-  const rec=p.recebimento || {}; pdfHeader(doc,'Recebimento',`${p.origem || ''} · ${wLbl(p.semana)} · ${fDate(rec.data || p.data || p.criadoEm)}`);
-  pdfTable(doc,['Item','Qtd. solicitada','Qtd. recebida','Diferença','Justificativa'],(rec.itens||p.itens||[]).map(i=>{ const sol=Number(i.qtd||0), ent=Number((i.qtdRecebida ?? i.qtd) || 0); return [i.nome||'',sol,ent,ent-sol,i.justificativa||'']; }),48);
+  const rec=p.recebimento || {};
+  pdfHeader(doc,'Recebimento',`${p.origem || ''} · ${wLbl(p.semana)} · ${fDate(rec.data || p.data || p.criadoEm)}`);
+
+  // A observação escrita na tela de recebimento fica salva em rec.observacoes.
+  // Antes, o PDF ignorava esse campo e mostrava uma coluna "Justificativa" vazia.
+  // Agora o PDF imprime sempre as observações gerais do recebimento abaixo da tabela.
+  const itensPdf = (rec.itens || p.itens || []).map(i => {
+    const sol = Number(i.qtd || 0);
+    const ent = Number((i.qtdRecebida ?? i.qtd) || 0);
+    return [i.nome || '', sol, ent, ent - sol];
+  });
+
+  pdfTable(doc, ['Item','Qtd. solicitada','Qtd. recebida','Diferença'], itensPdf, 48);
+
+  let y = (doc.lastAutoTable && doc.lastAutoTable.finalY ? doc.lastAutoTable.finalY : 48 + itensPdf.length * 6 + 10) + 10;
+  if (y > 250) { doc.addPage(); y = 20; }
+
+  const obsTxt = String(rec.observacoes || p.observacoes || '').trim() || 'Sem observações registradas.';
+  doc.setDrawColor(229,231,235);
+  doc.setFillColor(249,250,251);
+  doc.roundedRect(14, y - 5, 182, 32, 3, 3, 'FD');
+  doc.setFontSize(9);
+  doc.setFont(undefined, 'bold');
+  doc.setTextColor(17,24,39);
+  doc.text('Observações do recebimento', 18, y);
+  doc.setFont(undefined, 'normal');
+  doc.setTextColor(17,24,39);
+  const obsLines = doc.splitTextToSize(obsTxt, 172);
+  doc.text(obsLines, 18, y + 7);
+
   savePdf(doc,`NEXUS_Recebimento_${p.origem||''}_${p.semana||''}`);
 }
 function pdfOrcamento(o) {

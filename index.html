@@ -1379,101 +1379,425 @@ function RncCard({ rnc, onClick }) {
   </button>`;
 }
 
+/* SignaturePad — canvas de assinatura digital reutilizável.
+   Retorna dataURL via onChange (PNG transparente, traço escuro). */
+function SignaturePad({ value, onChange, label='Assinatura' }) {
+  const canvasRef = useRef(null);
+  const wrapRef = useRef(null);
+  const drawingRef = useRef(false);
+  const lastRef = useRef({ x: 0, y: 0 });
+  const dirtyRef = useRef(false);
+
+  // Inicializa o canvas com a resolução visual correta (DPR)
+  useEffect(() => {
+    const cv = canvasRef.current;
+    const wrap = wrapRef.current;
+    if (!cv || !wrap) return;
+    const dpr = window.devicePixelRatio || 1;
+    const w = wrap.clientWidth;
+    const h = 140;
+    cv.width = w * dpr;
+    cv.height = h * dpr;
+    cv.style.width = w + 'px';
+    cv.style.height = h + 'px';
+    const ctx = cv.getContext('2d');
+    ctx.scale(dpr, dpr);
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = '#111827';
+    // se já tinha assinatura salva, redesenha
+    if (value) {
+      const img = new Image();
+      img.onload = () => { ctx.drawImage(img, 0, 0, w, h); dirtyRef.current = true; };
+      img.src = value;
+    }
+  }, []); // só uma vez na montagem; tamanho fixo no editor
+
+  const pos = (e) => {
+    const cv = canvasRef.current;
+    const rect = cv.getBoundingClientRect();
+    const touch = e.touches?.[0];
+    const x = (touch ? touch.clientX : e.clientX) - rect.left;
+    const y = (touch ? touch.clientY : e.clientY) - rect.top;
+    return { x, y };
+  };
+  const start = (e) => {
+    e.preventDefault();
+    drawingRef.current = true;
+    lastRef.current = pos(e);
+  };
+  const move = (e) => {
+    if (!drawingRef.current) return;
+    e.preventDefault();
+    const p = pos(e);
+    const ctx = canvasRef.current.getContext('2d');
+    ctx.beginPath();
+    ctx.moveTo(lastRef.current.x, lastRef.current.y);
+    ctx.lineTo(p.x, p.y);
+    ctx.stroke();
+    lastRef.current = p;
+    dirtyRef.current = true;
+  };
+  const end = () => {
+    if (!drawingRef.current) return;
+    drawingRef.current = false;
+    if (dirtyRef.current) {
+      const data = canvasRef.current.toDataURL('image/png');
+      onChange?.(data);
+    }
+  };
+  const clear = () => {
+    const cv = canvasRef.current;
+    const ctx = cv.getContext('2d');
+    ctx.clearRect(0, 0, cv.width, cv.height);
+    dirtyRef.current = false;
+    onChange?.(null);
+  };
+
+  return html`<div ref=${wrapRef} style=${{ width: '100%' }}>
+    <div class="row" style=${{ justifyContent: 'space-between', marginBottom: 8 }}>
+      <span style=${{ fontSize: 11, fontWeight: 700, color: 'var(--s2)', textTransform: 'uppercase', letterSpacing: '.06em' }}>${label}</span>
+      <button class="btn bg0 bsm" onClick=${clear} style=${{ color: 'var(--s2)' }}><${Ic} n="x" s=${12}/>Limpar</button>
+    </div>
+    <div style=${{ position: 'relative', border: '1.5px dashed var(--bd)', borderRadius: 10, background: '#FAFAFA', overflow: 'hidden' }}>
+      <canvas
+        ref=${canvasRef}
+        onMouseDown=${start}
+        onMouseMove=${move}
+        onMouseUp=${end}
+        onMouseLeave=${end}
+        onTouchStart=${start}
+        onTouchMove=${move}
+        onTouchEnd=${end}
+        style=${{ display: 'block', touchAction: 'none', cursor: 'crosshair' }}
+      />
+      ${!value && !dirtyRef.current && html`<div style=${{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', color: 'var(--s3)', fontSize: 12, pointerEvents: 'none', fontStyle: 'italic' }}>Assine aqui</div>`}
+    </div>
+  </div>`;
+}
+
 function RncEditor({ rnc, allItems, toast, genNum, onBack, onSave, onDelete }) {
   const isEdit = !!rnc?.id;
+  const [step, setStep] = useState(1);
+
+  // --- Estado dos campos ---
   const [orig, setOrig] = useState(rnc?.origem || 'CD');
+  const [data, setData] = useState(rnc?.data || new Date().toISOString().split('T')[0]);
+  const [status, setStatus] = useState(rnc?.status || 'aberta');
+  const [resp, setResp] = useState(rnc?.responsavel || (LS.get('config') || {}).responsavel || '');
+
   const [produto, setProduto] = useState(rnc?.produto || '');
   const [fornecedor, setFornecedor] = useState(rnc?.fornecedor || '');
   const [unit, setUnit] = useState(rnc?.unidade || 'UND');
   const [qtd, setQtd] = useState(String(rnc?.quantidade || ''));
-  const [data, setData] = useState(rnc?.data || new Date().toISOString().split('T')[0]);
-  const [resp, setResp] = useState(rnc?.responsavel || (LS.get('config') || {}).responsavel || '');
+
   const [tipo, setTipo] = useState(rnc?.tipo || '');
   const [tipoCustom, setTipoCustom] = useState(rnc?.tipoCustom || '');
   const [desc, setDesc] = useState(rnc?.descricao || '');
+
   const [acao, setAcao] = useState(rnc?.acao || '');
   const [obsAcao, setObsAcao] = useState(rnc?.obsAcao || '');
-  const [status, setStatus] = useState(rnc?.status || 'aberta');
-  const [sig, setSig] = useState(rnc?.assinatura || null);
-  const [showSig, setShowSig] = useState(false);
+
   const [fotos, setFotos] = useState(rnc?.fotos || []);
+  const [assinatura, setAssinatura] = useState(rnc?.assinatura || null);
   const fotoRef = useRef(null);
 
-  const TIPOS = ['Produto fora do prazo', 'Produto com avaria', 'Quantidade incorreta', 'Produto fora do padrão de qualidade', 'Temperatura inadequada', 'Embalagem danificada', 'Outro (descrever)'];
-  const ACOES = ['Devolução ao fornecedor', 'Substituição imediata', 'Crédito em nota', 'Desconto na próxima entrega', 'Apenas registrar ocorrência'];
+  const TIPOS = [
+    { v: 'Produto fora do prazo', ic: 'orc' },
+    { v: 'Produto com avaria', ic: 'rnc' },
+    { v: 'Quantidade incorreta', ic: 'recv' },
+    { v: 'Produto fora do padrão de qualidade', ic: 'rnc' },
+    { v: 'Temperatura inadequada', ic: 'rnc' },
+    { v: 'Embalagem danificada', ic: 'rnc' },
+    { v: 'Outro (descrever)', ic: 'pen' },
+  ];
+  const ACOES = [
+    { v: 'Devolução ao fornecedor', desc: 'Material será devolvido na próxima entrega' },
+    { v: 'Substituição imediata', desc: 'Fornecedor deve repor o item' },
+    { v: 'Crédito em nota', desc: 'Abatimento no próximo faturamento' },
+    { v: 'Desconto na próxima entrega', desc: 'Negociar abatimento futuro' },
+    { v: 'Apenas registrar ocorrência', desc: 'Sem ação corretiva, apenas histórico' },
+  ];
+  const STATUS_OPTS = [
+    { v: 'aberta', l: 'Aberta', desc: 'Aguardando análise', c: 'brd2' },
+    { v: 'analise', l: 'Em análise', desc: 'Sendo verificada pela gestão', c: 'bam' },
+    { v: 'resolvida', l: 'Resolvida', desc: 'Tratada e finalizada', c: 'bgr2' },
+    { v: 'cancelada', l: 'Cancelada', desc: 'Sem prosseguimento', c: 'bgy' },
+  ];
 
   const addFoto = file => {
     if (!file) return;
     const r = new FileReader();
-    r.onload = e => { const img = new Image(); img.onload = () => { const c = document.createElement('canvas'); const max = 1200; let w = img.width, h = img.height; if (w > max) { h = Math.round(h * max / w); w = max; } if (h > max) { w = Math.round(w * max / h); h = max; } c.width = w; c.height = h; c.getContext('2d').drawImage(img, 0, 0, w, h); setFotos(p => [...p, c.toDataURL('image/jpeg', .75)]); }; img.src = e.target.result; };
+    r.onload = e => {
+      const img = new Image();
+      img.onload = () => {
+        const c = document.createElement('canvas');
+        const max = 1200;
+        let w = img.width, h = img.height;
+        if (w > max) { h = Math.round(h * max / w); w = max; }
+        if (h > max) { w = Math.round(w * max / h); h = max; }
+        c.width = w; c.height = h;
+        c.getContext('2d').drawImage(img, 0, 0, w, h);
+        setFotos(p => [...p, c.toDataURL('image/jpeg', .8)]);
+      };
+      img.src = e.target.result;
+    };
     r.readAsDataURL(file);
-  };
-
-  const salvar = () => {
-    const tipoFinal = tipo === 'Outro (descrever)' && tipoCustom ? tipoCustom : tipo;
-    onSave({ id: rnc?.id || uid(), numero: rnc?.numero || genNum(orig), data, responsavel: resp, origem: orig, produto, fornecedor, unidade: unit, quantidade: parseFloat(qtd) || 0, tipo: tipoFinal, tipoCustom, descricao: desc, acao, obsAcao, status, fotos, criadoEm: rnc?.criadoEm || new Date().toISOString() });
   };
 
   const itemsOrig = allItems.filter(i => i.orig === orig);
 
+  // --- Validações por etapa ---
+  const v1 = !!(orig && data && resp.trim());
+  const v2 = !!(produto.trim() && parseFloat(qtd) > 0 && (tipo && (tipo !== 'Outro (descrever)' || tipoCustom.trim())) && desc.trim());
+  const v3 = !!(acao);
+  const podeRegistrar = v1 && v2 && v3;
+
+  const tipoFinal = tipo === 'Outro (descrever)' && tipoCustom ? tipoCustom : tipo;
+
+  const salvar = () => {
+    if (!podeRegistrar) {
+      toast.show('Preencha os campos obrigatórios');
+      return;
+    }
+    onSave({
+      id: rnc?.id || uid(),
+      numero: rnc?.numero || genNum(orig),
+      data, responsavel: resp, origem: orig,
+      produto: produto.trim(),
+      fornecedor: fornecedor.trim(),
+      unidade: unit,
+      quantidade: parseFloat(qtd) || 0,
+      tipo: tipoFinal, tipoCustom,
+      descricao: desc.trim(),
+      acao, obsAcao: obsAcao.trim(),
+      status, fotos, assinatura,
+      criadoEm: rnc?.criadoEm || new Date().toISOString(),
+      atualizadoEm: new Date().toISOString(),
+    });
+  };
+
+  // --- Helpers visuais ---
+  const stepHeader = (n, label) => html`<div class="row" style=${{ gap: 10, marginBottom: 14 }}>
+    <div style=${{ width: 30, height: 30, borderRadius: '50%', background: 'var(--or)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: 13, flexShrink: 0 }}>${n}</div>
+    <div style=${{ fontWeight: 800, fontSize: 16, fontFamily: "'Plus Jakarta Sans',sans-serif" }}>${label}</div>
+  </div>`;
+
+  const labelObrig = (txt) => html`<label style=${{ fontSize: 11, fontWeight: 700, color: 'var(--s2)', textTransform: 'uppercase', letterSpacing: '.06em', display: 'block', marginBottom: 6 }}>${txt} <span style=${{ color: 'var(--rd)' }}>*</span></label>`;
+  const labelOpt = (txt) => html`<label style=${{ fontSize: 11, fontWeight: 700, color: 'var(--s2)', textTransform: 'uppercase', letterSpacing: '.06em', display: 'block', marginBottom: 6 }}>${txt}</label>`;
+
+  const stStat = ST_RNC[status] || { l: status, c: 'bgy' };
+
   return html`<div style=${{ maxWidth: 'none', margin: '0 auto' }}>
     <div class="stk" style=${{ padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 12 }}>
       <button class="btn bg0 bic" onClick=${onBack}><${Ic} n="left" s=${20}/></button>
-      <div style=${{ flex: 1 }}><div style=${{ fontWeight: 800, fontSize: 15, fontFamily: "'Plus Jakarta Sans',sans-serif" }}>${isEdit ? rnc.numero : 'Nova RNC'}</div><div style=${{ fontSize: 12, color: 'var(--s2)' }}>Registro de Não Conformidade</div></div>
+      <div style=${{ flex: 1, minWidth: 0 }}>
+        <div class="row" style=${{ gap: 6, marginBottom: 2 }}>
+          <span class=${`badge ${stStat.c}`}>${stStat.l}</span>
+          ${orig && html`<span class="badge bor">${orig}</span>`}
+        </div>
+        <div style=${{ fontWeight: 800, fontSize: 15, fontFamily: "'Plus Jakarta Sans',sans-serif" }}>${isEdit ? rnc.numero : 'Nova RNC'}</div>
+        <div style=${{ fontSize: 11, color: 'var(--s2)' }}>Registro de Não Conformidade</div>
+      </div>
       ${isEdit && html`<button class="btn bg0 bic" style=${{ color: 'var(--rd)' }} onClick=${() => { if (strongConfirm('Excluir registro')) onDelete(rnc.id); }}><${Ic} n="trash" s=${18}/></button>`}
     </div>
-    <div class="page" style=${{ paddingBottom: 120 }}>
-      <div class="card" style=${{ padding: 16, marginBottom: 12 }}>
-        <div style=${{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 12 }}>${['CD','CP'].map(o => html`<button key=${o} onClick=${() => setOrig(o)} style=${{ padding: 10, borderRadius: 10, border: `2px solid ${orig === o ? 'var(--or)' : 'var(--bd)'}`, background: orig === o ? 'var(--or3)' : '#fff', fontWeight: 700, fontSize: 13, cursor: 'pointer' }}><span style=${{ color: orig === o ? 'var(--or2)' : 'var(--ink)' }}>${o}</span></button>`)}</div>
-        <div style=${{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 8 }}>
-          <div><label style=${{ fontSize: 11, fontWeight: 700, color: 'var(--s2)', textTransform: 'uppercase', letterSpacing: '.06em', display: 'block', marginBottom: 6 }}>Data</label><input type="date" class="inp" value=${data} onInput=${e => setData(e.target.value)}/></div>
-          <div><label style=${{ fontSize: 11, fontWeight: 700, color: 'var(--s2)', textTransform: 'uppercase', letterSpacing: '.06em', display: 'block', marginBottom: 6 }}>Status</label><select class="inp" value=${status} onChange=${e => setStatus(e.target.value)}><option value="aberta">Aberta</option><option value="analise">Em análise</option><option value="resolvida">Resolvida</option><option value="cancelada">Cancelada</option></select></div>
-        </div>
-        <label style=${{ fontSize: 11, fontWeight: 700, color: 'var(--s2)', textTransform: 'uppercase', letterSpacing: '.06em', display: 'block', marginBottom: 6 }}>Responsável</label>
-        <input class="inp" value=${resp} onInput=${e => setResp(e.target.value)} placeholder="Nome do responsável pelo registro" style=${{ marginBottom: 8 }}/>
-        <label style=${{ fontSize: 11, fontWeight: 700, color: 'var(--s2)', textTransform: 'uppercase', letterSpacing: '.06em', display: 'block', marginBottom: 6 }}>Produto</label>
-        <select class="inp" value=${produto} onChange=${e => setProduto(e.target.value)} style=${{ marginBottom: 8 }}><option value="">Selecione ou descreva abaixo...</option>${itemsOrig.map(i => html`<option key=${i.name} value=${i.name}>${i.name}</option>`)}</select>
-        <input class="inp" value=${produto} onInput=${e => setProduto(e.target.value)} placeholder="Ou descreva livremente o produto" style=${{ marginBottom: 8 }}/>
-        <div style=${{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 8 }}>
-          <div><label style=${{ fontSize: 11, fontWeight: 700, color: 'var(--s2)', textTransform: 'uppercase', letterSpacing: '.06em', display: 'block', marginBottom: 6 }}>Qtd.</label><input type="number" min="0" class="inp" value=${qtd} onInput=${e => setQtd(e.target.value)} placeholder="0"/></div>
-          <div><label style=${{ fontSize: 11, fontWeight: 700, color: 'var(--s2)', textTransform: 'uppercase', letterSpacing: '.06em', display: 'block', marginBottom: 6 }}>Unidade</label><select class="inp" value=${unit} onChange=${e => setUnit(e.target.value)}>${['UND','KG','G','L','ML','PCT','CX'].map(u => html`<option key=${u} value=${u}>${u}</option>`)}</select></div>
-        </div>
-        <label style=${{ fontSize: 11, fontWeight: 700, color: 'var(--s2)', textTransform: 'uppercase', letterSpacing: '.06em', display: 'block', marginBottom: 6 }}>Fornecedor</label>
-        <input class="inp" value=${fornecedor} onInput=${e => setFornecedor(e.target.value)} placeholder="Nome do fornecedor"/>
-      </div>
-      <div class="card" style=${{ padding: 16, marginBottom: 12 }}>
-        <label style=${{ fontSize: 11, fontWeight: 700, color: 'var(--s2)', textTransform: 'uppercase', letterSpacing: '.06em', display: 'block', marginBottom: 8 }}>Tipo de problema</label>
-        <div style=${{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 12 }}>
-          ${TIPOS.map(t => html`<button key=${t} onClick=${() => setTipo(t)} style=${{ padding: '10px 14px', borderRadius: 10, border: `1.5px solid ${tipo === t ? 'var(--or)' : 'var(--bd)'}`, background: tipo === t ? 'var(--or3)' : '#fff', textAlign: 'left', fontSize: 13, fontWeight: tipo === t ? 700 : 400, color: tipo === t ? 'var(--or2)' : 'var(--ink)', cursor: 'pointer' }}>${t}</button>`)}
-        </div>
-        ${tipo === 'Outro (descrever)' && html`<input class="inp" value=${tipoCustom} onInput=${e => setTipoCustom(e.target.value)} placeholder="Descreva o problema..." style=${{ marginBottom: 12 }}/>`}
-        <label style=${{ fontSize: 11, fontWeight: 700, color: 'var(--s2)', textTransform: 'uppercase', letterSpacing: '.06em', display: 'block', marginBottom: 6 }}>Descrição detalhada</label>
-        <textarea class="inp" value=${desc} onInput=${e => setDesc(e.target.value)} rows="3" placeholder="Descreva o problema detalhadamente..."/>
-      </div>
-      <div class="card" style=${{ padding: 16, marginBottom: 12 }}>
-        <label style=${{ fontSize: 11, fontWeight: 700, color: 'var(--s2)', textTransform: 'uppercase', letterSpacing: '.06em', display: 'block', marginBottom: 8 }}>Ação solicitada</label>
-        <div style=${{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 12 }}>
-          ${ACOES.map(a => html`<button key=${a} onClick=${() => setAcao(a)} style=${{ padding: '10px 14px', borderRadius: 10, border: `1.5px solid ${acao === a ? 'var(--or)' : 'var(--bd)'}`, background: acao === a ? 'var(--or3)' : '#fff', textAlign: 'left', fontSize: 13, fontWeight: acao === a ? 700 : 400, color: acao === a ? 'var(--or2)' : 'var(--ink)', cursor: 'pointer' }}>${a}</button>`)}
-        </div>
-        <textarea class="inp" value=${obsAcao} onInput=${e => setObsAcao(e.target.value)} rows="2" placeholder="Observações sobre a ação..."/>
-      </div>
-      <div class="card" style=${{ padding: 16, marginBottom: 12 }}>
-        <div class="row" style=${{ justifyContent: 'space-between', marginBottom: 10 }}>
-          <label style=${{ fontSize: 11, fontWeight: 700, color: 'var(--s2)', textTransform: 'uppercase', letterSpacing: '.06em' }}>Fotos (${fotos.length})</label>
-          <button class="btn bs bsm" onClick=${() => fotoRef.current?.click()}><${Ic} n="img" s=${14}/>Adicionar</button>
-        </div>
-        <input ref=${fotoRef} type="file" accept="image/*" capture="environment" style=${{ display: 'none' }} onChange=${e => { addFoto(e.target.files[0]); e.target.value = ''; }}/>
-        ${fotos.length > 0 && html`<div style=${{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 8 }}>${fotos.map((f, i) => html`<div key=${i} style=${{ position: 'relative', aspectRatio: '1', borderRadius: 8, overflow: 'hidden' }}><img src=${f} style=${{ width: '100%', height: '100%', objectFit: 'cover' }}/><button onClick=${() => setFotos(p => p.filter((_, j) => j !== i))} style=${{ position: 'absolute', top: 4, right: 4, background: 'rgba(0,0,0,.6)', border: 'none', borderRadius: '50%', width: 24, height: 24, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#fff' }}><${Ic} n="x" s=${12}/></button></div>`)}</div>`}
-      </div>
-      <div class="card" style=${{ padding: 16 }}>
 
+    <!-- Stepper visual -->
+    <div style=${{ padding: '12px 16px 4px', background: '#fff', borderBottom: '1px solid var(--bd)' }}>
+      <div class="row" style=${{ gap: 4, justifyContent: 'space-between' }}>
+        ${[
+          { n: 1, l: 'Identificação', ok: v1 },
+          { n: 2, l: 'Ocorrência', ok: v2 },
+          { n: 3, l: 'Ação', ok: v3 },
+          { n: 4, l: 'Evidências', ok: true },
+        ].map(s => html`<button key=${s.n} onClick=${() => setStep(s.n)} style=${{
+          flex: 1, padding: '6px 4px', background: 'none', border: 'none', cursor: 'pointer',
+          borderBottom: `3px solid ${step === s.n ? 'var(--or)' : 'transparent'}`,
+          opacity: step === s.n ? 1 : .55,
+        }}>
+          <div class="row" style=${{ gap: 4, justifyContent: 'center', marginBottom: 2 }}>
+            <div style=${{ width: 18, height: 18, borderRadius: '50%', background: s.ok ? 'var(--gr)' : (step === s.n ? 'var(--or)' : 'var(--bd)'), color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 800 }}>${s.ok ? '✓' : s.n}</div>
+          </div>
+          <div style=${{ fontSize: 10, fontWeight: 700, color: step === s.n ? 'var(--ink)' : 'var(--s2)' }}>${s.l}</div>
+        </button>`)}
       </div>
     </div>
-    <div style=${{ position: 'sticky', bottom: 72, background: '#fff', borderTop: '1px solid var(--bd)', padding: '12px 16px', display: 'flex', gap: 8 }}>
-      <button class="btn bs" style=${{ flex: 1 }} onClick=${onBack}>Cancelar</button>
-      <button class="btn bp" style=${{ flex: 2, padding: 14, borderRadius: 12 }} onClick=${salvar}><${Ic} n="save" s=${16}/>${isEdit ? 'Salvar' : 'Registrar RNC'}</button>
+
+    <div class="page" style=${{ paddingBottom: 140 }}>
+
+      ${step === 1 && html`<div>
+        ${stepHeader(1, 'Identificação do registro')}
+
+        <div class="card" style=${{ padding: 16, marginBottom: 12 }}>
+          ${labelObrig('Origem')}
+          <div style=${{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 14 }}>
+            ${['CD','CP'].map(o => html`<button key=${o} onClick=${() => setOrig(o)} style=${{
+              padding: '12px', borderRadius: 10,
+              border: `2px solid ${orig === o ? 'var(--or)' : 'var(--bd)'}`,
+              background: orig === o ? 'var(--or3)' : '#fff',
+              fontWeight: 800, fontSize: 13, cursor: 'pointer',
+              color: orig === o ? 'var(--or2)' : 'var(--ink)',
+              display: 'flex', flexDirection: 'column', gap: 2, alignItems: 'flex-start',
+            }}>
+              <span>${o}</span>
+              <span style=${{ fontSize: 10, fontWeight: 500, color: 'var(--s2)' }}>${o === 'CD' ? 'Centro de Distribuição' : 'Cozinha de Produção'}</span>
+            </button>`)}
+          </div>
+
+          <div style=${{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+            <div>${labelObrig('Data da ocorrência')}<input type="date" class="inp" value=${data} onInput=${e => setData(e.target.value)}/></div>
+            <div>${labelObrig('Status')}<select class="inp" value=${status} onChange=${e => setStatus(e.target.value)}>${STATUS_OPTS.map(s => html`<option key=${s.v} value=${s.v}>${s.l}</option>`)}</select></div>
+          </div>
+          <div style=${{ fontSize: 11, color: 'var(--s2)', marginTop: 6 }}>${STATUS_OPTS.find(s => s.v === status)?.desc || ''}</div>
+        </div>
+
+        <div class="card" style=${{ padding: 16, marginBottom: 12 }}>
+          ${labelObrig('Responsável pelo registro')}
+          <input class="inp" value=${resp} onInput=${e => setResp(e.target.value)} placeholder="Nome completo"/>
+          <div style=${{ fontSize: 11, color: 'var(--s2)', marginTop: 6 }}>Quem identificou a não conformidade e está registrando este documento.</div>
+        </div>
+      </div>`}
+
+      ${step === 2 && html`<div>
+        ${stepHeader(2, 'Detalhes da ocorrência')}
+
+        <div class="card" style=${{ padding: 16, marginBottom: 12 }}>
+          ${labelObrig('Produto')}
+          <input
+            class="inp"
+            list="rnc-produtos"
+            value=${produto}
+            onInput=${e => setProduto(e.target.value)}
+            placeholder="Selecione ou digite o nome do produto"
+            style=${{ marginBottom: 12 }}
+          />
+          <datalist id="rnc-produtos">
+            ${itemsOrig.map(i => html`<option key=${i.name} value=${i.name}/>`)}
+          </datalist>
+
+          <div style=${{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: 10, marginBottom: 12 }}>
+            <div>${labelObrig('Quantidade')}<input type="number" min="0" step="any" class="inp" value=${qtd} onInput=${e => setQtd(e.target.value)} placeholder="0"/></div>
+            <div>${labelObrig('Unidade')}<select class="inp" value=${unit} onChange=${e => setUnit(e.target.value)}>${['UND','KG','G','L','ML','PCT','CX'].map(u => html`<option key=${u} value=${u}>${u}</option>`)}</select></div>
+          </div>
+
+          ${labelOpt('Fornecedor')}
+          <input class="inp" value=${fornecedor} onInput=${e => setFornecedor(e.target.value)} placeholder="Nome do fornecedor (opcional)"/>
+        </div>
+
+        <div class="card" style=${{ padding: 16, marginBottom: 12 }}>
+          ${labelObrig('Tipo de não conformidade')}
+          <div style=${{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 12 }}>
+            ${TIPOS.map(t => html`<button key=${t.v} onClick=${() => setTipo(t.v)} style=${{
+              padding: '12px 14px', borderRadius: 10,
+              border: `1.5px solid ${tipo === t.v ? 'var(--or)' : 'var(--bd)'}`,
+              background: tipo === t.v ? 'var(--or3)' : '#fff',
+              textAlign: 'left', fontSize: 13,
+              fontWeight: tipo === t.v ? 700 : 500,
+              color: tipo === t.v ? 'var(--or2)' : 'var(--ink)',
+              cursor: 'pointer',
+              display: 'flex', alignItems: 'center', gap: 10,
+            }}>
+              <${Ic} n=${t.ic} s=${16}/>
+              <span style=${{ flex: 1 }}>${t.v}</span>
+              ${tipo === t.v && html`<${Ic} n="chk" s=${16}/>`}
+            </button>`)}
+          </div>
+          ${tipo === 'Outro (descrever)' && html`<input class="inp" value=${tipoCustom} onInput=${e => setTipoCustom(e.target.value)} placeholder="Descreva brevemente o tipo do problema..." style=${{ marginBottom: 12 }}/>`}
+
+          ${labelObrig('Descrição detalhada')}
+          <textarea class="inp" value=${desc} onInput=${e => setDesc(e.target.value)} rows="4" placeholder="Descreva o que foi identificado: o que estava errado, quando notou, em que estado o produto chegou, etc."/>
+          <div style=${{ fontSize: 11, color: 'var(--s2)', marginTop: 6 }}>Quanto mais detalhado, mais útil para a gestão e o fornecedor.</div>
+        </div>
+      </div>`}
+
+      ${step === 3 && html`<div>
+        ${stepHeader(3, 'Ação corretiva solicitada')}
+
+        <div class="card" style=${{ padding: 16, marginBottom: 12 }}>
+          ${labelObrig('Selecione a ação')}
+          <div style=${{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 12 }}>
+            ${ACOES.map(a => html`<button key=${a.v} onClick=${() => setAcao(a.v)} style=${{
+              padding: '12px 14px', borderRadius: 10,
+              border: `1.5px solid ${acao === a.v ? 'var(--or)' : 'var(--bd)'}`,
+              background: acao === a.v ? 'var(--or3)' : '#fff',
+              textAlign: 'left', cursor: 'pointer',
+              display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 2,
+            }}>
+              <span style=${{ fontWeight: acao === a.v ? 800 : 700, fontSize: 13, color: acao === a.v ? 'var(--or2)' : 'var(--ink)' }}>${a.v}</span>
+              <span style=${{ fontSize: 11, color: 'var(--s2)' }}>${a.desc}</span>
+            </button>`)}
+          </div>
+
+          ${labelOpt('Observações sobre a ação')}
+          <textarea class="inp" value=${obsAcao} onInput=${e => setObsAcao(e.target.value)} rows="3" placeholder="Detalhes adicionais, combinados com o fornecedor, prazos, etc."/>
+        </div>
+      </div>`}
+
+      ${step === 4 && html`<div>
+        ${stepHeader(4, 'Evidências e assinatura')}
+
+        <div class="card" style=${{ padding: 16, marginBottom: 12 }}>
+          <div class="row" style=${{ justifyContent: 'space-between', marginBottom: 12 }}>
+            <div>
+              <div style=${{ fontSize: 13, fontWeight: 700, color: 'var(--ink)' }}>Fotos da ocorrência</div>
+              <div style=${{ fontSize: 11, color: 'var(--s2)', marginTop: 2 }}>${fotos.length} ${fotos.length === 1 ? 'evidência anexada' : 'evidências anexadas'}</div>
+            </div>
+            <button class="btn bs bsm" onClick=${() => fotoRef.current?.click()}><${Ic} n="img" s=${14}/>Adicionar</button>
+          </div>
+          <input ref=${fotoRef} type="file" accept="image/*" capture="environment" style=${{ display: 'none' }} onChange=${e => { addFoto(e.target.files[0]); e.target.value = ''; }}/>
+          ${fotos.length === 0
+            ? html`<div style=${{ padding: '24px 12px', textAlign: 'center', border: '1.5px dashed var(--bd)', borderRadius: 10, color: 'var(--s2)' }}>
+                <${Ic} n="img" s=${28} style=${{ color: 'var(--s3)' }}/>
+                <div style=${{ fontSize: 12, marginTop: 6 }}>Anexe fotos do produto, da embalagem ou do prazo de validade</div>
+              </div>`
+            : html`<div style=${{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 8 }}>${fotos.map((f, i) => html`<div key=${i} style=${{ position: 'relative', aspectRatio: '1', borderRadius: 10, overflow: 'hidden', border: '1px solid var(--bd)' }}>
+                <img src=${f} style=${{ width: '100%', height: '100%', objectFit: 'cover' }}/>
+                <div style=${{ position: 'absolute', top: 4, left: 4, background: 'rgba(0,0,0,.65)', color: '#fff', borderRadius: 6, padding: '2px 6px', fontSize: 10, fontWeight: 700 }}>#${i+1}</div>
+                <button onClick=${() => setFotos(p => p.filter((_, j) => j !== i))} style=${{ position: 'absolute', top: 4, right: 4, background: 'rgba(0,0,0,.7)', border: 'none', borderRadius: '50%', width: 24, height: 24, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#fff' }}><${Ic} n="x" s=${12}/></button>
+              </div>`)}</div>`
+          }
+        </div>
+
+        <div class="card" style=${{ padding: 16, marginBottom: 12 }}>
+          <div style=${{ fontSize: 13, fontWeight: 700, color: 'var(--ink)', marginBottom: 2 }}>Assinatura do responsável</div>
+          <div style=${{ fontSize: 11, color: 'var(--s2)', marginBottom: 12 }}>Opcional — confere autenticidade ao registro impresso.</div>
+          <${SignaturePad} value=${assinatura} onChange=${setAssinatura}/>
+        </div>
+
+        <!-- Resumo final -->
+        <div class="card" style=${{ padding: 16, marginBottom: 12, background: 'var(--or3)', border: '1.5px solid var(--or)' }}>
+          <div style=${{ fontSize: 11, fontWeight: 800, color: 'var(--or2)', textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: 10 }}>Resumo do registro</div>
+          ${[
+            ['Número', rnc?.numero || '(será gerado ao salvar)'],
+            ['Origem', orig],
+            ['Data', fDate(data)],
+            ['Responsável', resp || '—'],
+            ['Produto', produto || '—'],
+            ['Quantidade', qtd ? `${qtd} ${unit}` : '—'],
+            ['Tipo', tipoFinal || '—'],
+            ['Ação solicitada', acao || '—'],
+            ['Evidências', `${fotos.length} foto(s)${assinatura ? ' · assinado' : ''}`],
+          ].map(([k, v]) => html`<div key=${k} class="row" style=${{ padding: '6px 0', borderBottom: '1px dashed rgba(201, 120, 0, .25)', fontSize: 12 }}>
+            <span style=${{ fontWeight: 700, color: 'var(--s2)', minWidth: 110 }}>${k}</span>
+            <span style=${{ color: 'var(--ink)', fontWeight: 500, textAlign: 'right', flex: 1 }}>${v}</span>
+          </div>`)}
+        </div>
+      </div>`}
+
     </div>
-    
+
+    <!-- Footer fixo -->
+    <div style=${{ position: 'sticky', bottom: 72, background: '#fff', borderTop: '1px solid var(--bd)', padding: '12px 16px', display: 'flex', gap: 8 }}>
+      ${step > 1
+        ? html`<button class="btn bs" style=${{ flex: 1 }} onClick=${() => setStep(s => s - 1)}><${Ic} n="left" s=${14}/>Voltar</button>`
+        : html`<button class="btn bs" style=${{ flex: 1 }} onClick=${onBack}>Cancelar</button>`
+      }
+      ${step < 4
+        ? html`<button class="btn bp" style=${{ flex: 2, padding: 14, borderRadius: 12 }} onClick=${() => setStep(s => s + 1)}>Próxima etapa<${Ic} n="cr" s=${14}/></button>`
+        : html`<button class="btn bp" style=${{ flex: 2, padding: 14, borderRadius: 12, opacity: podeRegistrar ? 1 : .55 }} onClick=${salvar}><${Ic} n="save" s=${16}/>${isEdit ? 'Salvar alterações' : `Registrar como ${stStat.l}`}</button>`
+      }
+    </div>
   </div>`;
 }
 
@@ -1551,11 +1875,320 @@ function pdfOrcamento(o) {
   savePdf(doc,`NEXUS_Orcamento_${o.origem||''}_${o.semana||''}`);
 }
 function pdfRnc(r) {
-  const Doc=getJsPDF(); const doc=new Doc({ orientation:'p', unit:'mm', format:'a4' });
-  pdfHeader(doc,'RNC',`${r.numero || ''} · ${r.origem || ''} · ${fDate(r.data || r.criadoEm)} · Status: ${r.status || ''}`);
-  doc.setFontSize(9); doc.setTextColor(17,24,39);
-  [['Produto',r.produto],['Fornecedor',r.fornecedor],['Quantidade',r.quantidade],['Tipo',r.tipoCustom || r.tipo],['Responsável',r.responsavel],['Descrição',r.descricao],['Ação',r.acao],['Observações',r.obsAcao]].forEach(([k,v],idx)=>{ doc.setFont(undefined,'bold'); doc.text(`${k}:`,14,50+idx*8); doc.setFont(undefined,'normal'); doc.text(String(v||'-').slice(0,95),42,50+idx*8); });
-  savePdf(doc,`NEXUS_RNC_${r.numero||r.id||''}`);
+  const Doc = getJsPDF();
+  const doc = new Doc({ orientation: 'p', unit: 'mm', format: 'a4' });
+  const pageW = 210, pageH = 297, M = 14;
+
+  // Paleta
+  const COR_OR = [245, 149, 0];
+  const COR_OR2 = [201, 120, 0];
+  const COR_INK = [17, 24, 39];
+  const COR_S2 = [107, 114, 128];
+  const COR_S3 = [156, 163, 175];
+  const COR_BD = [229, 231, 235];
+  const COR_BG = [249, 250, 251];
+  const COR_RD = [220, 38, 38];
+  const COR_GR = [22, 163, 74];
+  const COR_AM = [217, 119, 6];
+
+  const stColor = {
+    aberta: COR_RD,
+    analise: COR_AM,
+    resolvida: COR_GR,
+    cancelada: COR_S2,
+  }[r.status] || COR_S2;
+  const stLabel = ({ aberta: 'ABERTA', analise: 'EM ANÁLISE', resolvida: 'RESOLVIDA', cancelada: 'CANCELADA' })[r.status] || (r.status || '').toUpperCase();
+
+  // ===== HEADER INSTITUCIONAL =====
+  // Faixa laranja
+  doc.setFillColor(...COR_OR);
+  doc.rect(0, 0, pageW, 36, 'F');
+
+  // Sombra inferior
+  doc.setFillColor(...COR_OR2);
+  doc.rect(0, 36, pageW, 1.5, 'F');
+
+  // Marca NEXUS
+  doc.setTextColor(255, 255, 255);
+  doc.setFont(undefined, 'bold');
+  doc.setFontSize(11);
+  doc.text('NEXUS', M, 11);
+  doc.setFont(undefined, 'normal');
+  doc.setFontSize(8);
+  doc.text('GRUPO ILHA · GESTÃO OPERACIONAL', M + 18, 11);
+
+  // Título do documento
+  doc.setFont(undefined, 'bold');
+  doc.setFontSize(18);
+  doc.text('REGISTRO DE NÃO CONFORMIDADE', M, 23);
+
+  doc.setFont(undefined, 'normal');
+  doc.setFontSize(9);
+  doc.text(`Documento de qualidade · ${r.origem === 'CD' ? 'Centro de Distribuição' : r.origem === 'CP' ? 'Cozinha de Produção' : (r.origem || '')}`, M, 30);
+
+  // Número da RNC no canto direito — em destaque
+  const numStr = r.numero || '—';
+  doc.setFillColor(255, 255, 255);
+  const numBoxW = 56, numBoxH = 22, numBoxX = pageW - M - numBoxW, numBoxY = 7;
+  doc.roundedRect(numBoxX, numBoxY, numBoxW, numBoxH, 3, 3, 'F');
+  doc.setTextColor(...COR_S2);
+  doc.setFont(undefined, 'bold');
+  doc.setFontSize(7);
+  doc.text('Nº DO REGISTRO', numBoxX + numBoxW / 2, numBoxY + 5, { align: 'center' });
+  doc.setTextColor(...COR_OR2);
+  doc.setFontSize(13);
+  doc.text(numStr, numBoxX + numBoxW / 2, numBoxY + 13, { align: 'center' });
+  // Status sob o número
+  doc.setFillColor(...stColor);
+  doc.roundedRect(numBoxX + 8, numBoxY + 15.5, numBoxW - 16, 4.5, 2, 2, 'F');
+  doc.setTextColor(255, 255, 255);
+  doc.setFontSize(7);
+  doc.text(stLabel, numBoxX + numBoxW / 2, numBoxY + 18.8, { align: 'center' });
+
+  let y = 48;
+
+  // ===== BLOCO 1: IDENTIFICAÇÃO =====
+  const drawSectionTitle = (n, titulo, yPos) => {
+    // Cabeçalho da seção: numeração + título
+    doc.setFillColor(...COR_INK);
+    doc.circle(M + 3, yPos - 1.5, 3, 'F');
+    doc.setTextColor(255, 255, 255);
+    doc.setFont(undefined, 'bold');
+    doc.setFontSize(8);
+    doc.text(String(n), M + 3, yPos + 0.5, { align: 'center' });
+    doc.setTextColor(...COR_INK);
+    doc.setFontSize(10);
+    doc.text(titulo, M + 9, yPos + 0.5);
+    // Linha embaixo
+    doc.setDrawColor(...COR_BD);
+    doc.setLineWidth(0.2);
+    doc.line(M + 9, yPos + 2.5, pageW - M, yPos + 2.5);
+    return yPos + 8;
+  };
+
+  const drawField = (label, value, yPos, opts = {}) => {
+    const { full = false, multi = false, valueColor = COR_INK } = opts;
+    const colW = full ? pageW - M * 2 : (pageW - M * 2) / 2 - 2;
+    const x = opts.x !== undefined ? opts.x : M;
+    doc.setTextColor(...COR_S2);
+    doc.setFont(undefined, 'bold');
+    doc.setFontSize(7);
+    doc.text(label.toUpperCase(), x, yPos);
+    doc.setTextColor(...valueColor);
+    doc.setFont(undefined, 'normal');
+    doc.setFontSize(10);
+    const txt = String(value || '—');
+    if (multi) {
+      const lines = doc.splitTextToSize(txt, colW);
+      doc.text(lines, x, yPos + 4.5);
+      return lines.length * 4.5 + 4.5;
+    } else {
+      doc.text(txt.length > 60 ? txt.slice(0, 60) + '…' : txt, x, yPos + 4.5);
+      return 4.5;
+    }
+  };
+
+  y = drawSectionTitle(1, 'Identificação do registro', y);
+  // Caixa de fundo
+  const idBoxY = y - 3;
+  doc.setFillColor(...COR_BG);
+  doc.roundedRect(M, idBoxY, pageW - M * 2, 32, 2, 2, 'F');
+  y += 2;
+  // Linha 1: Origem | Data
+  drawField('Origem', r.origem === 'CD' ? 'CD · Centro de Distribuição' : r.origem === 'CP' ? 'CP · Cozinha de Produção' : (r.origem || '—'), y);
+  drawField('Data da ocorrência', fDate(r.data || r.criadoEm), y, { x: M + (pageW - M * 2) / 2 + 2 });
+  y += 11;
+  // Linha 2: Responsável | Emitido em
+  drawField('Responsável pelo registro', r.responsavel || '—', y);
+  drawField('Documento emitido em', new Date(r.criadoEm || Date.now()).toLocaleString('pt-BR'), y, { x: M + (pageW - M * 2) / 2 + 2, valueColor: COR_S2 });
+  y += 13;
+
+  // ===== BLOCO 2: PRODUTO =====
+  y = drawSectionTitle(2, 'Produto / item afetado', y);
+  doc.setFillColor(...COR_BG);
+  doc.roundedRect(M, y - 3, pageW - M * 2, 22, 2, 2, 'F');
+  y += 2;
+  drawField('Produto', r.produto || '—', y, { full: true });
+  y += 11;
+  drawField('Quantidade', r.quantidade ? `${r.quantidade} ${r.unidade || ''}` : '—', y);
+  drawField('Fornecedor', r.fornecedor || '—', y, { x: M + (pageW - M * 2) / 2 + 2 });
+  y += 13;
+
+  // ===== BLOCO 3: NÃO CONFORMIDADE =====
+  y = drawSectionTitle(3, 'Não conformidade identificada', y);
+  // Badge do tipo
+  const tipoTxt = (r.tipoCustom && r.tipo === 'Outro (descrever)') ? r.tipoCustom : (r.tipo || '—');
+  doc.setFillColor(254, 242, 242);
+  const tipoW = Math.min(doc.getTextWidth(tipoTxt) + 10, pageW - M * 2 - 4);
+  doc.roundedRect(M, y - 2, tipoW, 7, 2, 2, 'F');
+  doc.setTextColor(...COR_RD);
+  doc.setFont(undefined, 'bold');
+  doc.setFontSize(9);
+  doc.text(tipoTxt, M + 5, y + 2.5);
+  y += 11;
+
+  // Descrição em quadro
+  const descTxt = String(r.descricao || 'Sem descrição registrada.').trim();
+  const descLines = doc.splitTextToSize(descTxt, pageW - M * 2 - 10);
+  const descBoxH = Math.max(20, descLines.length * 4.8 + 12);
+  doc.setDrawColor(...COR_BD);
+  doc.setLineWidth(0.3);
+  doc.setFillColor(255, 255, 255);
+  doc.roundedRect(M, y, pageW - M * 2, descBoxH, 2, 2, 'FD');
+  doc.setTextColor(...COR_S2);
+  doc.setFont(undefined, 'bold');
+  doc.setFontSize(7);
+  doc.text('DESCRIÇÃO DETALHADA', M + 4, y + 5);
+  doc.setTextColor(...COR_INK);
+  doc.setFont(undefined, 'normal');
+  doc.setFontSize(10);
+  doc.text(descLines, M + 4, y + 10.5);
+  y += descBoxH + 5;
+
+  // ===== BLOCO 4: AÇÃO CORRETIVA =====
+  if (y > pageH - 70) { doc.addPage(); y = 20; }
+  y = drawSectionTitle(4, 'Ação corretiva solicitada', y);
+  // Card destacado
+  doc.setFillColor(255, 248, 236);
+  doc.setDrawColor(...COR_OR);
+  doc.setLineWidth(0.5);
+  const acaoBoxY = y - 2;
+  const obsTxt = String(r.obsAcao || '').trim();
+  const obsLines = obsTxt ? doc.splitTextToSize(obsTxt, pageW - M * 2 - 10) : [];
+  const acaoBoxH = obsTxt ? Math.max(22, obsLines.length * 4.5 + 18) : 14;
+  doc.roundedRect(M, acaoBoxY, pageW - M * 2, acaoBoxH, 2, 2, 'FD');
+  // Ícone ▶
+  doc.setTextColor(...COR_OR2);
+  doc.setFont(undefined, 'bold');
+  doc.setFontSize(11);
+  doc.text('▶', M + 4, y + 3);
+  doc.setFontSize(11);
+  doc.text(r.acao || '—', M + 11, y + 3);
+  if (obsTxt) {
+    doc.setTextColor(...COR_S2);
+    doc.setFont(undefined, 'bold');
+    doc.setFontSize(7);
+    doc.text('OBSERVAÇÕES', M + 4, y + 10);
+    doc.setTextColor(...COR_INK);
+    doc.setFont(undefined, 'normal');
+    doc.setFontSize(9);
+    doc.text(obsLines, M + 4, y + 14.5);
+  }
+  y = acaoBoxY + acaoBoxH + 5;
+
+  // ===== BLOCO 5: ASSINATURA =====
+  if (y > pageH - 50) { doc.addPage(); y = 20; }
+  y = drawSectionTitle(5, 'Validação do registro', y);
+
+  // Caixa de assinatura
+  const sigBoxY = y;
+  const sigBoxH = 32;
+  doc.setDrawColor(...COR_BD);
+  doc.setLineWidth(0.3);
+  doc.setFillColor(255, 255, 255);
+  doc.roundedRect(M, sigBoxY, pageW - M * 2, sigBoxH, 2, 2, 'FD');
+
+  // Coluna 1: assinatura do responsável (imagem ou linha)
+  const sigW = (pageW - M * 2) / 2 - 4;
+  if (r.assinatura) {
+    try {
+      doc.addImage(r.assinatura, 'PNG', M + 4, sigBoxY + 4, sigW - 4, 18);
+    } catch (e) { /* ignora se imagem inválida */ }
+  } else {
+    // Linha pontilhada onde assinaria
+    doc.setLineDashPattern([1, 1], 0);
+    doc.line(M + 4, sigBoxY + 18, M + sigW - 4, sigBoxY + 18);
+    doc.setLineDashPattern([], 0);
+  }
+  doc.setTextColor(...COR_S2);
+  doc.setFont(undefined, 'bold');
+  doc.setFontSize(7);
+  doc.text('RESPONSÁVEL PELO REGISTRO', M + 4, sigBoxY + 23.5);
+  doc.setTextColor(...COR_INK);
+  doc.setFont(undefined, 'normal');
+  doc.setFontSize(9);
+  doc.text(r.responsavel || '—', M + 4, sigBoxY + 28);
+
+  // Coluna 2: ciência da gestão (linha em branco)
+  const col2X = M + sigW + 4;
+  doc.setLineDashPattern([1, 1], 0);
+  doc.line(col2X, sigBoxY + 18, col2X + sigW, sigBoxY + 18);
+  doc.setLineDashPattern([], 0);
+  doc.setTextColor(...COR_S2);
+  doc.setFont(undefined, 'bold');
+  doc.setFontSize(7);
+  doc.text('CIÊNCIA DA GESTÃO', col2X, sigBoxY + 23.5);
+  doc.setTextColor(...COR_INK);
+  doc.setFont(undefined, 'normal');
+  doc.setFontSize(9);
+  doc.text('Nome / Data', col2X, sigBoxY + 28);
+
+  y = sigBoxY + sigBoxH + 8;
+
+  // ===== PÁGINA DE EVIDÊNCIAS (fotos) =====
+  if (Array.isArray(r.fotos) && r.fotos.length > 0) {
+    doc.addPage();
+    let yE = 20;
+    yE = drawSectionTitle(6, `Evidências fotográficas (${r.fotos.length})`, yE);
+    yE += 2;
+
+    // Grid 2x2 por página
+    const gridW = (pageW - M * 2 - 6) / 2;
+    const gridH = (pageH - yE - 30) / 2;
+    let posX = M, posY = yE;
+    r.fotos.forEach((foto, i) => {
+      // Nova linha
+      if (i > 0 && i % 2 === 0) {
+        posX = M;
+        posY += gridH + 6;
+      }
+      // Nova página depois de 4 fotos
+      if (i > 0 && i % 4 === 0) {
+        doc.addPage();
+        let yE2 = 20;
+        yE2 = drawSectionTitle(6, `Evidências fotográficas (continuação)`, yE2);
+        posX = M;
+        posY = yE2 + 2;
+      }
+      // Moldura
+      doc.setDrawColor(...COR_BD);
+      doc.setFillColor(...COR_BG);
+      doc.roundedRect(posX, posY, gridW, gridH, 2, 2, 'FD');
+      try {
+        doc.addImage(foto, 'JPEG', posX + 2, posY + 2, gridW - 4, gridH - 10);
+      } catch (e) { /* ignora foto inválida */ }
+      // Legenda da foto
+      doc.setFillColor(...COR_INK);
+      doc.roundedRect(posX + 4, posY + gridH - 7, 14, 5, 1, 1, 'F');
+      doc.setTextColor(255, 255, 255);
+      doc.setFont(undefined, 'bold');
+      doc.setFontSize(7);
+      doc.text(`#${i + 1}`, posX + 11, posY + gridH - 3.5, { align: 'center' });
+
+      posX += gridW + 6;
+    });
+  }
+
+  // ===== RODAPÉ (em todas as páginas) =====
+  const totalPages = doc.internal.getNumberOfPages();
+  for (let p = 1; p <= totalPages; p++) {
+    doc.setPage(p);
+    // Faixa fina
+    doc.setDrawColor(...COR_BD);
+    doc.setLineWidth(0.2);
+    doc.line(M, pageH - 14, pageW - M, pageH - 14);
+    // Textos
+    doc.setTextColor(...COR_S3);
+    doc.setFont(undefined, 'normal');
+    doc.setFontSize(7);
+    doc.text(`NEXUS · Grupo Ilha · Registro de Não Conformidade ${numStr}`, M, pageH - 9);
+    doc.text(`Emitido em ${new Date().toLocaleString('pt-BR')}`, M, pageH - 5);
+    doc.text(`Página ${p} de ${totalPages}`, pageW - M, pageH - 9, { align: 'right' });
+    doc.setFont(undefined, 'bold');
+    doc.text('CONFIDENCIAL', pageW - M, pageH - 5, { align: 'right' });
+  }
+
+  doc.save(`NEXUS_RNC_${(numStr || r.id || '').replace(/[\\/:*?"<>|]+/g, '_')}.pdf`);
 }
 function pdfInventario(i) {
   const Doc=getJsPDF(); const doc=new Doc({ orientation:'p', unit:'mm', format:'a4' });

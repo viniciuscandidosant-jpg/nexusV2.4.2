@@ -1134,6 +1134,7 @@ function RncEditor({ rnc, allItems, toast, genNum, onBack, onSave, onDelete }) {
 
   // --- Estado dos campos ---
   const [orig, setOrig] = useState(rnc?.origem || 'CD');
+  const [setor, setSetor] = useState(rnc?.setor || '');
   const [data, setData] = useState(rnc?.data || new Date().toISOString().split('T')[0]);
   const [status, setStatus] = useState(rnc?.status || 'aberta');
   const [resp, setResp] = useState(rnc?.responsavel || (LS.get('config') || {}).responsavel || '');
@@ -1215,7 +1216,7 @@ function RncEditor({ rnc, allItems, toast, genNum, onBack, onSave, onDelete }) {
     onSave({
       id: rnc?.id || uid(),
       numero: rnc?.numero || genNum(orig),
-      data, responsavel: resp, origem: orig,
+      data, responsavel: resp, origem: orig, setor: (setor || '').trim(),
       produto: produto.trim(),
       fornecedor: fornecedor.trim(),
       unidade: unit,
@@ -1281,8 +1282,9 @@ function RncEditor({ rnc, allItems, toast, genNum, onBack, onSave, onDelete }) {
         ${stepHeader(1, 'Identificação do registro')}
 
         <div class="card" style=${{ padding: 16, marginBottom: 12 }}>
-          ${labelObrig('Setor de origem')}
-          <div style=${{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 14 }}>
+          ${labelObrig('Origem do produto')}
+          <div style=${{ fontSize: 11, color: 'var(--s2)', margin: '-2px 0 8px' }}>De onde o produto é. Define o código da RNC (RNC-CD ou RNC-CP).</div>
+          <div style=${{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 16 }}>
             ${['CD','CP'].map(o => html`<button key=${o} onClick=${() => setOrig(o)} style=${{
               padding: '12px', borderRadius: 10,
               border: `2px solid ${orig === o ? 'var(--or)' : 'var(--bd)'}`,
@@ -1296,7 +1298,23 @@ function RncEditor({ rnc, allItems, toast, genNum, onBack, onSave, onDelete }) {
             </button>`)}
           </div>
 
-          <div style=${{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+          ${labelOpt('Setor de origem')}
+          <div style=${{ fontSize: 11, color: 'var(--s2)', margin: '-2px 0 8px' }}>Onde a não conformidade foi identificada. Escolha ou escreva.</div>
+          <div style=${{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 8 }}>
+            ${['CD','CP','Outro'].map(s => {
+              const active = (s === 'Outro') ? (setor !== '' && setor !== 'CD' && setor !== 'CP') : (setor === s);
+              return html`<button key=${s} onClick=${() => setSetor(s === 'Outro' ? ' ' : s)} style=${{
+                padding: '9px 16px', borderRadius: 20,
+                border: `1.5px solid ${active ? 'var(--or)' : 'var(--bd)'}`,
+                background: active ? 'var(--or3)' : '#fff',
+                fontWeight: 700, fontSize: 13, cursor: 'pointer',
+                color: active ? 'var(--or2)' : 'var(--ink)',
+              }}>${s}</button>`;
+            })}
+          </div>
+          ${(setor !== '' && setor !== 'CD' && setor !== 'CP') && html`<input class="inp" value=${setor.trim()} onInput=${e => setSetor(e.target.value || ' ')} placeholder="Digite o setor (ex: Recebimento, Salão, Câmara fria...)" style=${{ marginBottom: 4 }}/>`}
+
+          <div style=${{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 12 }}>
             <div>${labelObrig('Data da ocorrência')}<input type="date" class="inp" value=${data} onInput=${e => setData(e.target.value)}/></div>
             <div>${labelObrig('Status')}<select class="inp" value=${status} onChange=${e => setStatus(e.target.value)}>${STATUS_OPTS.map(s => html`<option key=${s.v} value=${s.v}>${s.l}</option>`)}</select></div>
           </div>
@@ -1333,7 +1351,16 @@ function RncEditor({ rnc, allItems, toast, genNum, onBack, onSave, onDelete }) {
           </div>
 
           ${labelOpt('Fornecedor')}
-          <input class="inp" value=${fornecedor} onInput=${e => setFornecedor(e.target.value)} placeholder="Nome do fornecedor (opcional)"/>
+          <div style=${{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 8 }}>
+            ${[['CD','Centro de Distribuição (CD)'],['CP','Cozinha de Produção (CP)']].map(([k,full]) => html`<button key=${k} onClick=${() => setFornecedor(fornecedor === full ? '' : full)} style=${{
+              padding: '8px 14px', borderRadius: 20,
+              border: `1.5px solid ${fornecedor === full ? 'var(--or)' : 'var(--bd)'}`,
+              background: fornecedor === full ? 'var(--or3)' : '#fff',
+              fontWeight: 700, fontSize: 12, cursor: 'pointer',
+              color: fornecedor === full ? 'var(--or2)' : 'var(--ink)',
+            }}>${k}</button>`)}
+          </div>
+          <input class="inp" value=${fornecedor} onInput=${e => setFornecedor(e.target.value)} placeholder="Nome do fornecedor (opcional) — ou use CD/CP acima"/>
         </div>
 
         <div class="card" style=${{ padding: 16, marginBottom: 12 }}>
@@ -1674,15 +1701,18 @@ async function pdfRnc(r) {
   //  1 · IDENTIFICAÇÃO
   // ═══════════════════════════════════════════════════════════
   sectionTitle(1, 'Identificação do registro');
-  const idH = 30;
+  const setorTxt = (r.setor && r.setor.trim()) ? r.setor.trim() : '—';
+  const idH = 42;
   doc.setFillColor(...BG); doc.setDrawColor(...BD); doc.setLineWidth(0.2);
   doc.roundedRect(M, y, CW, idH, 2, 2, 'FD');
   const colW = (CW - 12) / 2;
   const cx1 = M + 4, cx2 = M + 4 + colW + 4;
-  field('Setor de origem', origemLabel, cx1, colW, y + 6, { bold: true });
-  field('Data da ocorrência', fDate(r.data) || '—', cx2, colW, y + 6, { bold: true });
-  field('Responsável pelo registro', r.responsavel || '—', cx1, colW, y + 18, { bold: true });
-  field('Documento emitido em', new Date(r.criadoEm || Date.now()).toLocaleString('pt-BR'), cx2, colW, y + 18, { valueColor: S1, size: 9 });
+  field('Origem do produto', origemLabel, cx1, colW, y + 6, { bold: true });
+  field('Setor de origem', setorTxt, cx2, colW, y + 6, { bold: true });
+  field('Data da ocorrência', fDate(r.data) || '—', cx1, colW, y + 18, { bold: true });
+  field('Responsável pelo registro', r.responsavel || '—', cx2, colW, y + 18, { bold: true });
+  field('Documento emitido em', new Date(r.criadoEm || Date.now()).toLocaleString('pt-BR'), cx1, colW, y + 30, { valueColor: S1, size: 9 });
+  field('Status', stLabel, cx2, colW, y + 30, { bold: true, valueColor: stColor, size: 9 });
   y += idH + 9;
 
   // ═══════════════════════════════════════════════════════════
@@ -1781,51 +1811,72 @@ async function pdfRnc(r) {
   //  EVIDÊNCIAS FOTOGRÁFICAS — 1 IMAGEM POR PÁGINA
   // ═══════════════════════════════════════════════════════════
   const fotos = Array.isArray(r.fotos) ? r.fotos : [];
-  fotos.forEach((foto, i) => {
+  // Pré-mede as dimensões reais de cada foto via Image() (confiável em qualquer navegador)
+  const medirImg = (src) => new Promise(resolve => {
+    try {
+      const im = new Image();
+      im.onload = () => resolve({ w: im.naturalWidth || 1, h: im.naturalHeight || 1 });
+      im.onerror = () => resolve(null);
+      im.src = src;
+    } catch (e) { resolve(null); }
+  });
+  const dims = [];
+  for (let k = 0; k < fotos.length; k++) { dims[k] = await medirImg(fotos[k]); }
+
+  for (let i = 0; i < fotos.length; i++) {
+    const foto = fotos[i];
     doc.addPage();
-    let yE = HH + 12;
-    // faixa de cabeçalho compacta na página de evidência
+    // faixa de cabeçalho da página de evidência
     doc.setFillColor(...OR); doc.rect(0, 0, pageW, HH, 'F');
     doc.setFillColor(...OR2); doc.rect(0, HH, pageW, 1.2, 'F');
+    const evLogoW = logo && logo.data && logo.w && logo.h ? 20 * (logo.w / logo.h) : 0;
     if (logo && logo.data) {
-      const lh = 18, lw = logo.w && logo.h ? lh * (logo.w / logo.h) : 18;
-      try { doc.addImage(logo.data, 'PNG', M, (HH - lh) / 2, lw, lh); } catch (e) {}
+      try { doc.addImage(logo.data, 'PNG', M, (HH - 20) / 2, evLogoW, 20); } catch (e) {}
     }
-    doc.setTextColor(255, 255, 255); doc.setFont(undefined, 'bold'); doc.setFontSize(15);
-    doc.text('NEXUS - RNC', M + 26, 15);
-    doc.setFont(undefined, 'normal'); doc.setFontSize(8);
+    const evTextX = M + (evLogoW ? evLogoW + 5 : 0);
+    doc.setTextColor(255, 255, 255); doc.setFont(undefined, 'bold'); doc.setFontSize(17);
+    doc.text('NEXUS - RNC', evTextX, 16);
+    doc.setFont(undefined, 'normal'); doc.setFontSize(8.5);
     doc.setTextColor(255, 244, 224);
-    doc.text(`Evidência ${i + 1} de ${fotos.length} · Documento ${numStr}`, M + 26, 22);
+    doc.text(`Evidência ${i + 1} de ${fotos.length} · Documento ${numStr}`, evTextX, 23);
 
+    // reinicia o cursor vertical no topo da área de conteúdo desta página
+    y = HH + 14;
     sectionTitle(6, `Evidência fotográfica ${i + 1}`);
-    // Área da imagem — ocupa a maior parte da página, moldura elegante
-    const areaX = M, areaY = y, areaW = CW, areaH = pageH - y - 26;
-    doc.setFillColor(...BG); doc.setDrawColor(...BD); doc.setLineWidth(0.3);
+    // Área da imagem
+    const areaX = M, areaY = y, areaW = CW, areaH = pageH - y - 22;
+    doc.setFillColor(255, 255, 255); doc.setDrawColor(...BD); doc.setLineWidth(0.3);
     doc.roundedRect(areaX, areaY, areaW, areaH, 2, 2, 'FD');
-    // dimensionar a imagem preservando proporção dentro da área (com margem interna)
-    const pad = 5;
-    const maxW = areaW - pad * 2, maxH = areaH - pad * 2 - 8;
-    let props = null;
-    try { props = doc.getImageProperties(foto); } catch (e) { props = null; }
+    // dimensiona preservando proporção (usa dimensões pré-medidas)
+    const capH = 9;
+    const pad = 6;
+    const maxW = areaW - pad * 2, maxH = areaH - pad * 2 - capH;
+    const d = dims[i];
     let drawW = maxW, drawH = maxH;
-    if (props && props.width && props.height) {
-      const ratio = props.width / props.height;
+    if (d && d.w && d.h) {
+      const ratio = d.w / d.h;
       drawW = maxW; drawH = drawW / ratio;
       if (drawH > maxH) { drawH = maxH; drawW = drawH * ratio; }
     }
     const imgX = areaX + (areaW - drawW) / 2;
     const imgY = areaY + pad + (maxH - drawH) / 2;
-    try { doc.addImage(foto, 'JPEG', imgX, imgY, drawW, drawH); } catch (e) {
-      doc.setTextColor(...S3); doc.setFontSize(9);
+    let imgOk = false;
+    for (const f of ['JPEG', 'PNG', 'WEBP']) {
+      try { doc.addImage(foto, f, imgX, imgY, drawW, drawH); imgOk = true; break; } catch (e) {}
+    }
+    if (!imgOk) {
+      try { doc.addImage(foto, imgX, imgY, drawW, drawH); imgOk = true; } catch (e) {}
+    }
+    if (!imgOk) {
+      doc.setTextColor(...S3); doc.setFont(undefined, 'normal'); doc.setFontSize(9);
       doc.text('Imagem indisponível', areaX + areaW / 2, areaY + areaH / 2, { align: 'center' });
     }
-    // legenda
-    doc.setFillColor(...INK);
-    doc.roundedRect(areaX + pad, areaY + areaH - 9, 30, 6, 1.5, 1.5, 'F');
+    // legenda discreta (chip laranja, alinhado ao estilo do documento)
+    doc.setFillColor(...OR);
+    doc.roundedRect(areaX + pad, areaY + areaH - capH - 1, 30, capH - 2, 1.5, 1.5, 'F');
     doc.setTextColor(255, 255, 255); doc.setFont(undefined, 'bold'); doc.setFontSize(7.5);
-    doc.text(`EVIDÊNCIA #${i + 1}`, areaX + pad + 15, areaY + areaH - 5, { align: 'center' });
-    y = areaY + areaH + 6;
-  });
+    doc.text(`EVIDÊNCIA ${i + 1}`, areaX + pad + 15, areaY + areaH - capH + 3.5, { align: 'center' });
+  }
 
   // ═══════════════════════════════════════════════════════════
   //  RODAPÉ EM TODAS AS PÁGINAS

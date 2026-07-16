@@ -312,7 +312,7 @@ function recordLabel(type, rec) {
   const orig = rec?.origem ? ` · ${rec.origem}` : '';
   return `${base}${sem ? ' ' + sem : ''}${orig}${cat}`.trim();
 }
-function fDate(s) { if (!s) return ''; try { return new Date(s).toLocaleDateString('pt-BR'); } catch { return ''; } }
+function fDate(s) { if (!s) return ''; try { if (typeof s === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(s)) { const [y,m,d]=s.split('-').map(Number); return new Date(y, m-1, d).toLocaleDateString('pt-BR'); } return new Date(s).toLocaleDateString('pt-BR'); } catch { return ''; } }
 function fMoeda(v) { return Number(v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }); }
 function ultimoPrecoGlobal(nome) {
   const t = LS.get('tabPrecos') || {};
@@ -1281,7 +1281,7 @@ function RncEditor({ rnc, allItems, toast, genNum, onBack, onSave, onDelete }) {
         ${stepHeader(1, 'Identificação do registro')}
 
         <div class="card" style=${{ padding: 16, marginBottom: 12 }}>
-          ${labelObrig('Origem')}
+          ${labelObrig('Setor de origem')}
           <div style=${{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 14 }}>
             ${['CD','CP'].map(o => html`<button key=${o} onClick=${() => setOrig(o)} style=${{
               padding: '12px', borderRadius: 10,
@@ -1356,7 +1356,7 @@ function RncEditor({ rnc, allItems, toast, genNum, onBack, onSave, onDelete }) {
           </div>
           ${tipo === 'Outro (descrever)' && html`<input class="inp" value=${tipoCustom} onInput=${e => setTipoCustom(e.target.value)} placeholder="Descreva brevemente o tipo do problema..." style=${{ marginBottom: 12 }}/>`}
 
-          ${labelObrig('Descrição detalhada')}
+          ${labelObrig('Descrição')}
           <textarea class="inp" value=${desc} onInput=${e => setDesc(e.target.value)} rows="4" placeholder="Descreva o que foi identificado: o que estava errado, quando notou, em que estado o produto chegou, etc."/>
           <div style=${{ fontSize: 11, color: 'var(--s2)', marginTop: 6 }}>Quanto mais detalhado, mais útil para a gestão e o fornecedor.</div>
         </div>
@@ -1578,7 +1578,7 @@ async function pdfRnc(r) {
   const stColor = { aberta: RD, analise: AM, resolvida: GR, cancelada: S2 }[r.status] || S2;
   const stLabel = ({ aberta: 'ABERTA', analise: 'EM ANÁLISE', resolvida: 'RESOLVIDA', cancelada: 'CANCELADA' })[r.status] || (r.status || '').toUpperCase();
   const numStr = r.numero || '—';
-  const origemLabel = r.origem === 'CD' ? 'Centro de Distribuição' : r.origem === 'CP' ? 'Cozinha de Produção' : (r.origem || '—');
+  const origemLabel = r.origem === 'CD' ? 'CD · Centro de Distribuição' : r.origem === 'CP' ? 'CP · Cozinha de Produção' : (r.origem || '—');
 
   // ═══════════════════════════════════════════════════════════
   //  CABEÇALHO
@@ -1634,16 +1634,24 @@ async function pdfRnc(r) {
 
   // ---- Helper: título de seção ----
   const sectionTitle = (n, titulo) => {
-    doc.setFillColor(...INK);
-    doc.roundedRect(M, y - 5, CW, 8, 1.5, 1.5, 'F');
-    doc.setTextColor(...OR);
-    doc.setFont(undefined, 'bold');
-    doc.setFontSize(9);
-    doc.text(String(n).padStart(2, '0'), M + 4, y + 0.3);
+    // chip do número (laranja, cantos arredondados)
+    const chipW = 8, chipH = 8;
+    doc.setFillColor(...OR);
+    doc.roundedRect(M, y - 5.2, chipW, chipH, 1.8, 1.8, 'F');
     doc.setTextColor(255, 255, 255);
-    doc.setFontSize(9.5);
-    doc.text(String(titulo).toUpperCase(), M + 12, y + 0.3);
-    y += 9;
+    doc.setFont(undefined, 'bold');
+    doc.setFontSize(8.5);
+    doc.text(String(n).padStart(2, '0'), M + chipW / 2, y + 0.1, { align: 'center' });
+    // título
+    doc.setTextColor(...INK);
+    doc.setFontSize(11);
+    doc.text(String(titulo), M + chipW + 4, y);
+    // régua fina abaixo
+    const tW = doc.getTextWidth(String(titulo));
+    doc.setDrawColor(...BD);
+    doc.setLineWidth(0.4);
+    doc.line(M + chipW + 4 + tW + 4, y - 1, pageW - M, y - 1);
+    y += 8;
   };
 
   // ---- Helper: campo rótulo/valor dentro de caixa ----
@@ -1671,8 +1679,8 @@ async function pdfRnc(r) {
   doc.roundedRect(M, y, CW, idH, 2, 2, 'FD');
   const colW = (CW - 12) / 2;
   const cx1 = M + 4, cx2 = M + 4 + colW + 4;
-  field('Origem', origemLabel, cx1, colW, y + 6, { bold: true });
-  field('Data da ocorrência', fDate(r.data || r.criadoEm), cx2, colW, y + 6, { bold: true });
+  field('Setor de origem', origemLabel, cx1, colW, y + 6, { bold: true });
+  field('Data da ocorrência', fDate(r.data) || '—', cx2, colW, y + 6, { bold: true });
   field('Responsável pelo registro', r.responsavel || '—', cx1, colW, y + 18, { bold: true });
   field('Documento emitido em', new Date(r.criadoEm || Date.now()).toLocaleString('pt-BR'), cx2, colW, y + 18, { valueColor: S1, size: 9 });
   y += idH + 9;
@@ -1710,7 +1718,7 @@ async function pdfRnc(r) {
   doc.roundedRect(M, y, CW, descH, 2, 2, 'FD');
   doc.setFillColor(...RD); doc.rect(M, y, 1.4, descH, 'F');
   doc.setTextColor(...S2); doc.setFont(undefined, 'bold'); doc.setFontSize(6.5);
-  doc.text('DESCRIÇÃO DETALHADA', M + 5, y + 6);
+  doc.text('DESCRIÇÃO', M + 5, y + 6);
   doc.setTextColor(...INK); doc.setFont(undefined, 'normal'); doc.setFontSize(9.5);
   doc.text(descLines, M + 5, y + 11.5);
   y += descH + 9;
@@ -1831,8 +1839,6 @@ async function pdfRnc(r) {
     doc.text(`NEXUS - RNC · Grupo Ilha · Documento ${numStr}`, M, pageH - 9);
     doc.text(`Emitido em ${new Date().toLocaleString('pt-BR')}`, M, pageH - 5.2);
     doc.text(`Página ${p} de ${totalPages}`, pageW - M, pageH - 9, { align: 'right' });
-    doc.setFont(undefined, 'bold');
-    doc.text('CONFIDENCIAL', pageW - M, pageH - 5.2, { align: 'right' });
   }
 
   doc.save(`NEXUS_RNC_${(numStr || r.id || '').replace(/[\\/:*?"<>|]+/g, '_')}.pdf`);

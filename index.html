@@ -352,32 +352,12 @@ function isInactiveItem(name) { return (LS.get('inactiveItems') || []).includes(
 function toggleInactiveItem(name) { const a = LS.get('inactiveItems') || []; LS.set('inactiveItems', a.includes(name) ? a.filter(x => x !== name) : [...a, name]); auditLog(a.includes(name) ? 'Item reativado' : 'Item inativado', name); }
 function clearDraft(k) { LS.del('draft_' + k); }
 function hydratePedidoDraft(d) { return d ? { origem:d.origem, semana:d.semana || dateToWeek(d.data), data:d.data, responsavel:d.responsavel, notas:d.notas, itens:Object.entries(d.qtds||{}).filter(([_,v])=>parseFloat(v||0)>0).map(([nome,qtd])=>({nome,qtd:parseFloat(qtd)})) } : null; }
-function hydrateInvDraft(d) { return d ? { origem:d.origem, categoria:d.categoria, semana:d.semana || dateToWeek(d.data), data:d.data, responsavel:d.responsavel, observacoes:d.observacoes, itens:Object.entries(d.qtds||{}).map(([nome,qtd])=>({nome,qtd:parseFloat(qtd||0)})) } : null; }
 
 function auditLog(action, detail) {
   const logs = LS.get('audit') || [];
   // Compatível com versões anteriores: algumas telas antigas liam acao/det, outras action/detail.
   logs.unshift({ id: uid(), data: new Date().toISOString(), action, detail, acao: action, det: detail });
   LS.set('audit', logs.slice(0, 500));
-}
-function stockLog(item, before, after, origem, motivo, extra = {}) {
-  const movs = LS.get('stockMovs') || [];
-  const delta = Number(after || 0) - Number(before || 0);
-  movs.unshift({ id: uid(), data: new Date().toISOString(), item, before, after, delta, origem, motivo, ...extra });
-  LS.set('stockMovs', movs.slice(0, 1500));
-  auditLog('Movimentação de estoque', `${item}: ${before} → ${after}. ${motivo || ''}`);
-}
-function formatMov(m) {
-  const d = fDate(m.data);
-  const tipo = m.tipo || m.origem || 'Movimentação';
-  const delta = Number(m.delta || 0);
-  const sinal = delta > 0 ? '+' : '';
-  const ref = m.refLabel || m.motivo || '';
-  return {
-    titulo: `${d} - ${tipo}`,
-    linha: `${m.item} · ${sinal}${Number(delta.toFixed ? delta.toFixed(2) : delta)} · ${m.before} → ${m.after}`,
-    detalhe: ref
-  };
 }
 function moveToTrash(type, record, motivo='Exclusão administrativa') {
   const trash = LS.get('trash') || [];
@@ -500,8 +480,6 @@ const TABS = [
   { id: 'orcamento', l: 'Orçamento', ic: 'money' },
   { id: 'pedidos', l: 'Pedidos', ic: 'orders' },
   { id: 'recebimento', l: 'Recebimento', ic: 'recv' },
-  { id: 'inventario', l: 'Inventário', ic: 'box' },
-  { id: 'estoque', l: 'Estoque', ic: 'handbox' },
   { id: 'rnc', l: 'RNC', ic: 'rnc' },
   { id: 'relatorios', l: 'Relatórios', ic: 'rep' },
   { id: 'analise', l: 'Análise', ic: 'chart' },
@@ -539,7 +517,6 @@ function BottomNav({ tab, setTab }) {
 ══════════════════════════════════════ */
 const ST_PED = { pendente: { l: 'Aguardando', c: 'bgy' }, recebido: { l: 'Recebido', c: 'bgr2' }, parcial: { l: 'Parcial', c: 'bam' }, cancelado: { l: 'Cancelado', c: 'brd2' } };
 const ST_RNC = { aberta: { l: 'Aberta', c: 'brd2' }, analise: { l: 'Em análise', c: 'bam' }, resolvida: { l: 'Resolvida', c: 'bgr2' }, cancelada: { l: 'Cancelada', c: 'bgy' } };
-const ST_INV = { rascunho: { l: 'Rascunho', c: 'bam' }, finalizado: { l: 'Finalizado', c: 'bgr2' } };
 
 /* ══════════════════════════════════════
    INÍCIO
@@ -547,12 +524,11 @@ const ST_INV = { rascunho: { l: 'Rascunho', c: 'bam' }, finalizado: { l: 'Finali
 function InicioTab({ setTab }) {
   const pedidos = LS.get('pedidos') || [];
   const rncs = LS.get('rncs') || [];
-  const inventarios = LS.get('inventarios') || [];
-  const estoque = LS.get('estoque') || {};
+  const orcamentos = LS.get('orcamentos') || [];
   const pend = pedidos.filter(p => p.status === 'pendente').length;
   const rncA = rncs.filter(r => r.status === 'aberta' || r.status === 'analise').length;
-  const invPend = inventarios.filter(i => i.status === 'rascunho').length;
-  const estBaixo = Object.values(estoque).filter(q => parseFloat(q) <= 2).length;
+  const parcial = pedidos.filter(p => p.status === 'parcial').length;
+  const orcPend = orcamentos.filter(o => o.status !== 'autorizado').length;
   const recentes = [...pedidos].sort((a, b) => new Date(b.criadoEm || 0) - new Date(a.criadoEm || 0)).slice(0, 4);
   return html`<div class="page">
     <div class="card" style=${{ padding: 20, marginBottom: 16, background: 'linear-gradient(135deg,var(--or) 0%,var(--or2) 100%)', color: '#fff', boxShadow: '0 4px 20px rgba(245,149,0,.3)' }}>
@@ -563,8 +539,8 @@ function InicioTab({ setTab }) {
     <div style=${{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 16 }}>
       ${[[`Pedidos pendentes`, pend, pend > 0 ? 'var(--or)' : 'var(--ink)', 'recebimento'],
         [`RNCs abertas`, rncA, rncA > 0 ? 'var(--rd)' : 'var(--ink)', 'rnc'],
-        [`Inventários em rascunho`, invPend, invPend > 0 ? 'var(--am)' : 'var(--ink)', 'inventario'],
-        [`Estoque baixo/zerado`, estBaixo, estBaixo > 0 ? 'var(--rd)' : 'var(--ink)', 'estoque'],
+        [`Recebimentos parciais`, parcial, parcial > 0 ? 'var(--am)' : 'var(--ink)', 'recebimento'],
+        [`Orçamentos a autorizar`, orcPend, orcPend > 0 ? 'var(--bl)' : 'var(--ink)', 'orcamento'],
       ].map(([l, v, c, t]) => html`
         <button class="stcard" key=${l} onClick=${() => setTab(t)}>
           <div style=${{ fontSize: 10, fontWeight: 700, color: 'var(--s3)', textTransform: 'uppercase', letterSpacing: '.05em', marginBottom: 8 }}>${l}</div>
@@ -610,7 +586,7 @@ function OrcamentoTab({ toast }) {
     const recebeu = vinculados.some(p => p.recebimento);
     if (recebeu) {
       const itensAfetados = vinculados.flatMap(p => (p.recebimento?.itens || p.itens || []).map(i => `${i.nome} (${i.qtdRecebida ?? i.qtd} ${i.unit || 'UND'})`)).join(', ');
-      if (!strongConfirm(`ATENÇÃO: Este orçamento gerou pedido(s) que já foram RECEBIDOS. O estoque NÃO será revertido automaticamente — verifique manualmente se necessário.\n\nItens recebidos: ${itensAfetados || 'ver pedido'}\n\nDigite EXCLUIR para confirmar.`)) return;
+      if (!strongConfirm(`ATENÇÃO: Este orçamento gerou pedido(s) que já foram RECEBIDOS. Excluir o orçamento não desfaz os recebimentos já registrados.\n\nItens recebidos: ${itensAfetados || 'ver pedido'}\n\nDigite EXCLUIR para confirmar.`)) return;
       vinculados.forEach(p => moveToTrash('pedido', p, 'Pedido com recebimento removido por exclusão do orçamento vinculado'));
     } else {
       if (vinculados.length && !strongConfirm(`Este orçamento gerou ${vinculados.length} pedido(s). Ao excluir, os pedidos vinculados também irão para a lixeira.`)) return;
@@ -719,11 +695,10 @@ function OrcEditor({ orc, cat, allItems, tPrecos, toast, onBack, onSave, onDelet
         return html`<details key=${catN + orig} open style=${{ marginBottom: 8 }}>
           <summary class="cat-hdr"><${Ic} n="cr" s=${14} c="chv" style=${{ color: 'var(--s3)' }}/><span style=${{ fontWeight: 700, fontSize: 14, flex: 1 }}>${catN}</span>${catTotal > 0 && html`<span class="badge bor">${fMoeda(catTotal)}</span>`}</summary>
           <div class="ilist">
-            <div class="ghdr" style=${{ gridTemplateColumns: '1fr 88px 70px 76px' }}><span>Produto</span><span style=${{ textAlign: 'center' }}>Estoque atual</span><span style=${{ textAlign: 'center' }}>Qtd.</span><span style=${{ textAlign: 'right' }}>Preço</span></div>
+            <div class="ghdr" style=${{ gridTemplateColumns: '1fr 70px 76px' }}><span>Produto</span><span style=${{ textAlign: 'center' }}>Qtd.</span><span style=${{ textAlign: 'right' }}>Preço</span></div>
             ${items.map((item, idx) => { const qtd = parseFloat(qtds[item.name] || 0), preco = parseFloat(precos[item.name] || 0), sub = qtd * preco; return html`
-              <div key=${item.name} class="irow" style=${{ gridTemplateColumns: '1fr 88px 70px 76px', background: qtd > 0 ? 'var(--or3)' : '#fff' }}>
+              <div key=${item.name} class="irow" style=${{ gridTemplateColumns: '1fr 70px 76px', background: qtd > 0 ? 'var(--or3)' : '#fff' }}>
                 <div><div style=${{ fontSize: 13, fontWeight: qtd > 0 ? 600 : 400 }}>${item.name}</div><div style=${{ fontSize: 11, color: 'var(--s3)' }}>${item.unit}${sub > 0 ? ` · ${fMoeda(sub)}` : ''}</div></div>
-                <div style=${{ textAlign:'center', fontSize:12, fontWeight:800, color: parseFloat((LS.get('estoque') || {})[item.name] || 0) <= 0 ? 'var(--rd)' : 'var(--s2)' }}>${parseFloat((LS.get('estoque') || {})[item.name] || 0)} ${item.unit}</div>
                 <div style=${{ display: 'flex', justifyContent: 'center' }}><input type="number" min="0" class="inp-n" value=${qtds[item.name] || ''} onInput=${e => setQtds(p => ({ ...p, [item.name]: e.target.value }))} disabled=${locked} placeholder="0" style=${{ borderColor: qtd > 0 ? 'var(--or)' : undefined }}/></div>
                 <div style=${{ display: 'flex', justifyContent: 'flex-end' }}><input type="number" min="0" step="0.01" class="inp-n" value=${precos[item.name] || ''} onInput=${e => setPrecos(p => ({ ...p, [item.name]: e.target.value }))} disabled=${locked} placeholder="0,00" style=${{ width: 72, fontSize: 12, borderColor: preco > 0 ? 'var(--or)' : undefined }}/></div>
               </div>`; })}
@@ -816,12 +791,11 @@ function PedidosTab({ toast }) {
   const [editing, setEditing] = useState(null);
   const cat = useMemo(getCatalog, []);
   const allItems = useMemo(() => flatCatalog(cat), [cat]);
-  const estoque = useMemo(() => LS.get('estoque') || {}, []);
 
   const savePed = p => { const upd = pedidos.find(x => x.id === p.id) ? pedidos.map(x => x.id === p.id ? p : x) : [p, ...pedidos]; setPedidos(upd); LS.set('pedidos', upd); };
   const delPed = id => { const rec = pedidos.find(p => p.id === id); if (rec) moveToTrash('pedido', rec); const upd = pedidos.filter(p => p.id !== id); setPedidos(upd); LS.set('pedidos', upd); };
 
-  if (view === 'editor') return html`<${PedidoEditor} pedido=${editing} cat=${cat} allItems=${allItems} estoque=${estoque} toast=${toast}
+  if (view === 'editor') return html`<${PedidoEditor} pedido=${editing} cat=${cat} allItems=${allItems} toast=${toast}
     onBack=${() => { setView('lista'); setEditing(null); }}
     onSave=${p => { savePed(p); clearDraft('pedido'); toast.show(editing ? 'Pedido salvo' : 'Pedido criado'); setView('lista'); setEditing(null); }}
     onDelete=${id => { delPed(id); toast.show('Pedido excluído'); setView('lista'); setEditing(null); }}/>`;
@@ -853,7 +827,7 @@ function PCard({ p, onClick, toast }) {
   </div>`;
 }
 
-function PedidoEditor({ pedido, cat, allItems, estoque, toast, onBack, onSave, onDelete }) {
+function PedidoEditor({ pedido, cat, allItems, toast, onBack, onSave, onDelete }) {
   const isEdit = !!pedido?.id; const locked = false; const hasRecebimento = pedido?.recebimento != null;
   const sems = useMemo(genSems, []);
   const [orig, setOrig] = useState(pedido?.origem || 'CD');
@@ -862,7 +836,6 @@ function PedidoEditor({ pedido, cat, allItems, estoque, toast, onBack, onSave, o
   const [resp, setResp] = useState(pedido?.responsavel || (LS.get('config') || {}).responsavel || '');
   const [notas, setNotas] = useState(pedido?.notas || '');
   const [qtds, setQtds] = useState(() => { const m = {}; (pedido?.itens || []).forEach(i => m[i.nome] = String(i.qtd)); return m; });
-  const [showEst, setShowEst] = useState(true);
   const [busca, setBusca] = useState('');
   const [marcados, setMarcados] = useState([]);
   const itemsOrig = useMemo(() => allItems.filter(i => i.orig === orig && (!busca || i.name.toLowerCase().includes(busca.toLowerCase()) || i.cat.toLowerCase().includes(busca.toLowerCase()))), [allItems, orig, busca]);
@@ -874,8 +847,6 @@ function PedidoEditor({ pedido, cat, allItems, estoque, toast, onBack, onSave, o
     onSave({ id: pedido?.id || uid(), origem: orig, semana: sem, data, responsavel: resp, notas, status: pedido?.status || 'pendente', itens, recebimento: pedido?.recebimento || null, criadoEm: pedido?.criadoEm || new Date().toISOString() });
   };
   useEffect(() => { if (locked) return; const draft = { origem: orig, semana: sem, data, responsavel: resp, notas, qtds, atualizadoEm: new Date().toISOString() }; LS.set('draft_pedido', draft); }, [orig, sem, data, resp, notas, JSON.stringify(qtds)]);
-  // Estoque atual dos itens desta origem
-  const estItems = Object.entries(estoque).filter(([k]) => itemsOrig.some(i => i.name === k));
   return html`<div style=${{ maxWidth: 'none', margin: '0 auto' }}>
     <div class="stk" style=${{ padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 12 }}>
       <button class="btn bg0 bic" onClick=${onBack}><${Ic} n="left" s=${20}/></button>
@@ -899,28 +870,16 @@ function PedidoEditor({ pedido, cat, allItems, estoque, toast, onBack, onSave, o
           <input class="inp" value=${busca} onInput=${e=>setBusca(e.target.value)} placeholder="Buscar item ou categoria..."/>
           <button class="btn bs bsm" onClick=${()=>setMarcados(itemsOrig.map(i=>i.name))}>Marcar todos</button>
           <button class="btn bs bsm" onClick=${()=>setQtds(p=>{const n={...p}; (marcados.length?marcados:itemsOrig.map(i=>i.name)).forEach(k=>n[k]=''); return n;})}>Zerar</button>
-          <button class="btn bs bsm" onClick=${()=>setQtds(p=>{const n={...p}; (marcados.length?marcados:itemsOrig.map(i=>i.name)).forEach(k=>n[k]=String(estoque[k] || 0)); return n;})}>Copiar estoque</button>
         </div>
       </div>
-      ${showEst && estItems.length > 0 && html`
-        <div class="card" style=${{ padding: 12, marginBottom: 12, background: 'var(--bl3)', border: '1px solid rgba(37,99,235,.15)' }}>
-          <div class="row" style=${{ justifyContent: 'space-between', marginBottom: 8 }}>
-            <div class="row" style=${{ gap: 6 }}><${Ic} n="info" s=${14} style=${{ color: 'var(--bl)' }}/><span style=${{ fontSize: 12, fontWeight: 700, color: 'var(--bl)' }}>Estoque atual — orientação de compra</span></div>
-            <button class="btn bg0" style=${{ padding: '2px 6px', fontSize: 11 }} onClick=${() => setShowEst(false)}>×</button>
-          </div>
-          <div style=${{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
-            ${estItems.map(([k, v]) => html`<span key=${k} style=${{ fontSize: 11, background: '#fff', borderRadius: 6, padding: '3px 8px', border: '1px solid rgba(37,99,235,.2)', color: parseFloat(v) <= 0 ? 'var(--rd)' : parseFloat(v) < 3 ? 'var(--am)' : 'var(--ink)', fontWeight: parseFloat(v) <= 2 ? 700 : 400 }}>${k.split(':').pop().trim().split('(')[0].trim()}: <b>${v}</b></span>`)}
-          </div>
-        </div>`}
       ${Object.entries(byC).map(([catN, prods]) => html`
         <details key=${catN + orig} open style=${{ marginBottom: 8 }}>
           <summary class="cat-hdr"><${Ic} n="cr" s=${14} c="chv" style=${{ color: 'var(--s3)' }}/><span style=${{ fontWeight: 700, fontSize: 14, flex: 1 }}>${catN}</span><span style=${{ fontSize: 12, color: 'var(--s2)' }}>${prods.filter(p => parseFloat(qtds[p.name] || 0) > 0).length}/${prods.length}</span></summary>
           <div class="ilist">
-            <div class="ghdr" style=${{ gridTemplateColumns: '1fr 56px 60px' }}><span>Produto</span><span style=${{ textAlign: 'center' }}>Estq.</span><span style=${{ textAlign: 'center' }}>Qtd.</span></div>
-            ${prods.map(prod => { const qtd = parseFloat(qtds[prod.name] || 0), estQ = estoque[prod.name]; return html`
-              <div key=${prod.name} class="irow" style=${{ gridTemplateColumns: '1fr 56px 60px', background: qtd > 0 ? 'var(--or3)' : '#fff' }}>
+            <div class="ghdr" style=${{ gridTemplateColumns: '1fr 60px' }}><span>Produto</span><span style=${{ textAlign: 'center' }}>Qtd.</span></div>
+            ${prods.map(prod => { const qtd = parseFloat(qtds[prod.name] || 0); return html`
+              <div key=${prod.name} class="irow" style=${{ gridTemplateColumns: '1fr 60px', background: qtd > 0 ? 'var(--or3)' : '#fff' }}>
                 <div><div style=${{ fontSize: 13, fontWeight: qtd > 0 ? 600 : 400 }}>${prod.name}</div><div style=${{ fontSize: 11, color: 'var(--s3)' }}>${prod.unit}</div></div>
-                <div style=${{ textAlign: 'center', fontSize: 13, fontWeight: 600, color: estQ === undefined ? 'var(--s3)' : parseFloat(estQ) <= 0 ? 'var(--rd)' : parseFloat(estQ) < 3 ? 'var(--am)' : 'var(--gr)' }}>${estQ !== undefined ? estQ : '—'}</div>
                 <div style=${{ display: 'flex', justifyContent: 'center' }}><input type="number" min="0" class="inp-n" value=${qtds[prod.name] || ''} onInput=${e => setQtds(p => ({ ...p, [prod.name]: e.target.value }))} disabled=${locked} placeholder="0" style=${{ borderColor: qtd > 0 ? 'var(--or)' : undefined }}/></div>
               </div>`; })}
           </div>
@@ -942,7 +901,7 @@ function RecebimentoTab({ toast }) {
   const savePed = p => { const upd = pedidos.map(x => x.id === p.id ? p : x); setPedidos(upd); LS.set('pedidos', upd); };
   if (view === 'editor') return html`<${RecEditor} pedido=${editing} toast=${toast}
     onBack=${() => { setView('lista'); setEditing(null); setPedidos(LS.get('pedidos') || []); }}
-    onSave=${p => { savePed(p); toast.show('Recebimento finalizado! Estoque atualizado.'); setView('lista'); setEditing(null); setPedidos(LS.get('pedidos') || []); }}/>`;
+    onSave=${p => { savePed(p); toast.show('Recebimento finalizado!'); setView('lista'); setEditing(null); setPedidos(LS.get('pedidos') || []); }}/>`;
   const pend = pedidos.filter(p => p.status === 'pendente');
   const rec = pedidos.filter(p => ['recebido', 'parcial'].includes(p.status)).sort((a, b) => new Date(b.recebimento?.finalizadoEm || 0) - new Date(a.recebimento?.finalizadoEm || 0));
   return html`<div class="page">
@@ -974,22 +933,6 @@ function RecEditor({ pedido, toast, onBack, onSave }) {
   const finalizar = () => {
     const iL = itens.map(i => ({ ...i, qtdRecebida: parseFloat(qtdsR[i.nome] || 0) || 0 }));
     const hasPend = iL.some(i => i.qtdRecebida < i.qtd);
-    // Atualizar estoque por diferença: se já havia recebimento, estorna/aplica apenas a diferença
-    const estoque = LS.get('estoque') || {};
-    const oldMap = {};
-    (rec.itens || []).forEach(r => { oldMap[r.nome] = parseFloat(r.qtdRecebida || 0) || 0; });
-    const refLabel = `Pedido ${wLbl(pedido.semana)} · ${pedido.origem}`;
-    iL.forEach(i => {
-      const anteriorRecebido = oldMap[i.nome] || 0;
-      const novoRecebido = parseFloat(i.qtdRecebida || 0) || 0;
-      const delta = novoRecebido - anteriorRecebido;
-      if (!delta) return;
-      const cur = parseFloat(estoque[i.nome] || 0);
-      const prox = cur + delta;
-      estoque[i.nome] = prox;
-      stockLog(i.nome, cur, prox, delta >= 0 ? 'Compra' : 'Correção de compra', refLabel, { tipo: delta >= 0 ? 'Compra' : 'Correção de compra', refId: pedido.id, refLabel });
-    });
-    LS.set('estoque', estoque);
     const ped = { ...pedido, status: hasPend ? 'parcial' : 'recebido', recebimento: { responsavel: resp, observacoes: obs, itens: iL, finalizadoEm: rec.finalizadoEm || new Date().toISOString(), atualizadoEm: new Date().toISOString(), status: hasPend ? 'parcial' : 'completo' } };
     if (hasPend && abrirRncAuto !== 'nunca') {
       const shouldOpen = abrirRncAuto === 'sempre' || confirm('Houve divergência no recebimento. Deseja abrir uma RNC automaticamente?');
@@ -1007,7 +950,7 @@ function RecEditor({ pedido, toast, onBack, onSave }) {
     <div class="stk" style=${{ padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 12 }}>
       <button class="btn bg0 bic" onClick=${onBack}><${Ic} n="left" s=${20}/></button>
       <div style=${{ flex: 1 }}><div style=${{ fontWeight: 800, fontSize: 15, fontFamily: "'Plus Jakarta Sans',sans-serif" }}>Recebimento · ${pedido.origem}</div><div style=${{ fontSize: 12, color: 'var(--s2)' }}>${wLbl(pedido.semana)}</div></div>
-      ${finalizado && html`<button class="btn brd bsm" onClick=${() => { if (strongConfirm('Excluir recebimento')) { const estoque=LS.get('estoque')||{}; const refLabel=`Estorno do pedido ${wLbl(pedido.semana)} · ${pedido.origem}`; (rec.itens||[]).forEach(i=>{ const qtd=parseFloat(i.qtdRecebida||0)||0; if(!qtd) return; const cur=parseFloat(estoque[i.nome]||0); const prox=cur-qtd; estoque[i.nome]=prox; stockLog(i.nome, cur, prox, 'Estorno de compra', refLabel, { tipo:'Estorno de compra', refId:pedido.id, refLabel }); }); LS.set('estoque',estoque); moveToTrash('recebimento', { pedidoId: pedido.id, recebimento: pedido.recebimento, semana: pedido.semana, origem: pedido.origem }); onSave({ ...pedido, status:'pendente', recebimento:null }); } }}>Excluir recebimento</button>`}
+      ${finalizado && html`<button class="btn brd bsm" onClick=${() => { if (strongConfirm('Excluir recebimento')) { moveToTrash('recebimento', { pedidoId: pedido.id, recebimento: pedido.recebimento, semana: pedido.semana, origem: pedido.origem }); onSave({ ...pedido, status:'pendente', recebimento:null }); } }}>Excluir recebimento</button>`}
     </div>
     <div class="page" style=${{ paddingBottom: 110 }}>
       <div class="card" style=${{ padding: 16, marginBottom: 12 }}>
@@ -1049,298 +992,6 @@ function RecEditor({ pedido, toast, onBack, onSave }) {
   </div>`;
 }
 
-/* ══════════════════════════════════════
-   ESTOQUE / INVENTÁRIO
-══════════════════════════════════════ */
-function EstoqueTab({ toast }) {
-  const [view, setView] = useState('lista');
-  const cat = useMemo(getCatalog, []);
-  const allItems = useMemo(() => flatCatalog(cat), [cat]);
-  const estoque = LS.get('estoque') || {};
-  const valorEstoqueAtual = allItems.reduce((soma, it) => soma + (parseFloat(estoque[it.name] || 0) * ultimoPrecoGlobal(it.name)), 0);
-
-  if (view === 'operacao') return html`<${OperacaoEstoque} allItems=${allItems} onBack=${() => setView('lista')}/>`;
-
-  return html`<div class="page">
-    <div class="row" style=${{ justifyContent: 'space-between', marginBottom: 16 }}>
-      <div><h2 style=${{ fontSize: 20, fontWeight: 800, fontFamily: "'Plus Jakarta Sans',sans-serif", margin: 0 }}>Estoque</h2><p style=${{ fontSize: 13, color: 'var(--s2)', margin: '2px 0 0' }}>Saldo atual, movimentações e ajustes manuais</p></div>
-      <button class="btn bs bsm" onClick=${() => setView('operacao')}><${Ic} n="box" s=${14}/>Operação</button>
-    </div>
-
-    <div class="card" style=${{ padding: 16, marginBottom: 14 }}><div style=${{ fontSize:10,fontWeight:800,color:'var(--s3)',textTransform:'uppercase',letterSpacing:'.06em',marginBottom:6 }}>Valor estimado em estoque</div><div style=${{ fontSize:26,fontWeight:800,fontFamily:"'Plus Jakarta Sans',sans-serif" }}>${fMoeda(valorEstoqueAtual)}</div><div style=${{ fontSize:12,color:'var(--s2)',marginTop:4 }}>calculado ao vivo pelo estoque atual e último preço cadastrado</div></div>
-
-    ${allItems.length > 0 ? html`
-      <div style=${{ marginBottom: 16 }}>
-        <span class="slbl">Estoque atual</span>
-        ${['CD', 'CP'].map(o => {
-          const itensO = allItems.filter(i => i.orig === o);
-          if (!itensO.length) return null;
-          const byC = {};
-          itensO.forEach(i => { if (!byC[i.cat]) byC[i.cat] = []; byC[i.cat].push(i); });
-          return html`<details key=${o} open style=${{ marginBottom: 8 }}>
-            <summary class="cat-hdr"><${Ic} n="cr" s=${14} c="chv" style=${{ color: 'var(--s3)' }}/><span style=${{ fontWeight: 700, fontSize: 14, flex: 1 }}>${o} · ${cat[o].label}</span><span class="badge bor">${itensO.length} itens</span></summary>
-            <div class="ilist">
-              ${Object.entries(byC).map(([catN, prods]) => html`
-                <div key=${catN} style=${{ padding: '8px 16px 4px', background: '#F9FAFB', fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.06em', color: 'var(--s3)', borderTop: '1px solid var(--bd)' }}>${catN}</div>
-                <div class="ghdr" style=${{ gridTemplateColumns: '1fr 80px 60px' }}><span>Produto</span><span style=${{ textAlign: 'center' }}>Qtd.</span><span style=${{ textAlign: 'center' }}>Un.</span></div>
-                ${prods.map(prod => { const q = parseFloat(estoque[prod.name] || 0); return html`
-                  <div key=${prod.name} class="irow" style=${{ gridTemplateColumns: '1fr 80px 60px', background: q <= 0 ? 'var(--rd3)' : '#fff' }}>
-                    <div style=${{ fontSize: 13, fontWeight: 500 }}>${prod.name}</div>
-                    <div style=${{ textAlign: 'center', fontWeight: 700, color: q <= 0 ? 'var(--rd)' : q < 3 ? 'var(--am)' : 'var(--gr)' }}>${q}</div>
-                    <div style=${{ textAlign: 'center', fontSize: 12, color: 'var(--s2)' }}>${prod.unit}</div>
-                  </div>`; })}
-              `)}
-            </div>
-          </details>`;
-        })}
-      </div>` : html`<div class="empty"><${Ic} n="box" s=${40} style=${{ color: 'var(--s3)' }}/><p>Nenhum item cadastrado para exibir no estoque.</p></div>`}
-  </div>`;
-}
-
-function InventarioTab({ toast }) {
-  const [view, setView] = useState('lista');
-  const [inventarios, setInventarios] = useState(() => LS.get('inventarios') || []);
-  const [editing, setEditing] = useState(null);
-  const estoque = LS.get('estoque') || {};
-  const cat = useMemo(getCatalog, []);
-  const allItems = useMemo(() => flatCatalog(cat), [cat]);
-
-  const saveInv = inv => { const upd = inventarios.find(x => x.id === inv.id) ? inventarios.map(x => x.id === inv.id ? inv : x) : [inv, ...inventarios]; setInventarios(upd); LS.set('inventarios', upd); };
-  const delInv = id => { const rec = inventarios.find(i => i.id === id); if (rec) moveToTrash('inventario', rec); const upd = inventarios.filter(i => i.id !== id); setInventarios(upd); LS.set('inventarios', upd); };
-
-  if (view === 'editor') return html`<${InvEditor} inv=${editing} cat=${cat} allItems=${allItems} estoque=${estoque} toast=${toast}
-    onBack=${() => { setView('lista'); setEditing(null); setInventarios(LS.get('inventarios') || []); }}
-    onSave=${inv => { saveInv(inv); toast.show(inv.status === 'finalizado' ? 'Inventário finalizado! Estoque atualizado.' : 'Rascunho salvo'); setView('lista'); setEditing(null); setInventarios(LS.get('inventarios') || []); }}
-    onDelete=${id => { delInv(id); toast.show('Excluído'); setView('lista'); setEditing(null); }}/>`;
-
-  const rascunhos = inventarios.filter(i => i.status === 'rascunho');
-  const finalizados = inventarios.filter(i => i.status === 'finalizado').sort((a, b) => new Date(b.finalizadoEm || 0) - new Date(a.finalizadoEm || 0));
-  const ultima = finalizados[0];
-
-  return html`<div class="page">
-    <div class="row" style=${{ justifyContent: 'space-between', marginBottom: 16 }}>
-      <div><h2 style=${{ fontSize: 20, fontWeight: 800, fontFamily: "'Plus Jakarta Sans',sans-serif", margin: 0 }}>Inventário</h2><p style=${{ fontSize: 13, color: 'var(--s2)', margin: '2px 0 0' }}>Contagens, rascunhos, finalização e histórico</p></div>
-      <button class="btn bp bsm" onClick=${() => { const d=LS.get('draft_inventario'); if(d && confirm('Continuar rascunho automático do inventário?')) setEditing(hydrateInvDraft(d)); else setEditing(null); setView('editor'); }}><${Ic} n="plus" s=${14}/>Novo</button>
-    </div>
-
-    <div style=${{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 16 }}>
-      <div class="stcard" style=${{ cursor: 'default' }}><div style=${{ fontSize: 10, fontWeight: 700, color: 'var(--s3)', textTransform: 'uppercase', letterSpacing: '.05em', marginBottom: 8 }}>Rascunhos</div><div style=${{ fontSize: 30, fontWeight: 800, color: rascunhos.length ? 'var(--am)' : 'var(--ink)', fontFamily: "'Plus Jakarta Sans',sans-serif" }}>${rascunhos.length}</div></div>
-      <div class="stcard" style=${{ cursor: 'default' }}><div style=${{ fontSize: 10, fontWeight: 700, color: 'var(--s3)', textTransform: 'uppercase', letterSpacing: '.05em', marginBottom: 8 }}>Finalizados</div><div style=${{ fontSize: 30, fontWeight: 800, fontFamily: "'Plus Jakarta Sans',sans-serif" }}>${finalizados.length}</div></div>
-    </div>
-
-    ${ultima && html`<div class="card" style=${{ padding: 14, marginBottom: 16 }}><div style=${{ fontSize:10,fontWeight:800,color:'var(--s3)',textTransform:'uppercase',letterSpacing:'.06em',marginBottom:5 }}>Última contagem finalizada</div><div style=${{ fontWeight:800, fontSize:14 }}>${wLbl(ultima.semana)} · ${ultima.origem}</div><div style=${{ fontSize:12, color:'var(--s2)', marginTop:3 }}>${fDate(ultima.finalizadoEm || ultima.data || ultima.criadoEm)} · ${(ultima.itens || []).length} itens</div></div>`}
-
-    ${inventarios.length === 0 && html`<div class="empty"><${Ic} n="box" s=${40} style=${{ color: 'var(--s3)' }}/><p>Nenhum inventário realizado.<br/>Inicie uma nova contagem.</p><button class="btn bp" style=${{ marginTop: 8 }} onClick=${() => setView('editor')}><${Ic} n="plus" s=${16}/>Iniciar contagem</button></div>`}
-    ${rascunhos.length > 0 && html`<span class="slbl">Rascunhos (${rascunhos.length})</span><div style=${{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 16 }}>${rascunhos.map(i => html`<${InvCard} key=${i.id} inv=${i} onClick=${() => { setEditing(i); setView('editor'); }}/>` )}</div>`}
-    ${finalizados.length > 0 && html`<span class="slbl">Histórico (${finalizados.length})</span><div style=${{ display: 'flex', flexDirection: 'column', gap: 8 }}>${finalizados.slice(0, 20).map(i => html`<${InvCard} key=${i.id} inv=${i} onClick=${() => { setEditing(i); setView('editor'); }}/>` )}</div>`}
-  </div>`;
-}
-
-function OperacaoEstoque({ allItems, onBack }) {
-  const [movs, setMovs] = useState(() => LS.get('stockMovs') || []);
-  const [estoqueState, setEstoqueState] = useState(() => LS.get('estoque') || {});
-  const [busca, setBusca] = useState('');
-  const [tipo, setTipo] = useState('todos');
-  const [origem, setOrigem] = useState('todos');
-  const [ini, setIni] = useState('');
-  const [fim, setFim] = useState('');
-  const [manualBusca, setManualBusca] = useState('');
-  const [manualItem, setManualItem] = useState('');
-  const [manualTipo, setManualTipo] = useState('entrada');
-  const [manualQtd, setManualQtd] = useState('');
-  const [manualMotivo, setManualMotivo] = useState('');
-  const itemMap = useMemo(() => Object.fromEntries((allItems || []).map(i => [i.name, i])), [allItems]);
-  const manualSug = useMemo(() => {
-    const q = manualBusca.trim().toLowerCase();
-    if (!q) return [];
-    return (allItems || []).filter(i => `${i.name} ${i.cat} ${i.orig}`.toLowerCase().includes(q)).slice(0, 8);
-  }, [manualBusca, allItems]);
-  const tipos = useMemo(() => ['todos', ...Array.from(new Set((movs || []).map(m => m.tipo || m.origem || 'Movimentação'))).sort()], [movs]);
-  const filtradas = useMemo(() => {
-    const q = busca.trim().toLowerCase();
-    return (movs || []).filter(m => {
-      const info = itemMap[m.item] || {};
-      const dt = (m.data || '').slice(0, 10);
-      if (q && !`${m.item || ''} ${info.cat || ''} ${info.orig || ''} ${m.tipo || ''} ${m.origem || ''} ${m.motivo || ''} ${m.refLabel || ''} ${fDate(m.data)}`.toLowerCase().includes(q)) return false;
-      if (tipo !== 'todos' && (m.tipo || m.origem || 'Movimentação') !== tipo) return false;
-      if (origem !== 'todos' && (info.orig || m.local || '') !== origem) return false;
-      if (ini && dt < ini) return false;
-      if (fim && dt > fim) return false;
-      return true;
-    });
-  }, [movs, busca, tipo, origem, ini, fim, itemMap]);
-  const totalEntrada = filtradas.reduce((s, m) => s + Math.max(0, Number(m.delta || 0)), 0);
-  const totalSaida = filtradas.reduce((s, m) => s + Math.min(0, Number(m.delta || 0)), 0);
-  const compras = filtradas.filter(m => String(m.tipo || m.origem || '').toLowerCase().includes('receb')).reduce((s, m) => s + Math.max(0, Number(m.delta || 0)), 0);
-  const limpar = () => { setBusca(''); setTipo('todos'); setOrigem('todos'); setIni(''); setFim(''); };
-  const aplicarManual = () => {
-    if (!manualItem) { alert('Selecione um item.'); return; }
-    const qtd = parseFloat(manualQtd || 0);
-    if (!qtd || qtd <= 0) { alert('Informe uma quantidade válida.'); return; }
-    if (!manualMotivo.trim()) { alert('Informe a justificativa da operação.'); return; }
-    const estoque = LS.get('estoque') || {};
-    const before = parseFloat(estoque[manualItem] || 0);
-    const after = manualTipo === 'entrada' ? before + qtd : before - qtd;
-    if (after < 0 && !confirm('A saída deixará o estoque negativo. Deseja continuar?')) return;
-    estoque[manualItem] = Number(after.toFixed(4));
-    LS.set('estoque', estoque);
-    stockLog(manualItem, before, estoque[manualItem], manualTipo === 'entrada' ? 'Entrada manual' : 'Saída manual', manualMotivo.trim(), { tipo: manualTipo === 'entrada' ? 'Entrada manual' : 'Saída manual', refLabel: manualMotivo.trim() });
-    setEstoqueState(estoque);
-    setMovs(LS.get('stockMovs') || []);
-    setManualQtd(''); setManualMotivo('');
-    alert('Operação registrada e estoque atualizado.');
-  };
-  return html`<div style=${{ maxWidth: 'none', margin: '0 auto' }}>
-    <div class="stk" style=${{ padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 12 }}>
-      <button class="btn bg0 bic" onClick=${onBack}><${Ic} n="left" s=${20}/></button>
-      <div style=${{ flex: 1 }}><div style=${{ fontWeight: 800, fontSize: 16, fontFamily: "'Plus Jakarta Sans',sans-serif" }}>Operação de estoque</div><div style=${{ fontSize: 12, color: 'var(--s2)' }}>Entrada, saída e extrato de movimentações por item</div></div>
-      <button class="btn bs bsm" onClick=${limpar}>Limpar filtros</button>
-    </div>
-    <div class="page">
-      <div class="card" style=${{ padding: 16, marginBottom: 14 }}>
-        <div style=${{ fontWeight:800, fontSize:15, marginBottom:12 }}>Entrada / saída manual</div>
-        <div style=${{ display:'grid', gridTemplateColumns:'minmax(260px,2fr) 150px 120px 2fr auto', gap:10, alignItems:'end' }}>
-          <div style=${{ position:'relative' }}><label style=${{ fontSize:10,fontWeight:800,color:'var(--s3)',textTransform:'uppercase',letterSpacing:'.06em',display:'block',marginBottom:6 }}>Item</label><input class="inp" value=${manualBusca} onInput=${e=>{setManualBusca(e.target.value); setManualItem('');}} placeholder="Buscar item para movimentar..."/>${manualSug.length>0 && !manualItem && html`<div class="card" style=${{ position:'absolute', zIndex:20, left:0, right:0, top:'64px', maxHeight:240, overflow:'auto', border:'1px solid var(--bd)' }}>${manualSug.map(i=>html`<button key=${i.name} onClick=${()=>{setManualItem(i.name); setManualBusca(i.name);}} style=${{ display:'block', width:'100%', border:0, background:'#fff', textAlign:'left', padding:'10px 12px', cursor:'pointer', borderBottom:'1px solid var(--bd)' }}><div style=${{ fontWeight:700, fontSize:13 }}>${i.name}</div><div style=${{ fontSize:11, color:'var(--s2)' }}>${i.orig} · ${i.cat} · estoque atual: ${estoqueState[i.name] || 0}</div></button>`)}</div>`}</div>
-          <div><label style=${{ fontSize:10,fontWeight:800,color:'var(--s3)',textTransform:'uppercase',letterSpacing:'.06em',display:'block',marginBottom:6 }}>Tipo</label><select class="inp" value=${manualTipo} onChange=${e=>setManualTipo(e.target.value)}><option value="entrada">Entrada</option><option value="saida">Saída</option></select></div>
-          <div><label style=${{ fontSize:10,fontWeight:800,color:'var(--s3)',textTransform:'uppercase',letterSpacing:'.06em',display:'block',marginBottom:6 }}>Qtd.</label><input type="number" min="0" step="0.5" class="inp" value=${manualQtd} onInput=${e=>setManualQtd(e.target.value)} placeholder="0"/></div>
-          <div><label style=${{ fontSize:10,fontWeight:800,color:'var(--s3)',textTransform:'uppercase',letterSpacing:'.06em',display:'block',marginBottom:6 }}>Justificativa obrigatória</label><input class="inp" value=${manualMotivo} onInput=${e=>setManualMotivo(e.target.value)} placeholder="Ex: ajuste operacional, perda, transferência, correção..."/></div>
-          <button class="btn bp" onClick=${aplicarManual}>Registrar</button>
-        </div>
-      </div>
-      <div class="card" style=${{ padding: 16, marginBottom: 14 }}>
-        <div style=${{ display: 'grid', gridTemplateColumns: 'minmax(260px,2fr) 170px 120px 150px 150px', gap: 10, alignItems:'end' }}>
-          <div><label style=${{ fontSize:10,fontWeight:800,color:'var(--s3)',textTransform:'uppercase',letterSpacing:'.06em',display:'block',marginBottom:6 }}>Buscar item ou referência</label><input class="inp" value=${busca} onInput=${e=>setBusca(e.target.value)} placeholder="Ex: polvo, compra, inventário, data..."/></div>
-          <div><label style=${{ fontSize:10,fontWeight:800,color:'var(--s3)',textTransform:'uppercase',letterSpacing:'.06em',display:'block',marginBottom:6 }}>Tipo</label><select class="inp" value=${tipo} onChange=${e=>setTipo(e.target.value)}>${tipos.map(t=>html`<option key=${t} value=${t}>${t === 'todos' ? 'Todos' : t}</option>`)}</select></div>
-          <div><label style=${{ fontSize:10,fontWeight:800,color:'var(--s3)',textTransform:'uppercase',letterSpacing:'.06em',display:'block',marginBottom:6 }}>Origem</label><select class="inp" value=${origem} onChange=${e=>setOrigem(e.target.value)}><option value="todos">Todas</option><option value="CD">CD</option><option value="CP">CP</option></select></div>
-          <div><label style=${{ fontSize:10,fontWeight:800,color:'var(--s3)',textTransform:'uppercase',letterSpacing:'.06em',display:'block',marginBottom:6 }}>De</label><input type="date" class="inp" value=${ini} onInput=${e=>setIni(e.target.value)}/></div>
-          <div><label style=${{ fontSize:10,fontWeight:800,color:'var(--s3)',textTransform:'uppercase',letterSpacing:'.06em',display:'block',marginBottom:6 }}>Até</label><input type="date" class="inp" value=${fim} onInput=${e=>setFim(e.target.value)}/></div>
-        </div>
-      </div>
-      <div style=${{ display:'grid', gridTemplateColumns:'repeat(4, minmax(160px, 1fr))', gap:10, marginBottom:14 }}>
-        ${[['Movimentações', filtradas.length], ['Entradas', `+${Number(totalEntrada.toFixed(2))}`], ['Saídas', Number(totalSaida.toFixed(2))], ['Compras recebidas', `+${Number(compras.toFixed(2))}`]].map(([l,v])=>html`<div class="card" style=${{ padding:14 }}><div style=${{ fontSize:10,fontWeight:800,color:'var(--s3)',textTransform:'uppercase',letterSpacing:'.06em',marginBottom:6 }}>${l}</div><div style=${{ fontSize:22,fontWeight:800,fontFamily:"'Plus Jakarta Sans',sans-serif" }}>${v}</div></div>`)}
-      </div>
-      <div class="card" style=${{ padding: 0, overflow:'hidden' }}>
-        <div class="ghdr" style=${{ gridTemplateColumns:'150px 160px 1fr 120px 220px' }}><span>Data / tipo</span><span>Origem</span><span>Item</span><span style=${{ textAlign:'right' }}>Movimento</span><span>Referência</span></div>
-        <div style=${{ maxHeight:'calc(100vh - 500px)', overflow:'auto' }}>
-          ${filtradas.length === 0 && html`<div style=${{ padding:24, textAlign:'center', color:'var(--s2)', fontSize:13 }}>Nenhuma movimentação encontrada com os filtros selecionados.</div>`}
-          ${filtradas.map((m,i)=>{ const info=itemMap[m.item]||{}; const delta=Number(m.delta||0); return html`<div key=${m.id||i} class="irow" style=${{ gridTemplateColumns:'150px 160px 1fr 120px 220px', alignItems:'center' }}>
-            <div><div style=${{ fontWeight:800,fontSize:12 }}>${fDate(m.data)}</div><div style=${{ fontSize:11,color:'var(--s2)' }}>${m.tipo || m.origem || 'Movimentação'}</div></div>
-            <div><span class="badge bor">${info.orig || m.local || '—'}</span><div style=${{ fontSize:11,color:'var(--s2)',marginTop:4,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap' }}>${info.cat || ''}</div></div>
-            <div><div style=${{ fontWeight:700,fontSize:13 }}>${m.item}</div><div style=${{ fontSize:11,color:'var(--s2)' }}>Estoque: ${m.before} → ${m.after}</div></div>
-            <div style=${{ textAlign:'right' }}><span class=${`badge ${delta>=0?'bgr2':'brd2'}`}>${delta>=0?'+':''}${Number(delta.toFixed ? delta.toFixed(2) : delta)}</span></div>
-            <div style=${{ fontSize:12,color:'var(--s2)' }}>${m.refLabel || m.motivo || '—'}</div>
-          </div>`; })}
-        </div>
-      </div>
-    </div>
-  </div>`;
-}
-
-function InvCard({ inv, onClick }) {
-  const st = ST_INV[inv.status] || { l: inv.status, c: 'bgy' };
-  return html`<button class="card" style=${{ padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 12, border: 'none', textAlign: 'left', width: '100%', cursor: 'pointer' }} onClick=${onClick}>
-    <div style=${{ flex: 1, minWidth: 0 }}><div class="row" style=${{ gap: 6, marginBottom: 4 }}><span class=${`badge ${st.c}`}>${st.l}</span><span class="badge bor">${inv.origem}</span>${inv.categoria && html`<span class="badge bbl">${inv.categoria}</span>`}</div><div style=${{ fontWeight: 700, fontSize: 14 }}>${wLbl(inv.semana)}</div><div style=${{ fontSize: 12, color: 'var(--s2)', marginTop: 2 }}>${fDate(inv.data)} · ${inv.responsavel || '—'}</div></div>
-    <${Ic} n="cr" s=${16} style=${{ color: 'var(--s3)' }}/>
-  </button>`;
-}
-
-function InvEditor({ inv, cat, allItems, estoque: estoqueInit, toast, onBack, onSave, onDelete }) {
-  const isEdit = !!inv?.id; const finalizado = inv?.status === 'finalizado';
-  const sems = useMemo(genSems, []);
-  const [orig, setOrig] = useState(inv?.origem || 'CD');
-  const [data, setData] = useState(inv?.data || todayISO());
-  const [sem, setSem] = useState(inv?.semana || dateToWeek(data));
-  const [resp, setResp] = useState(inv?.responsavel || (LS.get('config') || {}).responsavel || '');
-  const [obs, setObs] = useState(inv?.observacoes || '');
-  const [qtds, setQtds] = useState(() => { const m = {}; (inv?.itens || []).forEach(i => m[i.nome] = String(i.qtd)); return m; });
-  const categoriasOrig = useMemo(() => Object.keys(cat[orig]?.cats || {}), [cat, orig]);
-  const [catInv, setCatInv] = useState(inv?.categoria || categoriasOrig[0] || '');
-  const [busca, setBusca] = useState('');
-  useEffect(() => { const w = dateToWeek(data); if (w !== sem) setSem(w); }, [data]);
-  useEffect(() => { if (!categoriasOrig.includes(catInv)) setCatInv(categoriasOrig[0] || ''); }, [orig, categoriasOrig.join('|')]);
-
-  const itemsOrig = useMemo(() => allItems.filter(i => i.orig === orig && (!catInv || i.cat === catInv) && (!busca || i.name.toLowerCase().includes(busca.toLowerCase()))), [allItems, orig, catInv, busca]);
-  const byC = useMemo(() => { const m = {}; itemsOrig.forEach(i => { if (!m[i.cat]) m[i.cat] = []; m[i.cat].push(i); }); return m; }, [itemsOrig]);
-  const lancados = itemsOrig.filter(i => qtds[i.name] !== '' && qtds[i.name] !== undefined).length;
-
-  const buildInv = (status) => ({
-    id: inv?.id || uid(), origem: orig, categoria: catInv, semana: sem, data, status,
-    responsavel: resp, observacoes: obs,
-    itens: itemsOrig.map(i => ({ nome: i.name, cat: i.cat, unit: i.unit, qtd: parseFloat(qtds[i.name] || 0) })),
-    criadoEm: inv?.criadoEm || new Date().toISOString(),
-    finalizadoEm: status === 'finalizado' ? new Date().toISOString() : inv?.finalizadoEm,
-  });
-
-  const salvarRascunho = () => onSave(buildInv('rascunho'));
-
-  const finalizar = () => {
-    if (isWeekClosed(sem)) { toast.show('Semana fechada. Reabra em Configurações para editar.'); return; }
-    if (!resp.trim()) { toast.show('Informe o responsável'); return; }
-    const invFinal = buildInv('finalizado');
-    // INVENTÁRIO SOBREPÕE o estoque
-    const estoque = LS.get('estoque') || {};
-    invFinal.itens.forEach(i => { const before = parseFloat(estoque[i.nome] || 0); estoque[i.nome] = i.qtd; if (before !== i.qtd) stockLog(i.nome, before, i.qtd, 'Inventário', `Inventário ${wLbl(invFinal.semana)} · ${invFinal.origem}`, { tipo:'Inventário', refId: invFinal.id, refLabel:`Inventário ${wLbl(invFinal.semana)} · ${invFinal.origem}` }); });
-    LS.set('estoque', estoque);
-    onSave(invFinal);
-  };
-
-  useEffect(() => { if (finalizado) return; LS.set('draft_inventario', { origem:orig, categoria:catInv, semana:sem, data, responsavel:resp, observacoes:obs, qtds, atualizadoEm:new Date().toISOString() }); }, [orig, catInv, sem, data, resp, obs, JSON.stringify(qtds)]);
-
-  return html`<div style=${{ maxWidth: 'none', margin: '0 auto' }}>
-    <div class="stk" style=${{ padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 12 }}>
-      <button class="btn bg0 bic" onClick=${onBack}><${Ic} n="left" s=${20}/></button>
-      <div style=${{ flex: 1 }}><div style=${{ fontWeight: 800, fontSize: 15, fontFamily: "'Plus Jakarta Sans',sans-serif" }}>${isEdit ? 'Editar Inventário' : 'Novo Inventário'}</div><div style=${{ fontSize: 12, color: 'var(--s2)' }}>${lancados}/${itemsOrig.length} itens lançados</div></div>
-      ${isEdit && html`<button class="btn bg0 bic" style=${{ color: 'var(--rd)' }} onClick=${() => { if (strongConfirm('Excluir registro')) onDelete(inv.id); }}><${Ic} n="trash" s=${18}/></button>`}
-      ${!finalizado && html`<button class="btn bs bsm" onClick=${salvarRascunho}><${Ic} n="save" s=${14}/>Rascunho</button>`}
-    </div>
-    <div class="page" style=${{ paddingBottom: finalizado ? 24 : 120 }}>
-      <div class="card" style=${{ padding: 16, marginBottom: 12 }}>
-        <div style=${{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 12 }}>
-          ${['CD', 'CP'].map(o => html`<button key=${o} onClick=${() => { if (!finalizado) setOrig(o); }} style=${{ padding: 10, borderRadius: 10, border: `2px solid ${orig === o ? 'var(--or)' : 'var(--bd)'}`, background: orig === o ? 'var(--or3)' : '#fff', fontWeight: 700, fontSize: 13, cursor: 'pointer' }}><div style=${{ color: orig === o ? 'var(--or2)' : 'var(--ink)' }}>${o}</div><div style=${{ fontSize: 11, color: orig === o ? 'var(--or)' : 'var(--s2)', marginTop: 2 }}>${cat[o].label}</div></button>`)}
-        </div>
-        <label style=${{ fontSize: 11, fontWeight: 700, color: 'var(--s2)', textTransform: 'uppercase', letterSpacing: '.06em', display: 'block', marginBottom: 6 }}>Categoria do inventário</label>
-        <select class="inp" value=${catInv} onChange=${e => { setCatInv(e.target.value); setQtds({}); }} disabled=${false} style=${{ marginBottom: 12 }}>${categoriasOrig.map(c => html`<option key=${c} value=${c}>${c}</option>`)}</select>
-        <div style=${{ display:'grid', gridTemplateColumns:'1fr auto auto', gap:8, marginBottom:12 }}>
-          <input class="inp" value=${busca} onInput=${e=>setBusca(e.target.value)} placeholder="Buscar item nesta categoria..."/>
-          <button class="btn bs bsm" onClick=${()=>setQtds(Object.fromEntries(itemsOrig.map(i=>[i.name, String(estoqueInit[i.name] || 0)])))}>Copiar estoque</button>
-          <button class="btn bs bsm" onClick=${()=>setQtds(Object.fromEntries(itemsOrig.map(i=>[i.name, '0'])))}>Zerar</button>
-        </div>
-        <div style=${{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 8 }}>
-          <div><label style=${{ fontSize: 11, fontWeight: 700, color: 'var(--s2)', textTransform: 'uppercase', letterSpacing: '.06em', display: 'block', marginBottom: 6 }}>Data da contagem</label><input type="date" class="inp" value=${data} onInput=${e => setData(e.target.value)} disabled=${false}/></div>
-          <div><label style=${{ fontSize: 11, fontWeight: 700, color: 'var(--s2)', textTransform: 'uppercase', letterSpacing: '.06em', display: 'block', marginBottom: 6 }}>Semana automática</label><input class="inp" value=${weekFromDateLabel(data)} disabled=${true}/></div>
-        </div>
-        <label style=${{ fontSize: 11, fontWeight: 700, color: 'var(--s2)', textTransform: 'uppercase', letterSpacing: '.06em', display: 'block', marginBottom: 6 }}>Responsável</label>
-        <input class="inp" value=${resp} onInput=${e => setResp(e.target.value)} disabled=${false} placeholder="Nome do responsável"/>
-      </div>
-
-      ${Object.entries(byC).map(([catN, prods]) => html`
-        <details key=${catN + orig} open style=${{ marginBottom: 8 }}>
-          <summary class="cat-hdr"><${Ic} n="cr" s=${14} c="chv" style=${{ color: 'var(--s3)' }}/><span style=${{ fontWeight: 700, fontSize: 14, flex: 1 }}>${catN}</span><span style=${{ fontSize: 12, color: 'var(--s2)' }}>${prods.filter(p => qtds[p.name] !== '' && qtds[p.name] !== undefined).length}/${prods.length}</span></summary>
-          <div class="ilist">
-            <div class="ghdr" style=${{ gridTemplateColumns: '1fr 72px 72px' }}><span>Produto</span><span style=${{ textAlign: 'center' }}>Estq. ant.</span><span style=${{ textAlign: 'center' }}>Contagem</span></div>
-            ${prods.map(prod => { const estAtual = parseFloat(estoqueInit[prod.name] || 0), contagem = parseFloat(qtds[prod.name] || 0), lançado = qtds[prod.name] !== '' && qtds[prod.name] !== undefined; return html`
-              <div key=${prod.name} class="irow" style=${{ gridTemplateColumns: '1fr 72px 72px', background: lançado ? 'var(--or3)' : '#fff' }}>
-                <div><div style=${{ fontSize: 13, fontWeight: lançado ? 600 : 400 }}>${prod.name}</div><div style=${{ fontSize: 11, color: lançado && Math.abs(contagem - estAtual) > 0 ? (Math.abs(contagem - estAtual) >= 5 ? 'var(--rd)' : 'var(--am)') : 'var(--s3)', fontWeight: lançado && Math.abs(contagem - estAtual) > 0 ? 700 : 400 }}>${prod.unit}${lançado ? ` · Dif.: ${Number((contagem-estAtual).toFixed(2))} · ${Math.abs(contagem-estAtual)>=5?'Crítica':Math.abs(contagem-estAtual)>=2?'Média':Math.abs(contagem-estAtual)>0?'Baixa':'Sem divergência'}` : ''}</div></div>
-                <div style=${{ textAlign: 'center', fontSize: 13, fontWeight: 600, color: estAtual <= 0 ? 'var(--s3)' : 'var(--s2)' }}>${estoqueInit[prod.name] !== undefined ? estAtual : '—'}</div>
-                <div style=${{ display: 'flex', justifyContent: 'center' }}><input type="number" min="0" step="0.5" class="inp-n" value=${qtds[prod.name] || ''} onInput=${e => setQtds(p => ({ ...p, [prod.name]: e.target.value }))} disabled=${false} placeholder="0" style=${{ borderColor: lançado ? 'var(--or)' : undefined }}/></div>
-              </div>`; })}
-          </div>
-        </details>`)}
-
-      <div class="card" style=${{ padding: 16, marginBottom: 12 }}>
-        <label style=${{ fontSize: 11, fontWeight: 700, color: 'var(--s2)', textTransform: 'uppercase', letterSpacing: '.06em', display: 'block', marginBottom: 6 }}>Observações</label>
-        <textarea class="inp" value=${obs} onInput=${e => setObs(e.target.value)} disabled=${false} rows="2" placeholder="Observações sobre a contagem..."/>
-      </div>
-      <div class="card" style=${{ padding: 16 }}>
-
-      </div>
-    </div>
-    ${html`<div style=${{ position: 'sticky', bottom: 72, background: '#fff', borderTop: '1px solid var(--bd)', padding: '12px 16px' }}>
-      <button class="btn bgr" style=${{ width: '100%', padding: 14, borderRadius: 12, fontSize: 15 }} onClick=${finalizar}><${Ic} n="chk" s=${16}/>${finalizado ? 'Salvar alterações e atualizar estoque' : 'Finalizar inventário e atualizar estoque'}</button>
-    </div>`}
-    
-  </div>`;
-}
 
 /* ══════════════════════════════════════
    RNC
@@ -1874,327 +1525,317 @@ function pdfOrcamento(o) {
   pdfTable(doc,['Item','Categoria','Qtd.','Preço unit.','Subtotal'],(o.itens||[]).map(i=>[i.nome||'',i.cat||'',i.qtd??'',fMoeda(i.precoUnit||0),fMoeda((Number(i.qtd||0)*Number(i.precoUnit||0)))]),48);
   savePdf(doc,`NEXUS_Orcamento_${o.origem||''}_${o.semana||''}`);
 }
-function pdfRnc(r) {
+// ══════════════════════════════════════
+//   PDF · RNC (Registro de Não Conformidade)
+// ══════════════════════════════════════
+
+// Cache do logo em dataURL para embutir no PDF (carregado uma vez do arquivo local).
+let _rncLogoCache = undefined;
+function loadRncLogo() {
+  if (_rncLogoCache !== undefined) return Promise.resolve(_rncLogoCache);
+  const sources = ['logo-rnc-white.png', 'logo-ilha.png'];
+  const tryLoad = (idx) => new Promise(resolve => {
+    if (idx >= sources.length) { _rncLogoCache = null; return resolve(null); }
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => {
+      try {
+        const c = document.createElement('canvas');
+        c.width = img.naturalWidth; c.height = img.naturalHeight;
+        c.getContext('2d').drawImage(img, 0, 0);
+        _rncLogoCache = { data: c.toDataURL('image/png'), w: img.naturalWidth, h: img.naturalHeight };
+        resolve(_rncLogoCache);
+      } catch (e) { resolve(tryLoad(idx + 1)); }
+    };
+    img.onerror = () => resolve(tryLoad(idx + 1));
+    img.src = sources[idx];
+  });
+  return tryLoad(0);
+}
+
+async function pdfRnc(r) {
+  const logo = await loadRncLogo();
   const Doc = getJsPDF();
   const doc = new Doc({ orientation: 'p', unit: 'mm', format: 'a4' });
-  const pageW = 210, pageH = 297, M = 14;
+  const pageW = 210, pageH = 297, M = 16;
+  const CW = pageW - M * 2; // largura útil
 
-  // Paleta
-  const COR_OR = [245, 149, 0];
-  const COR_OR2 = [201, 120, 0];
-  const COR_INK = [17, 24, 39];
-  const COR_S2 = [107, 114, 128];
-  const COR_S3 = [156, 163, 175];
-  const COR_BD = [229, 231, 235];
-  const COR_BG = [249, 250, 251];
-  const COR_RD = [220, 38, 38];
-  const COR_GR = [22, 163, 74];
-  const COR_AM = [217, 119, 6];
+  // ---- Paleta ----
+  const OR   = [245, 149, 0];
+  const OR2  = [201, 120, 0];
+  const INK  = [24, 24, 27];
+  const S1   = [63, 63, 70];
+  const S2   = [113, 113, 122];
+  const S3   = [161, 161, 170];
+  const BD   = [228, 228, 231];
+  const BG   = [250, 250, 250];
+  const RD   = [220, 38, 38];
+  const RD_BG= [254, 242, 242];
+  const GR   = [22, 163, 74];
+  const AM   = [217, 119, 6];
+  const OR_BG= [255, 248, 236];
 
-  const stColor = {
-    aberta: COR_RD,
-    analise: COR_AM,
-    resolvida: COR_GR,
-    cancelada: COR_S2,
-  }[r.status] || COR_S2;
+  const stColor = { aberta: RD, analise: AM, resolvida: GR, cancelada: S2 }[r.status] || S2;
   const stLabel = ({ aberta: 'ABERTA', analise: 'EM ANÁLISE', resolvida: 'RESOLVIDA', cancelada: 'CANCELADA' })[r.status] || (r.status || '').toUpperCase();
-
-  // ===== HEADER INSTITUCIONAL =====
-  // Faixa laranja
-  doc.setFillColor(...COR_OR);
-  doc.rect(0, 0, pageW, 36, 'F');
-
-  // Sombra inferior
-  doc.setFillColor(...COR_OR2);
-  doc.rect(0, 36, pageW, 1.5, 'F');
-
-  // Marca NEXUS
-  doc.setTextColor(255, 255, 255);
-  doc.setFont(undefined, 'bold');
-  doc.setFontSize(11);
-  doc.text('NEXUS', M, 11);
-  doc.setFont(undefined, 'normal');
-  doc.setFontSize(8);
-  doc.text('GRUPO ILHA · GESTÃO OPERACIONAL', M + 18, 11);
-
-  // Título do documento
-  doc.setFont(undefined, 'bold');
-  doc.setFontSize(18);
-  doc.text('REGISTRO DE NÃO CONFORMIDADE', M, 23);
-
-  doc.setFont(undefined, 'normal');
-  doc.setFontSize(9);
-  doc.text(`Documento de qualidade · ${r.origem === 'CD' ? 'Centro de Distribuição' : r.origem === 'CP' ? 'Cozinha de Produção' : (r.origem || '')}`, M, 30);
-
-  // Número da RNC no canto direito — em destaque
   const numStr = r.numero || '—';
-  doc.setFillColor(255, 255, 255);
-  const numBoxW = 56, numBoxH = 22, numBoxX = pageW - M - numBoxW, numBoxY = 7;
-  doc.roundedRect(numBoxX, numBoxY, numBoxW, numBoxH, 3, 3, 'F');
-  doc.setTextColor(...COR_S2);
+  const origemLabel = r.origem === 'CD' ? 'Centro de Distribuição' : r.origem === 'CP' ? 'Cozinha de Produção' : (r.origem || '—');
+
+  // ═══════════════════════════════════════════════════════════
+  //  CABEÇALHO
+  // ═══════════════════════════════════════════════════════════
+  const HH = 34; // altura do cabeçalho
+  doc.setFillColor(...OR);
+  doc.rect(0, 0, pageW, HH, 'F');
+  doc.setFillColor(...OR2);
+  doc.rect(0, HH, pageW, 1.2, 'F');
+
+  // Logo (quadrado laranja com marca branca) à esquerda
+  let textX = M;
+  if (logo && logo.data) {
+    const logoH = 20, logoW = logo.w && logo.h ? logoH * (logo.w / logo.h) : 20;
+    try {
+      doc.addImage(logo.data, 'PNG', M, (HH - logoH) / 2, logoW, logoH);
+      textX = M + logoW + 5;
+    } catch (e) { textX = M; }
+  }
+
+  // Marca textual "NEXUS - RNC"
+  doc.setTextColor(255, 255, 255);
   doc.setFont(undefined, 'bold');
-  doc.setFontSize(7);
-  doc.text('Nº DO REGISTRO', numBoxX + numBoxW / 2, numBoxY + 5, { align: 'center' });
-  doc.setTextColor(...COR_OR2);
-  doc.setFontSize(13);
-  doc.text(numStr, numBoxX + numBoxW / 2, numBoxY + 13, { align: 'center' });
-  // Status sob o número
+  doc.setFontSize(19);
+  doc.text('NEXUS - RNC', textX, 15);
+  doc.setFont(undefined, 'normal');
+  doc.setFontSize(8.5);
+  doc.setTextColor(255, 244, 224);
+  doc.text('Registro de Não Conformidade · Grupo Ilha', textX, 22);
+  doc.setFontSize(7.5);
+  doc.text('Gestão Operacional NEXUS', textX, 27.5);
+
+  // Cartão do número no canto direito
+  const nbW = 52, nbH = 24, nbX = pageW - M - nbW, nbY = (HH - nbH) / 2;
+  doc.setFillColor(255, 255, 255);
+  doc.roundedRect(nbX, nbY, nbW, nbH, 2.5, 2.5, 'F');
+  doc.setTextColor(...S2);
+  doc.setFont(undefined, 'bold');
+  doc.setFontSize(6.5);
+  doc.text('DOCUMENTO Nº', nbX + nbW / 2, nbY + 5, { align: 'center' });
+  doc.setTextColor(...OR2);
+  doc.setFontSize(12);
+  doc.text(String(numStr), nbX + nbW / 2, nbY + 11.5, { align: 'center' });
+  // pílula de status
   doc.setFillColor(...stColor);
-  doc.roundedRect(numBoxX + 8, numBoxY + 15.5, numBoxW - 16, 4.5, 2, 2, 'F');
+  const pillW = nbW - 12;
+  doc.roundedRect(nbX + 6, nbY + 15, pillW, 5, 2.5, 2.5, 'F');
   doc.setTextColor(255, 255, 255);
   doc.setFontSize(7);
-  doc.text(stLabel, numBoxX + numBoxW / 2, numBoxY + 18.8, { align: 'center' });
+  doc.text(stLabel, nbX + nbW / 2, nbY + 18.5, { align: 'center' });
 
-  let y = 48;
+  let y = HH + 12;
 
-  // ===== BLOCO 1: IDENTIFICAÇÃO =====
-  const drawSectionTitle = (n, titulo, yPos) => {
-    // Cabeçalho da seção: numeração + título
-    doc.setFillColor(...COR_INK);
-    doc.circle(M + 3, yPos - 1.5, 3, 'F');
+  // ---- Helper: título de seção ----
+  const sectionTitle = (n, titulo) => {
+    doc.setFillColor(...INK);
+    doc.roundedRect(M, y - 5, CW, 8, 1.5, 1.5, 'F');
+    doc.setTextColor(...OR);
+    doc.setFont(undefined, 'bold');
+    doc.setFontSize(9);
+    doc.text(String(n).padStart(2, '0'), M + 4, y + 0.3);
     doc.setTextColor(255, 255, 255);
-    doc.setFont(undefined, 'bold');
-    doc.setFontSize(8);
-    doc.text(String(n), M + 3, yPos + 0.5, { align: 'center' });
-    doc.setTextColor(...COR_INK);
-    doc.setFontSize(10);
-    doc.text(titulo, M + 9, yPos + 0.5);
-    // Linha embaixo
-    doc.setDrawColor(...COR_BD);
-    doc.setLineWidth(0.2);
-    doc.line(M + 9, yPos + 2.5, pageW - M, yPos + 2.5);
-    return yPos + 8;
+    doc.setFontSize(9.5);
+    doc.text(String(titulo).toUpperCase(), M + 12, y + 0.3);
+    y += 9;
   };
 
-  const drawField = (label, value, yPos, opts = {}) => {
-    const { full = false, multi = false, valueColor = COR_INK } = opts;
-    const colW = full ? pageW - M * 2 : (pageW - M * 2) / 2 - 2;
-    const x = opts.x !== undefined ? opts.x : M;
-    doc.setTextColor(...COR_S2);
+  // ---- Helper: campo rótulo/valor dentro de caixa ----
+  const field = (label, value, x, w, yPos, opts = {}) => {
+    const vColor = opts.valueColor || INK;
+    doc.setTextColor(...S2);
     doc.setFont(undefined, 'bold');
-    doc.setFontSize(7);
-    doc.text(label.toUpperCase(), x, yPos);
-    doc.setTextColor(...valueColor);
-    doc.setFont(undefined, 'normal');
-    doc.setFontSize(10);
-    const txt = String(value || '—');
-    if (multi) {
-      const lines = doc.splitTextToSize(txt, colW);
-      doc.text(lines, x, yPos + 4.5);
-      return lines.length * 4.5 + 4.5;
-    } else {
-      doc.text(txt.length > 60 ? txt.slice(0, 60) + '…' : txt, x, yPos + 4.5);
-      return 4.5;
-    }
+    doc.setFontSize(6.5);
+    doc.text(String(label).toUpperCase(), x, yPos);
+    doc.setTextColor(...vColor);
+    doc.setFont(undefined, opts.bold ? 'bold' : 'normal');
+    doc.setFontSize(opts.size || 10);
+    const txt = String(value == null || value === '' ? '—' : value);
+    const lines = doc.splitTextToSize(txt, w);
+    doc.text(lines.slice(0, opts.maxLines || 2), x, yPos + 4.6);
+    return (Math.min(lines.length, opts.maxLines || 2)) * 4.6 + 4.6;
   };
 
-  y = drawSectionTitle(1, 'Identificação do registro', y);
-  // Caixa de fundo
-  const idBoxY = y - 3;
-  doc.setFillColor(...COR_BG);
-  doc.roundedRect(M, idBoxY, pageW - M * 2, 32, 2, 2, 'F');
-  y += 2;
-  // Linha 1: Origem | Data
-  drawField('Origem', r.origem === 'CD' ? 'CD · Centro de Distribuição' : r.origem === 'CP' ? 'CP · Cozinha de Produção' : (r.origem || '—'), y);
-  drawField('Data da ocorrência', fDate(r.data || r.criadoEm), y, { x: M + (pageW - M * 2) / 2 + 2 });
-  y += 11;
-  // Linha 2: Responsável | Emitido em
-  drawField('Responsável pelo registro', r.responsavel || '—', y);
-  drawField('Documento emitido em', new Date(r.criadoEm || Date.now()).toLocaleString('pt-BR'), y, { x: M + (pageW - M * 2) / 2 + 2, valueColor: COR_S2 });
-  y += 13;
+  // ═══════════════════════════════════════════════════════════
+  //  1 · IDENTIFICAÇÃO
+  // ═══════════════════════════════════════════════════════════
+  sectionTitle(1, 'Identificação do registro');
+  const idH = 30;
+  doc.setFillColor(...BG); doc.setDrawColor(...BD); doc.setLineWidth(0.2);
+  doc.roundedRect(M, y, CW, idH, 2, 2, 'FD');
+  const colW = (CW - 12) / 2;
+  const cx1 = M + 4, cx2 = M + 4 + colW + 4;
+  field('Origem', origemLabel, cx1, colW, y + 6, { bold: true });
+  field('Data da ocorrência', fDate(r.data || r.criadoEm), cx2, colW, y + 6, { bold: true });
+  field('Responsável pelo registro', r.responsavel || '—', cx1, colW, y + 18, { bold: true });
+  field('Documento emitido em', new Date(r.criadoEm || Date.now()).toLocaleString('pt-BR'), cx2, colW, y + 18, { valueColor: S1, size: 9 });
+  y += idH + 9;
 
-  // ===== BLOCO 2: PRODUTO =====
-  y = drawSectionTitle(2, 'Produto / item afetado', y);
-  doc.setFillColor(...COR_BG);
-  doc.roundedRect(M, y - 3, pageW - M * 2, 22, 2, 2, 'F');
-  y += 2;
-  drawField('Produto', r.produto || '—', y, { full: true });
-  y += 11;
-  drawField('Quantidade', r.quantidade ? `${r.quantidade} ${r.unidade || ''}` : '—', y);
-  drawField('Fornecedor', r.fornecedor || '—', y, { x: M + (pageW - M * 2) / 2 + 2 });
-  y += 13;
+  // ═══════════════════════════════════════════════════════════
+  //  2 · PRODUTO / ITEM AFETADO
+  // ═══════════════════════════════════════════════════════════
+  sectionTitle(2, 'Produto / item afetado');
+  const prH = 30;
+  doc.setFillColor(...BG); doc.setDrawColor(...BD);
+  doc.roundedRect(M, y, CW, prH, 2, 2, 'FD');
+  field('Produto', r.produto || '—', cx1, CW - 8, y + 6, { bold: true, size: 11 });
+  field('Quantidade', r.quantidade ? `${r.quantidade} ${r.unidade || ''}` : '—', cx1, colW, y + 18, { bold: true });
+  field('Fornecedor', r.fornecedor || '—', cx2, colW, y + 18, { bold: true });
+  y += prH + 9;
 
-  // ===== BLOCO 3: NÃO CONFORMIDADE =====
-  y = drawSectionTitle(3, 'Não conformidade identificada', y);
+  // ═══════════════════════════════════════════════════════════
+  //  3 · NÃO CONFORMIDADE
+  // ═══════════════════════════════════════════════════════════
+  sectionTitle(3, 'Não conformidade identificada');
   // Badge do tipo
   const tipoTxt = (r.tipoCustom && r.tipo === 'Outro (descrever)') ? r.tipoCustom : (r.tipo || '—');
-  doc.setFillColor(254, 242, 242);
-  const tipoW = Math.min(doc.getTextWidth(tipoTxt) + 10, pageW - M * 2 - 4);
-  doc.roundedRect(M, y - 2, tipoW, 7, 2, 2, 'F');
-  doc.setTextColor(...COR_RD);
-  doc.setFont(undefined, 'bold');
-  doc.setFontSize(9);
-  doc.text(tipoTxt, M + 5, y + 2.5);
-  y += 11;
-
-  // Descrição em quadro
+  doc.setFont(undefined, 'bold'); doc.setFontSize(8.5);
+  const tW = Math.min(doc.getTextWidth(tipoTxt) + 10, CW);
+  doc.setFillColor(...RD_BG); doc.setDrawColor(...RD); doc.setLineWidth(0.3);
+  doc.roundedRect(M, y, tW, 7.5, 3.5, 3.5, 'FD');
+  doc.setTextColor(...RD);
+  doc.text(tipoTxt, M + 5, y + 5);
+  y += 12;
+  // Caixa da descrição
   const descTxt = String(r.descricao || 'Sem descrição registrada.').trim();
-  const descLines = doc.splitTextToSize(descTxt, pageW - M * 2 - 10);
-  const descBoxH = Math.max(20, descLines.length * 4.8 + 12);
-  doc.setDrawColor(...COR_BD);
-  doc.setLineWidth(0.3);
-  doc.setFillColor(255, 255, 255);
-  doc.roundedRect(M, y, pageW - M * 2, descBoxH, 2, 2, 'FD');
-  doc.setTextColor(...COR_S2);
-  doc.setFont(undefined, 'bold');
-  doc.setFontSize(7);
-  doc.text('DESCRIÇÃO DETALHADA', M + 4, y + 5);
-  doc.setTextColor(...COR_INK);
-  doc.setFont(undefined, 'normal');
-  doc.setFontSize(10);
-  doc.text(descLines, M + 4, y + 10.5);
-  y += descBoxH + 5;
+  const descLines = doc.splitTextToSize(descTxt, CW - 10);
+  const descH = Math.max(24, descLines.length * 4.8 + 12);
+  doc.setFillColor(255, 255, 255); doc.setDrawColor(...BD); doc.setLineWidth(0.3);
+  doc.roundedRect(M, y, CW, descH, 2, 2, 'FD');
+  doc.setFillColor(...RD); doc.rect(M, y, 1.4, descH, 'F');
+  doc.setTextColor(...S2); doc.setFont(undefined, 'bold'); doc.setFontSize(6.5);
+  doc.text('DESCRIÇÃO DETALHADA', M + 5, y + 6);
+  doc.setTextColor(...INK); doc.setFont(undefined, 'normal'); doc.setFontSize(9.5);
+  doc.text(descLines, M + 5, y + 11.5);
+  y += descH + 9;
 
-  // ===== BLOCO 4: AÇÃO CORRETIVA =====
-  if (y > pageH - 70) { doc.addPage(); y = 20; }
-  y = drawSectionTitle(4, 'Ação corretiva solicitada', y);
-  // Card destacado
-  doc.setFillColor(255, 248, 236);
-  doc.setDrawColor(...COR_OR);
-  doc.setLineWidth(0.5);
-  const acaoBoxY = y - 2;
+  // ═══════════════════════════════════════════════════════════
+  //  4 · AÇÃO CORRETIVA
+  // ═══════════════════════════════════════════════════════════
+  if (y > pageH - 78) { doc.addPage(); y = 20; }
+  sectionTitle(4, 'Ação corretiva solicitada');
   const obsTxt = String(r.obsAcao || '').trim();
-  const obsLines = obsTxt ? doc.splitTextToSize(obsTxt, pageW - M * 2 - 10) : [];
-  const acaoBoxH = obsTxt ? Math.max(22, obsLines.length * 4.5 + 18) : 14;
-  doc.roundedRect(M, acaoBoxY, pageW - M * 2, acaoBoxH, 2, 2, 'FD');
-  // Ícone ▶
-  doc.setTextColor(...COR_OR2);
-  doc.setFont(undefined, 'bold');
-  doc.setFontSize(11);
-  doc.text('▶', M + 4, y + 3);
-  doc.setFontSize(11);
-  doc.text(r.acao || '—', M + 11, y + 3);
+  const obsLines = obsTxt ? doc.splitTextToSize(obsTxt, CW - 10) : [];
+  const acH = obsTxt ? Math.max(24, obsLines.length * 4.5 + 18) : 16;
+  doc.setFillColor(...OR_BG); doc.setDrawColor(...OR); doc.setLineWidth(0.4);
+  doc.roundedRect(M, y, CW, acH, 2, 2, 'FD');
+  doc.setTextColor(...OR2); doc.setFont(undefined, 'bold'); doc.setFontSize(10.5);
+  doc.text(String(r.acao || '—'), M + 6, y + 8);
   if (obsTxt) {
-    doc.setTextColor(...COR_S2);
-    doc.setFont(undefined, 'bold');
-    doc.setFontSize(7);
-    doc.text('OBSERVAÇÕES', M + 4, y + 10);
-    doc.setTextColor(...COR_INK);
-    doc.setFont(undefined, 'normal');
-    doc.setFontSize(9);
-    doc.text(obsLines, M + 4, y + 14.5);
+    doc.setTextColor(...S2); doc.setFont(undefined, 'bold'); doc.setFontSize(6.5);
+    doc.text('OBSERVAÇÕES', M + 6, y + 14);
+    doc.setTextColor(...INK); doc.setFont(undefined, 'normal'); doc.setFontSize(9);
+    doc.text(obsLines, M + 6, y + 18.5);
   }
-  y = acaoBoxY + acaoBoxH + 5;
+  y += acH + 9;
 
-  // ===== BLOCO 5: ASSINATURA =====
-  if (y > pageH - 50) { doc.addPage(); y = 20; }
-  y = drawSectionTitle(5, 'Validação do registro', y);
-
-  // Caixa de assinatura
-  const sigBoxY = y;
-  const sigBoxH = 32;
-  doc.setDrawColor(...COR_BD);
-  doc.setLineWidth(0.3);
-  doc.setFillColor(255, 255, 255);
-  doc.roundedRect(M, sigBoxY, pageW - M * 2, sigBoxH, 2, 2, 'FD');
-
-  // Coluna 1: assinatura do responsável (imagem ou linha)
-  const sigW = (pageW - M * 2) / 2 - 4;
+  // ═══════════════════════════════════════════════════════════
+  //  5 · VALIDAÇÃO / ASSINATURAS
+  // ═══════════════════════════════════════════════════════════
+  if (y > pageH - 52) { doc.addPage(); y = 20; }
+  sectionTitle(5, 'Validação do registro');
+  const sigH = 34;
+  const sigColW = (CW - 6) / 2;
+  // Coluna 1 — responsável
+  doc.setFillColor(255, 255, 255); doc.setDrawColor(...BD); doc.setLineWidth(0.3);
+  doc.roundedRect(M, y, sigColW, sigH, 2, 2, 'FD');
   if (r.assinatura) {
-    try {
-      doc.addImage(r.assinatura, 'PNG', M + 4, sigBoxY + 4, sigW - 4, 18);
-    } catch (e) { /* ignora se imagem inválida */ }
+    try { doc.addImage(r.assinatura, 'PNG', M + 4, y + 3, sigColW - 8, 18); } catch (e) {}
   } else {
-    // Linha pontilhada onde assinaria
     doc.setLineDashPattern([1, 1], 0);
-    doc.line(M + 4, sigBoxY + 18, M + sigW - 4, sigBoxY + 18);
+    doc.line(M + 6, y + 20, M + sigColW - 6, y + 20);
     doc.setLineDashPattern([], 0);
   }
-  doc.setTextColor(...COR_S2);
-  doc.setFont(undefined, 'bold');
-  doc.setFontSize(7);
-  doc.text('RESPONSÁVEL PELO REGISTRO', M + 4, sigBoxY + 23.5);
-  doc.setTextColor(...COR_INK);
-  doc.setFont(undefined, 'normal');
-  doc.setFontSize(9);
-  doc.text(r.responsavel || '—', M + 4, sigBoxY + 28);
-
-  // Coluna 2: ciência da gestão (linha em branco)
-  const col2X = M + sigW + 4;
+  doc.setTextColor(...S2); doc.setFont(undefined, 'bold'); doc.setFontSize(6.5);
+  doc.text('RESPONSÁVEL PELO REGISTRO', M + 4, y + 26);
+  doc.setTextColor(...INK); doc.setFont(undefined, 'normal'); doc.setFontSize(9);
+  doc.text(String(r.responsavel || '—'), M + 4, y + 31);
+  // Coluna 2 — ciência da gestão
+  const c2x = M + sigColW + 6;
+  doc.setFillColor(255, 255, 255); doc.setDrawColor(...BD);
+  doc.roundedRect(c2x, y, sigColW, sigH, 2, 2, 'FD');
   doc.setLineDashPattern([1, 1], 0);
-  doc.line(col2X, sigBoxY + 18, col2X + sigW, sigBoxY + 18);
+  doc.line(c2x + 6, y + 20, c2x + sigColW - 6, y + 20);
   doc.setLineDashPattern([], 0);
-  doc.setTextColor(...COR_S2);
-  doc.setFont(undefined, 'bold');
-  doc.setFontSize(7);
-  doc.text('CIÊNCIA DA GESTÃO', col2X, sigBoxY + 23.5);
-  doc.setTextColor(...COR_INK);
-  doc.setFont(undefined, 'normal');
-  doc.setFontSize(9);
-  doc.text('Nome / Data', col2X, sigBoxY + 28);
+  doc.setTextColor(...S2); doc.setFont(undefined, 'bold'); doc.setFontSize(6.5);
+  doc.text('CIÊNCIA DA GESTÃO', c2x + 4, y + 26);
+  doc.setTextColor(...S3); doc.setFont(undefined, 'normal'); doc.setFontSize(9);
+  doc.text('Nome / Data', c2x + 4, y + 31);
+  y += sigH + 6;
 
-  y = sigBoxY + sigBoxH + 8;
-
-  // ===== PÁGINA DE EVIDÊNCIAS (fotos) =====
-  if (Array.isArray(r.fotos) && r.fotos.length > 0) {
+  // ═══════════════════════════════════════════════════════════
+  //  EVIDÊNCIAS FOTOGRÁFICAS — 1 IMAGEM POR PÁGINA
+  // ═══════════════════════════════════════════════════════════
+  const fotos = Array.isArray(r.fotos) ? r.fotos : [];
+  fotos.forEach((foto, i) => {
     doc.addPage();
-    let yE = 20;
-    yE = drawSectionTitle(6, `Evidências fotográficas (${r.fotos.length})`, yE);
-    yE += 2;
+    let yE = HH + 12;
+    // faixa de cabeçalho compacta na página de evidência
+    doc.setFillColor(...OR); doc.rect(0, 0, pageW, HH, 'F');
+    doc.setFillColor(...OR2); doc.rect(0, HH, pageW, 1.2, 'F');
+    if (logo && logo.data) {
+      const lh = 18, lw = logo.w && logo.h ? lh * (logo.w / logo.h) : 18;
+      try { doc.addImage(logo.data, 'PNG', M, (HH - lh) / 2, lw, lh); } catch (e) {}
+    }
+    doc.setTextColor(255, 255, 255); doc.setFont(undefined, 'bold'); doc.setFontSize(15);
+    doc.text('NEXUS - RNC', M + 26, 15);
+    doc.setFont(undefined, 'normal'); doc.setFontSize(8);
+    doc.setTextColor(255, 244, 224);
+    doc.text(`Evidência ${i + 1} de ${fotos.length} · Documento ${numStr}`, M + 26, 22);
 
-    // Grid 2x2 por página
-    const gridW = (pageW - M * 2 - 6) / 2;
-    const gridH = (pageH - yE - 30) / 2;
-    let posX = M, posY = yE;
-    r.fotos.forEach((foto, i) => {
-      // Nova linha
-      if (i > 0 && i % 2 === 0) {
-        posX = M;
-        posY += gridH + 6;
-      }
-      // Nova página depois de 4 fotos
-      if (i > 0 && i % 4 === 0) {
-        doc.addPage();
-        let yE2 = 20;
-        yE2 = drawSectionTitle(6, `Evidências fotográficas (continuação)`, yE2);
-        posX = M;
-        posY = yE2 + 2;
-      }
-      // Moldura
-      doc.setDrawColor(...COR_BD);
-      doc.setFillColor(...COR_BG);
-      doc.roundedRect(posX, posY, gridW, gridH, 2, 2, 'FD');
-      try {
-        doc.addImage(foto, 'JPEG', posX + 2, posY + 2, gridW - 4, gridH - 10);
-      } catch (e) { /* ignora foto inválida */ }
-      // Legenda da foto
-      doc.setFillColor(...COR_INK);
-      doc.roundedRect(posX + 4, posY + gridH - 7, 14, 5, 1, 1, 'F');
-      doc.setTextColor(255, 255, 255);
-      doc.setFont(undefined, 'bold');
-      doc.setFontSize(7);
-      doc.text(`#${i + 1}`, posX + 11, posY + gridH - 3.5, { align: 'center' });
+    sectionTitle(6, `Evidência fotográfica ${i + 1}`);
+    // Área da imagem — ocupa a maior parte da página, moldura elegante
+    const areaX = M, areaY = y, areaW = CW, areaH = pageH - y - 26;
+    doc.setFillColor(...BG); doc.setDrawColor(...BD); doc.setLineWidth(0.3);
+    doc.roundedRect(areaX, areaY, areaW, areaH, 2, 2, 'FD');
+    // dimensionar a imagem preservando proporção dentro da área (com margem interna)
+    const pad = 5;
+    const maxW = areaW - pad * 2, maxH = areaH - pad * 2 - 8;
+    let props = null;
+    try { props = doc.getImageProperties(foto); } catch (e) { props = null; }
+    let drawW = maxW, drawH = maxH;
+    if (props && props.width && props.height) {
+      const ratio = props.width / props.height;
+      drawW = maxW; drawH = drawW / ratio;
+      if (drawH > maxH) { drawH = maxH; drawW = drawH * ratio; }
+    }
+    const imgX = areaX + (areaW - drawW) / 2;
+    const imgY = areaY + pad + (maxH - drawH) / 2;
+    try { doc.addImage(foto, 'JPEG', imgX, imgY, drawW, drawH); } catch (e) {
+      doc.setTextColor(...S3); doc.setFontSize(9);
+      doc.text('Imagem indisponível', areaX + areaW / 2, areaY + areaH / 2, { align: 'center' });
+    }
+    // legenda
+    doc.setFillColor(...INK);
+    doc.roundedRect(areaX + pad, areaY + areaH - 9, 30, 6, 1.5, 1.5, 'F');
+    doc.setTextColor(255, 255, 255); doc.setFont(undefined, 'bold'); doc.setFontSize(7.5);
+    doc.text(`EVIDÊNCIA #${i + 1}`, areaX + pad + 15, areaY + areaH - 5, { align: 'center' });
+    y = areaY + areaH + 6;
+  });
 
-      posX += gridW + 6;
-    });
-  }
-
-  // ===== RODAPÉ (em todas as páginas) =====
+  // ═══════════════════════════════════════════════════════════
+  //  RODAPÉ EM TODAS AS PÁGINAS
+  // ═══════════════════════════════════════════════════════════
   const totalPages = doc.internal.getNumberOfPages();
   for (let p = 1; p <= totalPages; p++) {
     doc.setPage(p);
-    // Faixa fina
-    doc.setDrawColor(...COR_BD);
-    doc.setLineWidth(0.2);
+    doc.setDrawColor(...BD); doc.setLineWidth(0.2);
     doc.line(M, pageH - 14, pageW - M, pageH - 14);
-    // Textos
-    doc.setTextColor(...COR_S3);
-    doc.setFont(undefined, 'normal');
-    doc.setFontSize(7);
-    doc.text(`NEXUS · Grupo Ilha · Registro de Não Conformidade ${numStr}`, M, pageH - 9);
-    doc.text(`Emitido em ${new Date().toLocaleString('pt-BR')}`, M, pageH - 5);
+    doc.setTextColor(...S3); doc.setFont(undefined, 'normal'); doc.setFontSize(7);
+    doc.text(`NEXUS - RNC · Grupo Ilha · Documento ${numStr}`, M, pageH - 9);
+    doc.text(`Emitido em ${new Date().toLocaleString('pt-BR')}`, M, pageH - 5.2);
     doc.text(`Página ${p} de ${totalPages}`, pageW - M, pageH - 9, { align: 'right' });
     doc.setFont(undefined, 'bold');
-    doc.text('CONFIDENCIAL', pageW - M, pageH - 5, { align: 'right' });
+    doc.text('CONFIDENCIAL', pageW - M, pageH - 5.2, { align: 'right' });
   }
 
   doc.save(`NEXUS_RNC_${(numStr || r.id || '').replace(/[\\/:*?"<>|]+/g, '_')}.pdf`);
-}
-function pdfInventario(i) {
-  const Doc=getJsPDF(); const doc=new Doc({ orientation:'p', unit:'mm', format:'a4' });
-  pdfHeader(doc,'Inventário',`${i.origem || ''} · ${wLbl(i.semana)} · ${i.categoria || ''} · Status: ${i.status || ''}`);
-  pdfTable(doc,['Item','Categoria','Qtd. contada','Unid.'],(i.itens||[]).map(x=>[x.nome||'',x.cat||i.categoria||'',x.qtd??'',x.unit||'']),48);
-  savePdf(doc,`NEXUS_Inventario_${i.origem||''}_${i.semana||''}`);
 }
 
 /* ══════════════════════════════════════
@@ -2205,8 +1846,7 @@ function RelatoriosTab({ toast }) {
   const pedidos = LS.get('pedidos') || [];
   const rncs = LS.get('rncs') || [];
   const orcamentos = LS.get('orcamentos') || [];
-  const inventarios = LS.get('inventarios') || [];
-  const SECS = [{ id: 'pedidos', l: 'Pedidos' }, { id: 'recebimento', l: 'Recebimento' }, { id: 'rnc', l: 'RNC' }, { id: 'orcamentos', l: 'Orçamentos' }, { id: 'inventarios', l: 'Inventários' }];
+  const SECS = [{ id: 'pedidos', l: 'Pedidos' }, { id: 'recebimento', l: 'Recebimento' }, { id: 'rnc', l: 'RNC' }, { id: 'orcamentos', l: 'Orçamentos' }];
   const recebimentos = pedidos.filter(p => p.recebimento);
   return html`<div class="page">
     <div style=${{ marginBottom: 16 }}><h2 style=${{ fontSize: 20, fontWeight: 800, fontFamily: "'Plus Jakarta Sans',sans-serif", margin: 0 }}>Relatórios</h2></div>
@@ -2232,7 +1872,7 @@ function RelatoriosTab({ toast }) {
       ${[...rncs].sort((a,b)=>new Date(b.criadoEm||0)-new Date(a.criadoEm||0)).map(r => { const st = ST_RNC[r.status] || { l: r.status, c: 'bgy' }; return html`
         <div key=${r.id} class="card" style=${{ padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 12 }}>
           <div style=${{ flex: 1, minWidth: 0 }}><div class="row" style=${{ gap: 6, marginBottom: 4 }}><span class=${`badge ${st.c}`}>${st.l}</span>${r.origem&&html`<span class="badge bor">${r.origem}</span>`}</div><div style=${{ fontWeight: 700, fontSize: 14 }}>${r.numero}</div><div style=${{ fontSize: 12, color: 'var(--s2)' }}>${r.produto||'—'} · ${fDate(r.data)}</div></div>
-          <button class="btn bs bsm" onClick=${() => { try { pdfRnc(r); toast.show('PDF gerado'); } catch(e) { toast.show('Erro'); } }}><${Ic} n="pdf" s=${14}/>PDF</button>
+          <button class="btn bs bsm" onClick=${async () => { try { await pdfRnc(r); toast.show('PDF gerado'); } catch(e) { toast.show('Erro'); } }}><${Ic} n="pdf" s=${14}/>PDF</button>
         </div>`; })}
     </div>`}
     ${secao === 'orcamentos' && html`<div style=${{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -2243,18 +1883,6 @@ function RelatoriosTab({ toast }) {
           <button class="btn bs bsm" onClick=${() => { try { pdfOrcamento(o); toast.show('PDF gerado'); } catch(e) { toast.show('Erro'); } }}><${Ic} n="pdf" s=${14}/>PDF</button>
         </div>`)}
     </div>`}
-    ${secao === 'inventarios' && html`<div style=${{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-      ${inventarios.length === 0 && html`<div class="empty"><${Ic} n="box" s=${32} style=${{ color: 'var(--s3)' }}/><p>Nenhum inventário.</p></div>`}
-      ${[...inventarios].sort((a,b)=>new Date(b.finalizadoEm||b.criadoEm||0)-new Date(a.finalizadoEm||a.criadoEm||0)).map(i => { const st = ST_INV[i.status] || { l: i.status, c: 'bgy' }; return html`
-        <div key=${i.id} class="card" style=${{ padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 12 }}>
-          <div style=${{ flex: 1, minWidth: 0 }}>
-            <div class="row" style=${{ gap: 6, marginBottom: 4 }}><span class=${`badge ${st.c}`}>${st.l}</span><span class="badge bor">${i.origem}</span>${i.categoria && html`<span class="badge bbl">${i.categoria}</span>`}</div>
-            <div style=${{ fontWeight: 700, fontSize: 14 }}>${wLbl(i.semana)}</div>
-            <div style=${{ fontSize: 12, color: 'var(--s2)' }}>${i.responsavel||'—'} · ${fDate(i.data)}</div>
-          </div>
-          <button class="btn bs bsm" onClick=${() => { try { pdfInventario(i); toast.show('PDF gerado'); } catch(e) { toast.show('Erro'); } }}><${Ic} n="pdf" s=${14}/>PDF</button>
-        </div>`; })}
-    </div>`}
   </div>`;
 }
 
@@ -2264,18 +1892,18 @@ function RelatoriosTab({ toast }) {
 
 function AnaliseTab() {
   const pedidos = LS.get('pedidos') || [];
-  const inventarios = LS.get('inventarios') || [];
+  const rncs = LS.get('rncs') || [];
   const tPrecos = LS.get('tabPrecos') || {};
-  const estoque = LS.get('estoque') || {};
   const cat = useMemo(getCatalog, []);
   const allItems = useMemo(() => flatCatalog(cat), [cat]);
-  const [view, setView] = useState('geral');
+  const [view, setView] = useState('compras');
+
   const semanas = useMemo(() => [...new Set([
     ...pedidos.map(p => p.semana).filter(Boolean),
-    ...inventarios.map(i => i.semana).filter(Boolean),
+    ...rncs.map(r => dateToWeek(r.data)).filter(Boolean),
     ...Object.keys(tPrecos || {})
-  ])].sort(), [pedidos, inventarios, tPrecos]);
-  const [semIni, setSemIni] = useState(semanas.length > 4 ? semanas[semanas.length - 4] : (semanas[0] || ''));
+  ])].sort(), [pedidos, rncs, tPrecos]);
+  const [semIni, setSemIni] = useState(semanas.length > 6 ? semanas[semanas.length - 6] : (semanas[0] || ''));
   const [semFim, setSemFim] = useState(semanas[semanas.length - 1] || '');
   const [origem, setOrigem] = useState('TODOS');
   const [categoria, setCategoria] = useState('TODAS');
@@ -2286,111 +1914,209 @@ function AnaliseTab() {
   const origemOk = o => origem === 'TODOS' || o === origem;
   const meta = nome => allItems.find(i => i.name === nome) || {};
   const categorias = useMemo(() => [...new Set(allItems.filter(i => origem === 'TODOS' || i.orig === origem).map(i => i.cat))].sort(), [allItems, origem]);
-  const itemOk = nome => {
-    const m = meta(nome);
-    return origemOk(m.orig) && (categoria === 'TODAS' || !categoria || m.cat === categoria);
-  };
+  const itemOk = nome => { const m = meta(nome); return origemOk(m.orig) && (categoria === 'TODAS' || !categoria || m.cat === categoria); };
   const ultimoPreco = (nome, semanaRef = '') => {
     const ws = Object.keys(tPrecos || {}).filter(w => !semanaRef || w <= semanaRef).sort().reverse();
     for (const w of ws) if (tPrecos[w]?.[nome]) return parseFloat(tPrecos[w][nome]);
     return 0;
   };
-  const recebidosPedido = p => {
-    const rec = p.recebimento?.itens || [];
-    return (p.itens || []).map(i => {
-      const r = rec.find(x => x.nome === i.nome);
-      const qtd = p.recebimento ? parseFloat(r?.qtdRecebida ?? 0) : 0;
-      return { nome: i.nome, qtd, preco: parseFloat(i.precoUnit || 0), origem: p.origem, semana: p.semana, data: p.recebimento?.data || p.criadoEm, pedido: p };
-    }).filter(i => i.qtd > 0 && itemOk(i.nome));
-  };
+
+  // ─── COMPRAS: pedido x recebido por item ───
   const pedidosPeriodo = useMemo(() => pedidos.filter(p => p.semana && inRange(p.semana) && origemOk(p.origem)), [pedidos, semIni, semFim, origem]);
-  const comprasItens = useMemo(() => pedidosPeriodo.flatMap(recebidosPedido), [pedidosPeriodo, categoria, origem]);
-  const inventariosPeriodo = useMemo(() => inventarios.filter(i => i.semana && inRange(i.semana) && origemOk(i.origem)), [inventarios, semIni, semFim, origem]);
-  const consumo = useMemo(() => {
-    const lista = [...inventarios].filter(i => i.status === 'finalizado' && origemOk(i.origem)).sort((a,b) => `${a.origem}-${a.semana}`.localeCompare(`${b.origem}-${b.semana}`));
-    const grupos = {};
-    lista.forEach(inv => { const k = `${inv.origem}|${inv.categoria || 'geral'}`; if (!grupos[k]) grupos[k] = []; grupos[k].push(inv); });
+  const linhasCompra = useMemo(() => {
     const linhas = [];
-    Object.values(grupos).forEach(arr => {
-      arr.sort((a,b) => String(a.semana).localeCompare(String(b.semana)));
-      for (let idx = 1; idx < arr.length; idx++) {
-        const ant = arr[idx - 1], atual = arr[idx];
-        if (!inRange(atual.semana)) continue;
-        const recs = pedidos.filter(p => p.recebimento && p.origem === atual.origem && p.semana > ant.semana && p.semana <= atual.semana).flatMap(recebidosPedido);
-        const nomes = [...new Set([...(ant.itens || []).map(i => i.nome), ...(atual.itens || []).map(i => i.nome), ...recs.map(i => i.nome)])];
-        nomes.forEach(nome => {
-          if (!itemOk(nome)) return;
-          const qAnt = parseFloat((ant.itens || []).find(i => i.nome === nome)?.qtd || 0);
-          const qAtual = parseFloat((atual.itens || []).find(i => i.nome === nome)?.qtd || 0);
-          const qRec = recs.filter(r => r.nome === nome).reduce((s,r) => s + r.qtd, 0);
-          const qtd = qAnt + qRec - qAtual;
-          if (qtd > 0) {
-            const preco = recs.find(r => r.nome === nome)?.preco || ultimoPreco(nome, atual.semana);
-            linhas.push({ nome, origem: atual.origem, categoria: meta(nome).cat || atual.categoria || 'Geral', semana: atual.semana, qtd, custo: qtd * preco });
-          }
+    pedidosPeriodo.forEach(p => {
+      const rec = p.recebimento?.itens || [];
+      (p.itens || []).forEach(i => {
+        if (!itemOk(i.nome)) return;
+        const r = rec.find(x => x.nome === i.nome);
+        const pedido = parseFloat(i.qtd || 0);
+        const recebido = p.recebimento ? parseFloat(r?.qtdRecebida ?? 0) : null; // null = ainda não recebido
+        const preco = ultimoPreco(i.nome, p.semana);
+        linhas.push({
+          nome: i.nome, origem: p.origem, categoria: meta(i.nome).cat || i.cat || 'Geral',
+          semana: p.semana, pedido, recebido, preco,
+          custoPedido: pedido * preco,
+          custoRecebido: (recebido == null ? pedido : recebido) * preco,
+          divergente: recebido != null && recebido !== pedido,
+          statusPed: p.status,
         });
-      }
+      });
     });
     return linhas;
-  }, [inventarios, pedidos, semIni, semFim, origem, categoria]);
+  }, [pedidosPeriodo, categoria, origem]);
 
-  const ranking = useMemo(() => {
+  const rankingCompra = useMemo(() => {
     const m = {};
-    consumo.forEach(c => { if (!m[c.nome]) m[c.nome] = { nome: c.nome, origem: meta(c.nome).orig || c.origem, categoria: c.categoria, qtd: 0, custo: 0, semanas: new Set() }; m[c.nome].qtd += c.qtd; m[c.nome].custo += c.custo; m[c.nome].semanas.add(c.semana); });
-    return Object.values(m).map(x => ({ ...x, semanas: x.semanas.size })).sort((a,b) => b.qtd - a.qtd);
-  }, [consumo]);
-  const porSemana = useMemo(() => {
+    linhasCompra.forEach(c => {
+      if (!m[c.nome]) m[c.nome] = { nome: c.nome, origem: meta(c.nome).orig || c.origem, categoria: c.categoria, pedido: 0, recebido: 0, custo: 0, semanas: new Set(), divs: 0 };
+      m[c.nome].pedido += c.pedido;
+      m[c.nome].recebido += (c.recebido == null ? 0 : c.recebido);
+      m[c.nome].custo += c.custoRecebido;
+      m[c.nome].semanas.add(c.semana);
+      if (c.divergente) m[c.nome].divs += 1;
+    });
+    return Object.values(m).map(x => ({ ...x, semanas: x.semanas.size })).sort((a, b) => b.custo - a.custo);
+  }, [linhasCompra]);
+
+  const comprasPorSemana = useMemo(() => {
     const m = {};
-    semanas.filter(inRange).forEach(w => m[w] = { semana: w, label: w.replace(/\d{4}-W/, 'W'), consumoQtd: 0, consumoCusto: 0, compraQtd: 0, compraCusto: 0, cd: 0, cp: 0 });
-    consumo.forEach(c => { if (!m[c.semana]) m[c.semana] = { semana: c.semana, label: c.semana.replace(/\d{4}-W/, 'W'), consumoQtd: 0, consumoCusto: 0, compraQtd: 0, compraCusto: 0, cd: 0, cp: 0 }; m[c.semana].consumoQtd += c.qtd; m[c.semana].consumoCusto += c.custo; });
-    comprasItens.forEach(i => { if (!m[i.semana]) m[i.semana] = { semana: i.semana, label: i.semana.replace(/\d{4}-W/, 'W'), consumoQtd: 0, consumoCusto: 0, compraQtd: 0, compraCusto: 0, cd: 0, cp: 0 }; m[i.semana].compraQtd += i.qtd; m[i.semana].compraCusto += i.qtd * i.preco; if (i.origem === 'CD') m[i.semana].cd += i.qtd * i.preco; if (i.origem === 'CP') m[i.semana].cp += i.qtd * i.preco; });
-    return Object.values(m).sort((a,b) => a.semana.localeCompare(b.semana));
-  }, [semanas, semIni, semFim, consumo, comprasItens]);
-  const compOrigem = useMemo(() => {
-    const b = { CD: { consumo: 0, custo: 0, compras: 0, compraCusto: 0, inventarios: 0 }, CP: { consumo: 0, custo: 0, compras: 0, compraCusto: 0, inventarios: 0 } };
-    consumo.forEach(c => { if (b[c.origem]) { b[c.origem].consumo += c.qtd; b[c.origem].custo += c.custo; } });
-    comprasItens.forEach(i => { if (b[i.origem]) { b[i.origem].compras += i.qtd; b[i.origem].compraCusto += i.qtd * i.preco; } });
-    inventariosPeriodo.forEach(i => { if (b[i.origem]) b[i.origem].inventarios += 1; });
-    return b;
-  }, [consumo, comprasItens, inventariosPeriodo]);
+    semanas.filter(inRange).forEach(w => m[w] = { semana: w, label: w.replace(/\d{4}-W/, 'W'), pedidoCusto: 0, recebidoCusto: 0, itens: 0, divs: 0 });
+    linhasCompra.forEach(c => {
+      if (!m[c.semana]) m[c.semana] = { semana: c.semana, label: c.semana.replace(/\d{4}-W/, 'W'), pedidoCusto: 0, recebidoCusto: 0, itens: 0, divs: 0 };
+      m[c.semana].pedidoCusto += c.custoPedido;
+      m[c.semana].recebidoCusto += c.custoRecebido;
+      m[c.semana].itens += 1;
+      if (c.divergente) m[c.semana].divs += 1;
+    });
+    return Object.values(m).sort((a, b) => a.semana.localeCompare(b.semana));
+  }, [semanas, semIni, semFim, linhasCompra]);
+
+  const totalPedido = linhasCompra.reduce((s, c) => s + c.custoPedido, 0);
+  const totalRecebido = linhasCompra.reduce((s, c) => s + c.custoRecebido, 0);
+  const totalDivergencias = linhasCompra.filter(c => c.divergente).length;
+  const totalRecebidosItens = linhasCompra.filter(c => c.recebido != null).length;
+  const taxaDivergencia = totalRecebidosItens ? (totalDivergencias / totalRecebidosItens * 100) : 0;
+
+  // ─── RNC: ocorrências por insumo / tipo / fornecedor / origem ───
+  const rncsPeriodo = useMemo(() => rncs.filter(r => { const w = dateToWeek(r.data); return inRange(w) && origemOk(r.origem); }), [rncs, semIni, semFim, origem]);
+  const rncPorItem = useMemo(() => {
+    const m = {};
+    rncsPeriodo.forEach(r => {
+      const nome = (r.produto || '—').trim();
+      if (categoria !== 'TODAS' && meta(nome).cat && meta(nome).cat !== categoria) return;
+      if (!m[nome]) m[nome] = { nome, qtd: 0, fornecedores: new Set(), tipos: {}, origens: new Set(), abertas: 0, resolvidas: 0 };
+      m[nome].qtd += 1;
+      if (r.fornecedor) m[nome].fornecedores.add(r.fornecedor);
+      if (r.origem) m[nome].origens.add(r.origem);
+      const t = (r.tipoCustom && r.tipo === 'Outro (descrever)') ? r.tipoCustom : (r.tipo || 'Não especificado');
+      m[nome].tipos[t] = (m[nome].tipos[t] || 0) + 1;
+      if (r.status === 'aberta' || r.status === 'analise') m[nome].abertas += 1;
+      if (r.status === 'resolvida') m[nome].resolvidas += 1;
+    });
+    return Object.values(m).map(x => ({ ...x, fornecedores: [...x.fornecedores], origens: [...x.origens], tipoTop: Object.entries(x.tipos).sort((a, b) => b[1] - a[1])[0]?.[0] || '—' })).sort((a, b) => b.qtd - a.qtd);
+  }, [rncsPeriodo, categoria]);
+  const rncPorTipo = useMemo(() => {
+    const m = {};
+    rncsPeriodo.forEach(r => { const t = (r.tipoCustom && r.tipo === 'Outro (descrever)') ? r.tipoCustom : (r.tipo || 'Não especificado'); m[t] = (m[t] || 0) + 1; });
+    return Object.entries(m).map(([label, qtd]) => ({ label, qtd })).sort((a, b) => b.qtd - a.qtd);
+  }, [rncsPeriodo]);
+  const rncPorFornecedor = useMemo(() => {
+    const m = {};
+    rncsPeriodo.forEach(r => { const f = (r.fornecedor || 'Não informado').trim(); m[f] = (m[f] || 0) + 1; });
+    return Object.entries(m).map(([label, qtd]) => ({ label, qtd })).sort((a, b) => b.qtd - a.qtd);
+  }, [rncsPeriodo]);
+  const rncPorSemana = useMemo(() => {
+    const m = {};
+    semanas.filter(inRange).forEach(w => m[w] = { semana: w, label: w.replace(/\d{4}-W/, 'W'), qtd: 0 });
+    rncsPeriodo.forEach(r => { const w = dateToWeek(r.data); if (!m[w]) m[w] = { semana: w, label: w.replace(/\d{4}-W/, 'W'), qtd: 0 }; m[w].qtd += 1; });
+    return Object.values(m).sort((a, b) => a.semana.localeCompare(b.semana));
+  }, [semanas, semIni, semFim, rncsPeriodo]);
+  const totalRnc = rncsPeriodo.length;
+  const rncAbertas = rncsPeriodo.filter(r => r.status === 'aberta' || r.status === 'analise').length;
+  const insumoCritico = rncPorItem[0];
+
+  // ─── HISTÓRICO POR ITEM ───
   const itensLista = useMemo(() => allItems.filter(i => origemOk(i.orig) && (categoria === 'TODAS' || i.cat === categoria)).filter(i => !buscaItem || `${i.name} ${i.cat}`.toLowerCase().includes(buscaItem.toLowerCase())).slice(0, 40), [allItems, origem, categoria, buscaItem]);
   const historicoItem = useMemo(() => {
     if (!itemSel) return [];
     const linhas = [];
-    inventarios.forEach(inv => { if (!inv.semana || !inRange(inv.semana) || !origemOk(inv.origem)) return; const it = (inv.itens || []).find(x => x.nome === itemSel); if (it) linhas.push({ data: inv.data || inv.finalizadoEm || inv.criadoEm, tipo: 'Inventário', origem: inv.origem, texto: `Contagem lançada: ${it.qtd} ${it.unit || meta(itemSel).unit || ''}`, semana: inv.semana }); });
-    pedidos.forEach(p => { if (!p.semana || !inRange(p.semana) || !origemOk(p.origem)) return; (p.itens || []).filter(i => i.nome === itemSel).forEach(i => linhas.push({ data: p.criadoEm, tipo: 'Pedido', origem: p.origem, texto: `Pedido: ${i.qtd} ${i.unit || meta(itemSel).unit || ''}`, semana: p.semana })); recebidosPedido(p).filter(i => i.nome === itemSel).forEach(i => linhas.push({ data: i.data, tipo: 'Compra recebida', origem: i.origem, texto: `Recebido: +${i.qtd} ${meta(itemSel).unit || ''} · ${fMoeda(i.qtd * i.preco)}`, semana: i.semana })); });
-    return linhas.sort((a,b) => new Date(a.data || 0) - new Date(b.data || 0));
-  }, [itemSel, inventarios, pedidos, semIni, semFim, origem]);
-  const totalCompra = comprasItens.reduce((s,i) => s + i.qtd * i.preco, 0);
-  const totalConsumo = consumo.reduce((s,i) => s + i.custo, 0);
-  const qtdConsumo = consumo.reduce((s,i) => s + i.qtd, 0);
-  const valorEstoque = Object.entries(estoque).filter(([nome]) => itemOk(nome)).reduce((s,[nome,q]) => s + parseFloat(q || 0) * ultimoPreco(nome), 0);
+    pedidos.forEach(p => {
+      if (!p.semana || !inRange(p.semana) || !origemOk(p.origem)) return;
+      (p.itens || []).filter(i => i.nome === itemSel).forEach(i => {
+        const r = (p.recebimento?.itens || []).find(x => x.nome === itemSel);
+        const rec = p.recebimento ? (r?.qtdRecebida ?? 0) : null;
+        linhas.push({ data: p.criadoEm, tipo: 'Pedido', origem: p.origem, texto: `Pedido: ${i.qtd} ${i.unit || meta(itemSel).unit || ''}${rec != null ? ` · Recebido: ${rec}${rec != i.qtd ? ' ⚠ divergência' : ''}` : ' · aguardando recebimento'}`, semana: p.semana });
+      });
+    });
+    rncs.forEach(r => {
+      if ((r.produto || '').trim() !== itemSel) return;
+      const w = dateToWeek(r.data);
+      if (!inRange(w) || !origemOk(r.origem)) return;
+      const t = (r.tipoCustom && r.tipo === 'Outro (descrever)') ? r.tipoCustom : (r.tipo || '');
+      linhas.push({ data: r.data, tipo: 'RNC', origem: r.origem, texto: `${r.numero} · ${t}${r.fornecedor ? ' · ' + r.fornecedor : ''}`, semana: w });
+    });
+    return linhas.sort((a, b) => new Date(b.data || 0) - new Date(a.data || 0));
+  }, [itemSel, pedidos, rncs, semIni, semFim, origem]);
+  const rncItemSel = historicoItem.filter(h => h.tipo === 'RNC').length;
+
   const fmtK = v => v >= 1000 ? 'R$' + (v / 1000).toFixed(1) + 'k' : 'R$' + Math.round(v || 0);
 
-  function Kpi({ label, value, sub }) {
-    return html`<div class="card" style=${{ padding: 16 }}><div style=${{ fontSize:10, fontWeight:800, color:'var(--s3)', textTransform:'uppercase', letterSpacing:'.06em', marginBottom:6 }}>${label}</div><div style=${{ fontSize:24, fontWeight:800, fontFamily:"'Plus Jakarta Sans',sans-serif" }}>${value}</div>${sub ? html`<div style=${{ fontSize:12, color:'var(--s2)', marginTop:4 }}>${sub}</div>` : null}</div>`;
+  function Kpi({ label, value, sub, color }) {
+    return html`<div class="card" style=${{ padding: 16 }}>
+      <div style=${{ fontSize: 10, fontWeight: 800, color: 'var(--s3)', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 6 }}>${label}</div>
+      <div style=${{ fontSize: 24, fontWeight: 800, fontFamily: "'Plus Jakarta Sans',sans-serif", color: color || 'var(--ink)' }}>${value}</div>
+      ${sub && html`<div style=${{ fontSize: 12, color: 'var(--s2)', marginTop: 4 }}>${sub}</div>`}
+    </div>`;
   }
-  function BarList({ rows, valueKey = 'qtd', money = false, maxRows = 10 }) {
+  function BarList({ rows, valueKey = 'qtd', money = false, maxRows = 10, color = 'var(--or)' }) {
     const data = rows.slice(0, maxRows);
     const max = Math.max(...data.map(r => Number(r[valueKey] || 0)), 1);
-    return html`<div style=${{ display:'flex', flexDirection:'column', gap:8 }}>${data.map((r,idx) => html`<div key=${r.nome || r.label || idx}><div class="row" style=${{ justifyContent:'space-between', gap:10, marginBottom:4 }}><div style=${{ fontSize:13, fontWeight:700, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>${idx + 1}. ${r.nome || r.label}</div><div style=${{ fontSize:12, fontWeight:800, color:'var(--or)', flexShrink:0 }}>${money ? fMoeda(r[valueKey] || 0) : Number(r[valueKey] || 0).toLocaleString('pt-BR')}</div></div><div style=${{ height:8, background:'var(--bd2)', borderRadius:20, overflow:'hidden' }}><div style=${{ width: Math.max(4, (Number(r[valueKey] || 0) / max) * 100) + '%', height:'100%', background:'var(--or)', borderRadius:20 }}></div></div></div>`)}</div>`;
+    return html`<div style=${{ display: 'flex', flexDirection: 'column', gap: 8 }}>${data.map((r, idx) => html`<div key=${r.nome || r.label || idx}><div class="row" style=${{ justifyContent: 'space-between', gap: 10, marginBottom: 4 }}><div style=${{ fontSize: 13, fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>${idx + 1}. ${r.nome || r.label}</div><div style=${{ fontSize: 12, fontWeight: 800, color, flexShrink: 0 }}>${money ? fMoeda(r[valueKey] || 0) : Number(r[valueKey] || 0).toLocaleString('pt-BR')}</div></div><div style=${{ height: 8, background: 'var(--bd2)', borderRadius: 20, overflow: 'hidden' }}><div style=${{ width: Math.max(4, (Number(r[valueKey] || 0) / max) * 100) + '%', height: '100%', background: color, borderRadius: 20 }}></div></div></div>`)}</div>`;
   }
-  function SemanaChart({ rows }) {
-    const max = Math.max(...rows.map(r => Math.max(r.compraCusto, r.consumoCusto)), 1);
-    return html`<div style=${{ display:'flex', alignItems:'end', gap:10, minHeight:210, paddingTop:8 }}>${rows.map(r => html`<div key=${r.semana} style=${{ flex:1, minWidth:46, display:'flex', flexDirection:'column', alignItems:'center', gap:6 }}><div style=${{ height:160, width:'100%', display:'flex', alignItems:'end', gap:4, justifyContent:'center' }}><div title="Recebido" style=${{ width:'42%', height: Math.max(4, r.compraCusto / max * 160) + 'px', background:'var(--or)', borderRadius:'8px 8px 2px 2px' }}></div><div title="Consumo" style=${{ width:'42%', height: Math.max(4, r.consumoCusto / max * 160) + 'px', background:'#2563EB', borderRadius:'8px 8px 2px 2px' }}></div></div><div style=${{ fontSize:11, fontWeight:800, color:'var(--s2)' }}>${r.label}</div></div>`)}</div>`;
+  function DuoChart({ rows, kA, kB, labelA, labelB, colorA = 'var(--or)', colorB = '#2563EB' }) {
+    const max = Math.max(...rows.map(r => Math.max(r[kA], r[kB])), 1);
+    return html`<div><div class="row" style=${{ gap: 16, marginBottom: 12, fontSize: 12 }}><span class="row" style=${{ gap: 5 }}><span style=${{ width: 12, height: 12, borderRadius: 3, background: colorA, display: 'inline-block' }}></span>${labelA}</span><span class="row" style=${{ gap: 5 }}><span style=${{ width: 12, height: 12, borderRadius: 3, background: colorB, display: 'inline-block' }}></span>${labelB}</span></div>
+    <div style=${{ display: 'flex', alignItems: 'end', gap: 10, minHeight: 200, paddingTop: 8 }}>${rows.map(r => html`<div key=${r.semana} style=${{ flex: 1, minWidth: 40, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}><div style=${{ height: 160, width: '100%', display: 'flex', alignItems: 'end', gap: 4, justifyContent: 'center' }}><div title=${labelA} style=${{ width: '42%', height: Math.max(4, r[kA] / max * 160) + 'px', background: colorA, borderRadius: '6px 6px 2px 2px' }}></div><div title=${labelB} style=${{ width: '42%', height: Math.max(4, r[kB] / max * 160) + 'px', background: colorB, borderRadius: '6px 6px 2px 2px' }}></div></div><div style=${{ fontSize: 11, fontWeight: 800, color: 'var(--s2)' }}>${r.label}</div></div>`)}</div></div>`;
+  }
+  function MonoChart({ rows, k = 'qtd', color = 'var(--rd)' }) {
+    const max = Math.max(...rows.map(r => r[k]), 1);
+    return html`<div style=${{ display: 'flex', alignItems: 'end', gap: 10, minHeight: 180, paddingTop: 8 }}>${rows.map(r => html`<div key=${r.semana} style=${{ flex: 1, minWidth: 36, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}><div style=${{ fontSize: 11, fontWeight: 800, color: 'var(--s2)' }}>${r[k] || ''}</div><div style=${{ height: 140, width: '60%', display: 'flex', alignItems: 'end' }}><div style=${{ width: '100%', height: Math.max(3, r[k] / max * 140) + 'px', background: color, borderRadius: '6px 6px 2px 2px' }}></div></div><div style=${{ fontSize: 11, fontWeight: 800, color: 'var(--s2)' }}>${r.label}</div></div>`)}</div>`;
   }
 
-  return html`<div class="page" style=${{ maxWidth:'1440px' }}>
-    <div style=${{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', gap:16, marginBottom:16 }}><div><h2 style=${{ fontSize:22, fontWeight:800, fontFamily:"'Plus Jakarta Sans',sans-serif", margin:0 }}>Análise</h2><p style=${{ fontSize:13, color:'var(--s2)', margin:'4px 0 0' }}>Análise operacional: consumo em quantidade, valor consumido, compras e comparação por período.</p></div></div>
-    <div class="card" style=${{ padding:16, marginBottom:16 }}><div style=${{ display:'grid', gridTemplateColumns:'repeat(5, minmax(150px, 1fr))', gap:10, alignItems:'end' }}><div><label style=${{ fontSize:10, fontWeight:800, color:'var(--s3)', textTransform:'uppercase' }}>De</label><select class="inp" value=${semIni} onChange=${e => setSemIni(e.target.value)}><option value="">Primeira semana</option>${semanas.map(w => html`<option key=${w} value=${w}>${wLbl(w)}</option>`)}</select></div><div><label style=${{ fontSize:10, fontWeight:800, color:'var(--s3)', textTransform:'uppercase' }}>Até</label><select class="inp" value=${semFim} onChange=${e => setSemFim(e.target.value)}><option value="">Última semana</option>${semanas.map(w => html`<option key=${w} value=${w}>${wLbl(w)}</option>`)}</select></div><div><label style=${{ fontSize:10, fontWeight:800, color:'var(--s3)', textTransform:'uppercase' }}>Origem</label><select class="inp" value=${origem} onChange=${e => { setOrigem(e.target.value); setCategoria('TODAS'); }}><option value="TODOS">CD + CP</option><option value="CD">CD</option><option value="CP">CP</option></select></div><div><label style=${{ fontSize:10, fontWeight:800, color:'var(--s3)', textTransform:'uppercase' }}>Categoria</label><select class="inp" value=${categoria} onChange=${e => setCategoria(e.target.value)}><option value="TODAS">Todas</option>${categorias.map(c => html`<option key=${c} value=${c}>${c}</option>`)}</select></div><button class="btn bs" onClick=${() => { setSemIni(''); setSemFim(''); setOrigem('TODOS'); setCategoria('TODAS'); }}>Limpar filtros</button></div></div>
-    <div class="ptab" style=${{ marginBottom:16 }}>${[{id:'geral',l:'Visão geral'},{id:'consumo',l:'Ranking'},{id:'semanas',l:'Semanas'},{id:'origens',l:'CD x CP'},{id:'item',l:'Histórico por item'}].map(v => html`<button key=${v.id} class=${view === v.id ? 'on' : ''} onClick=${() => setView(v.id)}>${v.l}</button>`)}</div>
-    ${view === 'geral' ? html`<div><div style=${{ display:'grid', gridTemplateColumns:'repeat(4, minmax(180px, 1fr))', gap:12, marginBottom:16 }}><${Kpi} label="Custo recebido" value=${fMoeda(totalCompra)} sub=${`${comprasItens.length} itens recebidos`}/><${Kpi} label="Consumo calculado" value=${fMoeda(totalConsumo)} sub=${`${Number(qtdConsumo.toFixed(2)).toLocaleString('pt-BR')} unidades consumidas`}/><${Kpi} label="Valor estimado em estoque" value=${fMoeda(valorEstoque)} sub="baseado no último preço"/><${Kpi} label="Itens analisados" value=${ranking.length} sub="com consumo no período"/></div><div style=${{ display:'grid', gridTemplateColumns:'2fr 1fr', gap:12 }}><div class="card" style=${{ padding:16 }}><div style=${{ fontWeight:800, fontSize:15, marginBottom:4 }}>Recebido x consumo por semana</div><div style=${{ fontSize:12, color:'var(--s2)', marginBottom:12 }}>Laranja: recebido. Azul: consumo calculado.</div>${porSemana.length ? html`<${SemanaChart} rows=${porSemana}/>` : html`<p style=${{ fontSize:13, color:'var(--s2)' }}>Sem dados no período.</p>`}</div><div class="card" style=${{ padding:16 }}><div style=${{ fontWeight:800, fontSize:15, marginBottom:12 }}>Top consumo</div>${ranking.length ? html`<${BarList} rows=${ranking} valueKey="qtd" maxRows=${8}/>` : html`<p style=${{ fontSize:13, color:'var(--s2)' }}>Sem consumo calculado.</p>`}</div></div></div>` : null}
-    ${view === 'consumo' ? html`<div style=${{ display:'grid', gridTemplateColumns:'1.15fr .85fr', gap:12 }}><div class="card" style=${{ padding:16 }}><div style=${{ fontWeight:800, fontSize:15, marginBottom:12 }}>Ranking por quantidade</div>${ranking.length ? html`<${BarList} rows=${ranking} valueKey="qtd" maxRows=${20}/>` : html`<p style=${{ fontSize:13, color:'var(--s2)' }}>Sem dados.</p>`}</div><div class="card" style=${{ padding:16 }}><div style=${{ fontWeight:800, fontSize:15, marginBottom:12 }}>Ranking por custo</div>${ranking.length ? html`<${BarList} rows=${[...ranking].sort((a,b) => b.custo - a.custo)} valueKey="custo" money=${true} maxRows=${15}/>` : html`<p style=${{ fontSize:13, color:'var(--s2)' }}>Sem dados.</p>`}</div><div class="card" style=${{ padding:16, gridColumn:'1 / -1' }}><div style=${{ fontWeight:800, fontSize:15, marginBottom:12 }}>Tabela detalhada</div><div style=${{ overflowX:'auto' }}><table style=${{ width:'100%', borderCollapse:'collapse', fontSize:12 }}><thead><tr style=${{ borderBottom:'2px solid var(--bd)' }}>${['Item','Origem','Categoria','Qtd.','Custo','Semanas'].map((h,i) => html`<th key=${h} style=${{ textAlign:i<3?'left':'right', padding:'8px 6px', fontSize:10, textTransform:'uppercase', color:'var(--s3)' }}>${h}</th>`)}</tr></thead><tbody>${ranking.map((r,i) => html`<tr key=${r.nome} style=${{ borderBottom:'1px solid var(--bd)', background:i%2?'#FAFAFA':'#fff' }}><td style=${{ padding:'9px 6px', fontWeight:700 }}>${r.nome}</td><td style=${{ padding:'9px 6px' }}>${r.origem}</td><td style=${{ padding:'9px 6px' }}>${r.categoria}</td><td style=${{ padding:'9px 6px', textAlign:'right', fontWeight:800 }}>${Number(r.qtd.toFixed(2)).toLocaleString('pt-BR')}</td><td style=${{ padding:'9px 6px', textAlign:'right', fontWeight:800 }}>${fMoeda(r.custo)}</td><td style=${{ padding:'9px 6px', textAlign:'right' }}>${r.semanas}</td></tr>`)}</tbody></table></div></div></div>` : null}
-    ${view === 'semanas' ? html`<div><div class="card" style=${{ padding:16, marginBottom:12 }}><div style=${{ fontWeight:800, fontSize:15, marginBottom:12 }}>Comparação entre semanas</div><div style=${{ overflowX:'auto' }}><table style=${{ width:'100%', borderCollapse:'collapse', fontSize:12 }}><thead><tr style=${{ borderBottom:'2px solid var(--bd)' }}>${['Semana','Qtd. consumida','Custo consumo','Qtd. recebida','Custo recebido','Saldo custo'].map((h,i) => html`<th key=${h} style=${{ textAlign:i===0?'left':'right', padding:'8px 6px', fontSize:10, textTransform:'uppercase', color:'var(--s3)' }}>${h}</th>`)}</tr></thead><tbody>${porSemana.map((r,i) => html`<tr key=${r.semana} style=${{ borderBottom:'1px solid var(--bd)', background:i%2?'#FAFAFA':'#fff' }}><td style=${{ padding:'9px 6px', fontWeight:800 }}>${wLbl(r.semana)}</td><td style=${{ padding:'9px 6px', textAlign:'right' }}>${Number(r.consumoQtd.toFixed(2)).toLocaleString('pt-BR')}</td><td style=${{ padding:'9px 6px', textAlign:'right', fontWeight:700 }}>${fMoeda(r.consumoCusto)}</td><td style=${{ padding:'9px 6px', textAlign:'right' }}>${Number(r.compraQtd.toFixed(2)).toLocaleString('pt-BR')}</td><td style=${{ padding:'9px 6px', textAlign:'right', fontWeight:700 }}>${fMoeda(r.compraCusto)}</td><td style=${{ padding:'9px 6px', textAlign:'right', fontWeight:800, color:r.compraCusto-r.consumoCusto>=0?'var(--gr)':'var(--rd)' }}>${fMoeda(r.compraCusto-r.consumoCusto)}</td></tr>`)}</tbody></table></div></div><div class="card" style=${{ padding:16 }}><div style=${{ fontWeight:800, fontSize:15, marginBottom:12 }}>Gráfico semanal</div>${porSemana.length ? html`<${SemanaChart} rows=${porSemana}/>` : html`<p style=${{ fontSize:13, color:'var(--s2)' }}>Sem dados no período.</p>`}</div></div>` : null}
-    ${view === 'origens' ? html`<div style=${{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>${['CD','CP'].map(o => html`<div key=${o} class="card" style=${{ padding:16 }}><div style=${{ fontWeight:800, fontSize:18, marginBottom:12 }}>${o} · ${cat[o]?.label || ''}</div><div style=${{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}><${Kpi} label="Qtd. consumida" value=${Number(compOrigem[o].consumo.toFixed(2)).toLocaleString('pt-BR')}/><${Kpi} label="Custo consumo" value=${fMoeda(compOrigem[o].custo)}/><${Kpi} label="Qtd. recebida" value=${Number(compOrigem[o].compras.toFixed(2)).toLocaleString('pt-BR')}/><${Kpi} label="Custo recebido" value=${fMoeda(compOrigem[o].compraCusto)}/></div></div>`)}</div>` : null}
-    ${view === 'item' ? html`<div style=${{ display:'grid', gridTemplateColumns:'360px 1fr', gap:12 }}><div class="card" style=${{ padding:16 }}><div style=${{ fontWeight:800, fontSize:15, marginBottom:10 }}>Buscar item</div><input class="inp" value=${buscaItem} onInput=${e => setBuscaItem(e.target.value)} placeholder="Digite o nome do item..." style=${{ marginBottom:10 }}/><div style=${{ display:'flex', flexDirection:'column', gap:6, maxHeight:520, overflowY:'auto' }}>${itensLista.map(i => html`<button key=${i.name} onClick=${() => setItemSel(i.name)} style=${{ padding:'10px 12px', borderRadius:10, border:`1.5px solid ${itemSel===i.name?'var(--or)':'var(--bd)'}`, background:itemSel===i.name?'var(--or3)':'#fff', textAlign:'left', cursor:'pointer' }}><div style=${{ fontSize:13, fontWeight:700 }}>${i.name}</div><div style=${{ fontSize:11, color:'var(--s2)', marginTop:2 }}>${i.orig} · ${i.cat} · ${i.unit}</div></button>`)}</div></div><div class="card" style=${{ padding:16 }}>${!itemSel ? html`<div class="empty"><${Ic} n="info" s=${36} style=${{ color:'var(--s3)' }}/><p>Selecione um item para ver a linha do tempo analítica.</p></div>` : html`<div><div style=${{ fontWeight:800, fontSize:18, marginBottom:4 }}>${itemSel}</div><div style=${{ fontSize:12, color:'var(--s2)', marginBottom:16 }}>${meta(itemSel).orig || ''} · ${meta(itemSel).cat || ''} · Estoque atual: ${estoque[itemSel] ?? 0} ${meta(itemSel).unit || ''}</div>${historicoItem.length ? html`<div style=${{ display:'flex', flexDirection:'column', gap:10 }}>${historicoItem.map((h,i) => html`<div key=${i} style=${{ display:'grid', gridTemplateColumns:'110px 150px 1fr', gap:12, padding:'10px 0', borderTop:i?'1px solid var(--bd)':'none' }}><div style=${{ fontSize:12, fontWeight:800 }}>${fDate(h.data)}</div><div><span class="badge ${h.tipo.includes('Compra')?'bgr2':h.tipo.includes('Inventário')?'bor':'bbl'}">${h.tipo}</span></div><div><div style=${{ fontSize:13, fontWeight:700 }}>${h.texto}</div><div style=${{ fontSize:11, color:'var(--s2)', marginTop:2 }}>${h.origem} · ${wLbl(h.semana)}</div></div></div>`)}</div>` : html`<p style=${{ fontSize:13, color:'var(--s2)' }}>Nenhum histórico encontrado no período selecionado.</p>`}</div>`}</div></div>` : null}
+  return html`<div class="page" style=${{ maxWidth: '1440px' }}>
+    <div style=${{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 16, marginBottom: 16 }}><div><h2 style=${{ fontSize: 22, fontWeight: 800, fontFamily: "'Plus Jakarta Sans',sans-serif", margin: 0 }}>Análise</h2><p style=${{ fontSize: 13, color: 'var(--s2)', margin: '4px 0 0' }}>Compras (pedido × recebimento) e não conformidades por insumo, fornecedor e período.</p></div></div>
+
+    <div class="card" style=${{ padding: 16, marginBottom: 16 }}><div style=${{ display: 'grid', gridTemplateColumns: 'repeat(5, minmax(150px, 1fr))', gap: 10, alignItems: 'end' }}>
+      <div><label style=${{ fontSize: 10, fontWeight: 800, color: 'var(--s3)', textTransform: 'uppercase' }}>De</label><select class="inp" value=${semIni} onChange=${e => setSemIni(e.target.value)}><option value="">Primeira semana</option>${semanas.map(w => html`<option key=${w} value=${w}>${wLbl(w)}</option>`)}</select></div>
+      <div><label style=${{ fontSize: 10, fontWeight: 800, color: 'var(--s3)', textTransform: 'uppercase' }}>Até</label><select class="inp" value=${semFim} onChange=${e => setSemFim(e.target.value)}><option value="">Última semana</option>${semanas.map(w => html`<option key=${w} value=${w}>${wLbl(w)}</option>`)}</select></div>
+      <div><label style=${{ fontSize: 10, fontWeight: 800, color: 'var(--s3)', textTransform: 'uppercase' }}>Origem</label><select class="inp" value=${origem} onChange=${e => { setOrigem(e.target.value); setCategoria('TODAS'); }}><option value="TODOS">CD + CP</option><option value="CD">CD</option><option value="CP">CP</option></select></div>
+      <div><label style=${{ fontSize: 10, fontWeight: 800, color: 'var(--s3)', textTransform: 'uppercase' }}>Categoria</label><select class="inp" value=${categoria} onChange=${e => setCategoria(e.target.value)}><option value="TODAS">Todas</option>${categorias.map(c => html`<option key=${c} value=${c}>${c}</option>`)}</select></div>
+      <button class="btn bs" onClick=${() => { setSemIni(''); setSemFim(''); setOrigem('TODOS'); setCategoria('TODAS'); }}>Limpar filtros</button>
+    </div></div>
+
+    <div class="ptab" style=${{ marginBottom: 16 }}>${[{ id: 'compras', l: 'Compras' }, { id: 'rnc', l: 'Não conformidades' }, { id: 'item', l: 'Histórico por insumo' }].map(v => html`<button key=${v.id} class=${view === v.id ? 'on' : ''} onClick=${() => setView(v.id)}>${v.l}</button>`)}</div>
+
+    ${view === 'compras' ? html`<div>
+      <div style=${{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(180px, 1fr))', gap: 12, marginBottom: 16 }}>
+        <${Kpi} label="Custo pedido" value=${fMoeda(totalPedido)} sub=${`${linhasCompra.length} linhas de pedido`}/>
+        <${Kpi} label="Custo recebido" value=${fMoeda(totalRecebido)} sub="valorizado pelo último preço"/>
+        <${Kpi} label="Divergências" value=${totalDivergencias} sub=${`${totalRecebidosItens} itens conferidos`} color=${totalDivergencias > 0 ? 'var(--rd)' : 'var(--gr)'}/>
+        <${Kpi} label="Taxa de divergência" value=${taxaDivergencia.toFixed(1) + '%'} sub="recebido ≠ pedido" color=${taxaDivergencia > 10 ? 'var(--rd)' : taxaDivergencia > 0 ? 'var(--am)' : 'var(--gr)'}/>
+      </div>
+      <div style=${{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 12, marginBottom: 12 }}>
+        <div class="card" style=${{ padding: 16 }}><div style=${{ fontWeight: 800, fontSize: 15, marginBottom: 4 }}>Pedido × recebido por semana</div><div style=${{ fontSize: 12, color: 'var(--s2)', marginBottom: 12 }}>Custo em R$ por semana.</div>${comprasPorSemana.length ? html`<${DuoChart} rows=${comprasPorSemana} kA="pedidoCusto" kB="recebidoCusto" labelA="Pedido" labelB="Recebido"/>` : html`<p style=${{ fontSize: 13, color: 'var(--s2)' }}>Sem dados no período.</p>`}</div>
+        <div class="card" style=${{ padding: 16 }}><div style=${{ fontWeight: 800, fontSize: 15, marginBottom: 12 }}>Top insumos comprados</div>${rankingCompra.length ? html`<${BarList} rows=${rankingCompra} valueKey="custo" money=${true} maxRows=${8}/>` : html`<p style=${{ fontSize: 13, color: 'var(--s2)' }}>Sem compras no período.</p>`}</div>
+      </div>
+      <div class="card" style=${{ padding: 16 }}><div style=${{ fontWeight: 800, fontSize: 15, marginBottom: 12 }}>Detalhamento por insumo</div><div style=${{ overflowX: 'auto' }}><table style=${{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}><thead><tr style=${{ borderBottom: '2px solid var(--bd)' }}>${['Insumo', 'Origem', 'Categoria', 'Pedido', 'Recebido', 'Custo', 'Diverg.', 'Semanas'].map((h, i) => html`<th key=${h} style=${{ textAlign: i < 3 ? 'left' : 'right', padding: '8px 6px', fontSize: 10, textTransform: 'uppercase', color: 'var(--s3)' }}>${h}</th>`)}</tr></thead><tbody>${rankingCompra.map((r, i) => html`<tr key=${r.nome} style=${{ borderBottom: '1px solid var(--bd)', background: i % 2 ? '#FAFAFA' : '#fff' }}><td style=${{ padding: '9px 6px', fontWeight: 700 }}>${r.nome}</td><td style=${{ padding: '9px 6px' }}>${r.origem}</td><td style=${{ padding: '9px 6px' }}>${r.categoria}</td><td style=${{ padding: '9px 6px', textAlign: 'right' }}>${Number(r.pedido.toFixed(2)).toLocaleString('pt-BR')}</td><td style=${{ padding: '9px 6px', textAlign: 'right' }}>${Number(r.recebido.toFixed(2)).toLocaleString('pt-BR')}</td><td style=${{ padding: '9px 6px', textAlign: 'right', fontWeight: 800 }}>${fMoeda(r.custo)}</td><td style=${{ padding: '9px 6px', textAlign: 'right', fontWeight: 800, color: r.divs > 0 ? 'var(--rd)' : 'var(--gr)' }}>${r.divs}</td><td style=${{ padding: '9px 6px', textAlign: 'right' }}>${r.semanas}</td></tr>`)}</tbody></table></div></div>
+    </div>` : null}
+
+    ${view === 'rnc' ? html`<div>
+      ${insumoCritico && insumoCritico.qtd > 1 ? html`<div class="card" style=${{ padding: 16, marginBottom: 16, background: 'var(--rd3)', border: '1px solid rgba(220,38,38,.2)' }}><div class="row" style=${{ gap: 10 }}><${Ic} n="rnc" s=${20} style=${{ color: 'var(--rd)' }}/><div><div style=${{ fontWeight: 800, fontSize: 15, color: 'var(--rd)' }}>Insumo mais recorrente: ${insumoCritico.nome}</div><div style=${{ fontSize: 13, color: 'var(--s1)', marginTop: 2 }}>${insumoCritico.qtd} ocorrências no período · problema mais comum: ${insumoCritico.tipoTop}${insumoCritico.fornecedores.length ? ' · fornecedor(es): ' + insumoCritico.fornecedores.join(', ') : ''}</div></div></div></div>` : null}
+      <div style=${{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(160px, 1fr))', gap: 12, marginBottom: 16 }}>
+        <${Kpi} label="Total de RNCs" value=${totalRnc} sub="no período/filtros"/>
+        <${Kpi} label="Em aberto" value=${rncAbertas} color=${rncAbertas > 0 ? 'var(--rd)' : 'var(--gr)'} sub="aberta ou em análise"/>
+        <${Kpi} label="Insumos distintos" value=${rncPorItem.length} sub="com ocorrência"/>
+        <${Kpi} label="Fornecedores" value=${rncPorFornecedor.filter(f => f.label !== 'Não informado').length} sub="citados nas RNCs"/>
+      </div>
+      <div style=${{ display: 'grid', gridTemplateColumns: '1.2fr .8fr', gap: 12, marginBottom: 12 }}>
+        <div class="card" style=${{ padding: 16 }}><div style=${{ fontWeight: 800, fontSize: 15, marginBottom: 4 }}>Insumos com mais não conformidades</div><div style=${{ fontSize: 12, color: 'var(--s2)', marginBottom: 12 }}>Ranking por número de ocorrências — identifica o insumo problemático recorrente.</div>${rncPorItem.length ? html`<${BarList} rows=${rncPorItem} valueKey="qtd" maxRows=${12} color="var(--rd)"/>` : html`<p style=${{ fontSize: 13, color: 'var(--s2)' }}>Nenhuma RNC no período.</p>`}</div>
+        <div class="card" style=${{ padding: 16 }}><div style=${{ fontWeight: 800, fontSize: 15, marginBottom: 12 }}>Por tipo de problema</div>${rncPorTipo.length ? html`<${BarList} rows=${rncPorTipo} valueKey="qtd" maxRows=${10} color="var(--am)"/>` : html`<p style=${{ fontSize: 13, color: 'var(--s2)' }}>Sem dados.</p>`}</div>
+      </div>
+      <div style=${{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
+        <div class="card" style=${{ padding: 16 }}><div style=${{ fontWeight: 800, fontSize: 15, marginBottom: 12 }}>Por fornecedor</div>${rncPorFornecedor.length ? html`<${BarList} rows=${rncPorFornecedor} valueKey="qtd" maxRows=${10} color="#2563EB"/>` : html`<p style=${{ fontSize: 13, color: 'var(--s2)' }}>Sem dados.</p>`}</div>
+        <div class="card" style=${{ padding: 16 }}><div style=${{ fontWeight: 800, fontSize: 15, marginBottom: 12 }}>Evolução por semana</div>${rncPorSemana.length ? html`<${MonoChart} rows=${rncPorSemana} k="qtd" color="var(--rd)"/>` : html`<p style=${{ fontSize: 13, color: 'var(--s2)' }}>Sem dados.</p>`}</div>
+      </div>
+      <div class="card" style=${{ padding: 16 }}><div style=${{ fontWeight: 800, fontSize: 15, marginBottom: 12 }}>Detalhamento por insumo</div><div style=${{ overflowX: 'auto' }}><table style=${{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}><thead><tr style=${{ borderBottom: '2px solid var(--bd)' }}>${['Insumo', 'Ocorrências', 'Problema mais comum', 'Fornecedor(es)', 'Origem', 'Abertas', 'Resolvidas'].map((h, i) => html`<th key=${h} style=${{ textAlign: i === 0 ? 'left' : i === 1 || i > 4 ? 'right' : 'left', padding: '8px 6px', fontSize: 10, textTransform: 'uppercase', color: 'var(--s3)' }}>${h}</th>`)}</tr></thead><tbody>${rncPorItem.map((r, i) => html`<tr key=${r.nome} style=${{ borderBottom: '1px solid var(--bd)', background: i % 2 ? '#FAFAFA' : '#fff' }}><td style=${{ padding: '9px 6px', fontWeight: 700 }}>${r.nome}</td><td style=${{ padding: '9px 6px', textAlign: 'right', fontWeight: 800, color: r.qtd > 2 ? 'var(--rd)' : 'var(--ink)' }}>${r.qtd}</td><td style=${{ padding: '9px 6px' }}>${r.tipoTop}</td><td style=${{ padding: '9px 6px' }}>${r.fornecedores.join(', ') || '—'}</td><td style=${{ padding: '9px 6px' }}>${r.origens.join(', ') || '—'}</td><td style=${{ padding: '9px 6px', textAlign: 'right', color: r.abertas > 0 ? 'var(--rd)' : 'var(--s2)' }}>${r.abertas}</td><td style=${{ padding: '9px 6px', textAlign: 'right', color: 'var(--gr)' }}>${r.resolvidas}</td></tr>`)}</tbody></table></div></div>
+    </div>` : null}
+
+    ${view === 'item' ? html`<div style=${{ display: 'grid', gridTemplateColumns: '360px 1fr', gap: 12 }}>
+      <div class="card" style=${{ padding: 16 }}><div style=${{ fontWeight: 800, fontSize: 15, marginBottom: 10 }}>Buscar insumo</div><input class="inp" value=${buscaItem} onInput=${e => setBuscaItem(e.target.value)} placeholder="Digite o nome do insumo..." style=${{ marginBottom: 10 }}/><div style=${{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 520, overflowY: 'auto' }}>${itensLista.map(i => html`<button key=${i.name} onClick=${() => setItemSel(i.name)} style=${{ padding: '10px 12px', borderRadius: 10, border: `1.5px solid ${itemSel === i.name ? 'var(--or)' : 'var(--bd)'}`, background: itemSel === i.name ? 'var(--or3)' : '#fff', textAlign: 'left', cursor: 'pointer' }}><div style=${{ fontSize: 13, fontWeight: 700 }}>${i.name}</div><div style=${{ fontSize: 11, color: 'var(--s2)', marginTop: 2 }}>${i.orig} · ${i.cat} · ${i.unit}</div></button>`)}</div></div>
+      <div class="card" style=${{ padding: 16 }}>${!itemSel ? html`<div class="empty"><${Ic} n="info" s=${36} style=${{ color: 'var(--s3)' }}/><p>Selecione um insumo para ver o histórico de compras e não conformidades.</p></div>` : html`<div><div style=${{ fontWeight: 800, fontSize: 18, marginBottom: 4 }}>${itemSel}</div><div style=${{ fontSize: 12, color: 'var(--s2)', marginBottom: 16 }}>${meta(itemSel).orig || ''} · ${meta(itemSel).cat || ''}${rncItemSel > 0 ? html` · <span style=${{ color: 'var(--rd)', fontWeight: 700 }}>${rncItemSel} RNC(s) no período</span>` : ''}</div>${historicoItem.length ? html`<div style=${{ display: 'flex', flexDirection: 'column', gap: 10 }}>${historicoItem.map((h, i) => html`<div key=${i} style=${{ display: 'grid', gridTemplateColumns: '110px 90px 1fr', gap: 12, padding: '10px 0', borderTop: i ? '1px solid var(--bd)' : 'none' }}><div style=${{ fontSize: 12, fontWeight: 800 }}>${fDate(h.data)}</div><div><span class="badge ${h.tipo === 'RNC' ? 'brd2' : 'bgr2'}">${h.tipo}</span></div><div><div style=${{ fontSize: 13, fontWeight: 700 }}>${h.texto}</div><div style=${{ fontSize: 11, color: 'var(--s2)', marginTop: 2 }}>${h.origem} · ${wLbl(h.semana)}</div></div></div>`)}</div>` : html`<p style=${{ fontSize: 13, color: 'var(--s2)' }}>Nenhum histórico encontrado no período selecionado.</p>`}</div>`}</div>
+    </div>` : null}
   </div>`;
 }
+
 
 
 /* ══════════════════════════════════════
@@ -2542,9 +2268,8 @@ function AdminLocal({ toast }) {
   const [trash, setTrash] = useState(() => LS.get('trash') || []);
   const [logs, setLogs] = useState(() => LS.get('audit') || []);
   const [logBusca, setLogBusca] = useState('');
-  const estoque = LS.get('estoque') || {};
   const pedidos = LS.get('pedidos') || [];
-  const inventarios = LS.get('inventarios') || [];
+  const orcamentos = LS.get('orcamentos') || [];
   const rncs = LS.get('rncs') || [];
   const logsFiltrados = logs.filter(l => { const ac = l.acao || l.action || ''; const det = l.det || l.detail || ''; return !logBusca || `${ac} ${det} ${fDate(l.data)}`.toLowerCase().includes(logBusca.toLowerCase()); });
   const restaurar = t => {
@@ -2552,7 +2277,6 @@ function AdminLocal({ toast }) {
     if (t.type === 'pedido') { const a=LS.get('pedidos')||[]; LS.set('pedidos',[t.record,...a]); }
     if (t.type === 'orcamento') { const a=LS.get('orcamentos')||[]; LS.set('orcamentos',[t.record,...a]); }
     if (t.type === 'recebimento') { const a=LS.get('pedidos')||[]; LS.set('pedidos', a.map(p => p.id === t.record?.pedidoId ? { ...p, status:'pendente', recebimento:null } : p)); }
-    if (t.type === 'inventario') { const a=LS.get('inventarios')||[]; LS.set('inventarios',[t.record,...a]); }
     if (t.type === 'rnc') { const a=LS.get('rncs')||[]; LS.set('rncs',[t.record,...a]); }
     const nt=trash.filter(x=>x.id!==t.id); LS.set('trash',nt); setTrash(nt); auditLog('Restauração de lixeira', `${t.type}: ${t.record?.numero || t.record?.semana || t.record?.id || ''}`); setLogs(LS.get('audit')||[]); toast.show('Registro restaurado');
   };
@@ -2568,7 +2292,7 @@ function AdminLocal({ toast }) {
     <div style=${{ display:'grid', gridTemplateColumns:'2fr 1fr', gap:14, marginBottom:14 }}>
       <div class="card" style=${{ padding:16 }}>
         <div style=${{ fontWeight:800, fontSize:16, marginBottom:10 }}>Lixeira administrativa</div>
-        <p style=${{ fontSize:12, color:'var(--s2)', margin:'0 0 12px' }}>Pedidos, orçamentos, inventários, recebimentos e RNCs excluídos ficam aqui para restauração ou exclusão definitiva.</p>
+        <p style=${{ fontSize:12, color:'var(--s2)', margin:'0 0 12px' }}>Pedidos, orçamentos, recebimentos e RNCs excluídos ficam aqui para restauração ou exclusão definitiva.</p>
         <div style=${{ display:'flex', flexDirection:'column', gap:8, maxHeight:360, overflow:'auto' }}>
           ${trash.length===0 && html`<p style=${{ fontSize:13,color:'var(--s2)' }}>Nenhum item na lixeira.</p>`}
           ${trash.map(t=>html`<div key=${t.id} style=${{ border:'1px solid var(--bd)',borderRadius:12,padding:12,background:'#fff', display:'grid', gridTemplateColumns:'1fr auto', gap:10, alignItems:'center' }}>
@@ -2580,7 +2304,7 @@ function AdminLocal({ toast }) {
       <div class="card" style=${{ padding:16 }}>
         <div style=${{ fontWeight:800, fontSize:16, marginBottom:10 }}>Painel de saúde operacional</div>
         <div style=${{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
-          ${[['Pedidos pendentes',pedidos.filter(p=>p.status==='pendente').length],['Recebimentos parciais',pedidos.filter(p=>p.status==='parcial').length],['Inventários rascunho',inventarios.filter(i=>i.status==='rascunho').length],['RNCs abertas',rncs.filter(r=>r.status==='aberta'||r.status==='analise').length],['Estoque zerado',Object.values(estoque).filter(q=>parseFloat(q)<=0).length],['Estoque baixo',Object.values(estoque).filter(q=>parseFloat(q)>0&&parseFloat(q)<3).length]].map(([l,v])=>html`<div style=${{ padding:12, border:'1px solid var(--bd)', borderRadius:12, background:'#fff' }}><div style=${{ fontSize:10,color:'var(--s3)',fontWeight:800,textTransform:'uppercase',letterSpacing:'.06em' }}>${l}</div><div style=${{ fontSize:24,fontWeight:800,fontFamily:"'Plus Jakarta Sans',sans-serif" }}>${v}</div></div>`)}
+          ${[['Pedidos pendentes',pedidos.filter(p=>p.status==='pendente').length],['Recebimentos parciais',pedidos.filter(p=>p.status==='parcial').length],['Recebimentos OK',pedidos.filter(p=>p.status==='recebido').length],['RNCs abertas',rncs.filter(r=>r.status==='aberta'||r.status==='analise').length],['RNCs resolvidas',rncs.filter(r=>r.status==='resolvida').length],['Orçam. a autorizar',orcamentos.filter(o=>o.status!=='autorizado').length]].map(([l,v])=>html`<div style=${{ padding:12, border:'1px solid var(--bd)', borderRadius:12, background:'#fff' }}><div style=${{ fontSize:10,color:'var(--s3)',fontWeight:800,textTransform:'uppercase',letterSpacing:'.06em' }}>${l}</div><div style=${{ fontSize:24,fontWeight:800,fontFamily:"'Plus Jakarta Sans',sans-serif" }}>${v}</div></div>`)}
         </div>
       </div>
     </div>
@@ -2690,8 +2414,6 @@ function App() {
         ${tab === 'orcamento' && html`<${OrcamentoTab} toast=${toast}/>`}
         ${tab === 'pedidos' && html`<${PedidosTab} toast=${toast}/>`}
         ${tab === 'recebimento' && html`<${RecebimentoTab} toast=${toast}/>`}
-        ${tab === 'inventario' && html`<${InventarioTab} toast=${toast}/>`}
-        ${tab === 'estoque' && html`<${EstoqueTab} toast=${toast}/>`}
         ${tab === 'rnc' && html`<${RncTab} toast=${toast}/>`}
         ${tab === 'relatorios' && html`<${RelatoriosTab} toast=${toast}/>`}
         ${tab === 'analise' && html`<${AnaliseTab}/>`}

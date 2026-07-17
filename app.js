@@ -188,7 +188,7 @@ function downloadJson(filename, data) {
   const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = filename; a.click(); setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 function exportBackup() {
-  const data = { app:'NEXUS', version:'2.6.2', exportedAt:new Date().toISOString(), stores:{} };
+  const data = { app:'NEXUS', version:'2.6.3', exportedAt:new Date().toISOString(), stores:{} };
   for (let i=0;i<localStorage.length;i++) { const k=localStorage.key(i); if (k?.startsWith('nx:')) { try { data.stores[k.slice(3)] = JSON.parse(localStorage.getItem(k)); } catch (error) { console.warn('Backup ignorou uma chave inválida:', k, error); } } }
   downloadJson(`NEXUS_backup_${todayISO()}.json`, data);
   auditLog('Backup exportado', `${Object.keys(data.stores).length} conjuntos de dados`);
@@ -1687,7 +1687,6 @@ function pdfOrcamento(o) {
 //   PDF · RNC (Registro de Não Conformidade)
 // ══════════════════════════════════════
 
-// Cache do logo em dataURL para embutir no PDF (carregado uma vez do arquivo local).
 let _rncLogoCache = undefined;
 function loadRncLogo() {
   if (_rncLogoCache !== undefined) return Promise.resolve(_rncLogoCache);
@@ -1715,30 +1714,29 @@ async function pdfRnc(r) {
   const logo = await loadRncLogo();
   const Doc = getJsPDF();
   const doc = new Doc({ orientation: 'p', unit: 'mm', format: 'a4' });
-  const pageW = 210, pageH = 297, M = 14, CW = pageW - M * 2;
-  const footerLineY = pageH - 15;
-  const contentBottom = footerLineY - 12;
+  const pageW = 210, pageH = 297, M = 13, CW = pageW - M * 2;
+  const footerY = pageH - 14;
+  const contentBottom = footerY - 7;
 
   const OR = [245, 149, 0];
   const OR_D = [190, 111, 0];
-  const OR_SOFT = [255, 248, 236];
+  const OR_BG = [255, 249, 240];
   const INK = [24, 24, 27];
   const S1 = [82, 82, 91];
   const S2 = [113, 113, 122];
   const S3 = [161, 161, 170];
-  const BD = [228, 228, 231];
-  const BG = [250, 250, 251];
+  const BD = [226, 226, 232];
+  const BG = [249, 250, 251];
   const RD = [220, 38, 38];
   const RD_BG = [254, 242, 242];
   const AM = [217, 119, 6];
   const AM_BG = [255, 251, 235];
   const GR = [22, 163, 74];
   const GR_BG = [240, 253, 244];
-  const BL_BG = [248, 250, 252];
 
   const statusMeta = {
     aberta: { label: 'ABERTA', detail: 'Aguardando retorno do fornecedor', color: RD, fill: RD_BG },
-    analise: { label: 'EM ACOMPANHAMENTO', detail: 'Providência pendente de conclusão', color: AM, fill: AM_BG },
+    analise: { label: 'EM ACOMPANHAMENTO', detail: 'Reposição, crédito ou correção em andamento', color: AM, fill: AM_BG },
     resolvida: { label: 'CONCLUÍDA', detail: 'Providência efetivada', color: GR, fill: GR_BG },
     cancelada: { label: 'CANCELADA', detail: 'Registro encerrado sem prosseguimento', color: S2, fill: BG },
   }[r.status] || { label: String(r.status || 'SEM STATUS').toUpperCase(), detail: '', color: S2, fill: BG };
@@ -1750,292 +1748,303 @@ async function pdfRnc(r) {
       ? 'CP · Cozinha de Produção'
       : (r.origem || '—');
 
-  const pageTitle = 'REGISTRO DE NÃO CONFORMIDADE';
-  let y = 39;
-  const normalize = value => value == null || value === '' ? '—' : String(value);
-  const newContentPage = (context = 'Continuação do registro') => {
+  const cleanValue = (value, fallback = '—') => {
+    if (value == null) return fallback;
+    const txt = String(value).trim();
+    if (!txt) return fallback;
+    if (/^(sem|não|nao)/i.test(txt)) return fallback;
+    return txt;
+  };
+  const normalize = (value, fallback = '—') => cleanValue(value, fallback);
+  const nfTxt = normalize(r.notaFiscal, 'Não informada');
+  const loteTxt = normalize(r.lote, 'Não informado');
+  const tempTxt = r.temperatura == null || String(r.temperatura).trim() === '' ? '—' : `${r.temperatura} °C`;
+  const qtdAfectada = r.quantidade ? `${r.quantidade} ${r.unidade || ''}` : '—';
+  const fabricacaoTxt = r.fabricacao ? fDate(r.fabricacao) : '—';
+  const validadeTxt = r.validade ? fDate(r.validade) : '—';
+  const impactoTxt = `${r.gravidade || '—'} · ${fMoeda(r.impactoFinanceiro || 0)}`;
+  const quantidadeAceita = Math.max(0, Number(r.qtdRecebida || 0) - Number(r.qtdRecusada || 0));
+  const tipoTxt = (r.tipoCustom && r.tipo === 'Outro (descrever)') ? r.tipoCustom : (r.tipo || 'Não informado');
+
+  let y = 33;
+
+  const newPage = (context = 'Continuação do registro') => {
     doc.addPage();
     drawHeader(context);
-    y = 39;
+    y = 33;
   };
-  const ensureSpace = (height, context = 'Continuação do registro') => {
-    if (y + height > contentBottom) newContentPage(context);
+  const ensureSpace = (h, context = 'Continuação do registro') => {
+    if (y + h > contentBottom) newPage(context);
   };
 
   function drawHeader(context = 'Documento de ocorrência e acompanhamento') {
     doc.setFillColor(255,255,255);
-    doc.rect(0,0,pageW,35,'F');
+    doc.rect(0, 0, pageW, 28, 'F');
     doc.setFillColor(...OR);
-    doc.rect(0,0,pageW,3,'F');
+    doc.rect(0, 0, pageW, 3, 'F');
 
-    const brandX = M, brandY = 8, brandW = 34, brandH = 17;
+    const logoBox = { x: M, y: 7.5, w: 24, h: 14 };
     doc.setFillColor(...OR);
-    doc.roundedRect(brandX, brandY, brandW, brandH, 2.6, 2.6, 'F');
+    doc.roundedRect(logoBox.x, logoBox.y, logoBox.w, logoBox.h, 2.3, 2.3, 'F');
     if (logo && logo.data) {
-      const innerPad = 2.2;
-      const maxW = brandW - innerPad * 2;
-      const maxH = brandH - innerPad * 2;
-      const ratio = logo.w && logo.h ? (logo.w / logo.h) : 1.7;
+      const pad = 1.8;
+      const maxW = logoBox.w - pad * 2;
+      const maxH = logoBox.h - pad * 2;
+      const ratio = logo.w && logo.h ? logo.w / logo.h : 1.7;
       let w = maxW, h = w / ratio;
       if (h > maxH) { h = maxH; w = h * ratio; }
-      const lx = brandX + (brandW - w) / 2;
-      const ly = brandY + (brandH - h) / 2;
+      const lx = logoBox.x + (logoBox.w - w) / 2;
+      const ly = logoBox.y + (logoBox.h - h) / 2;
       try { doc.addImage(logo.data, 'PNG', lx, ly, w, h); } catch (e) {}
     }
 
-    const tx = brandX + brandW + 7;
-    const titleMax = 84;
-    const titleLines = doc.splitTextToSize(pageTitle, titleMax).slice(0, 2);
-    doc.setTextColor(...INK);
+    const titleX = M + 29;
+    const titleMaxW = 96;
+    let titleSize = 12.6;
     doc.setFont(undefined, 'bold');
-    doc.setFontSize(14.2);
-    doc.text(titleLines, tx, 13.8);
+    doc.setFontSize(titleSize);
+    while (doc.getTextWidth('REGISTRO DE NÃO CONFORMIDADE') > titleMaxW && titleSize > 10.5) {
+      titleSize -= 0.3;
+      doc.setFontSize(titleSize);
+    }
+    doc.setTextColor(...INK);
+    doc.text('REGISTRO DE NÃO CONFORMIDADE', titleX, 13);
     doc.setFont(undefined, 'normal');
-    doc.setFontSize(8);
+    doc.setFontSize(7.2);
     doc.setTextColor(...S2);
-    doc.text(context, tx, 20.5);
-    doc.text('Grupo Ilha · Gestão Operacional NEXUS', tx, 25.2);
+    doc.text(context, titleX, 17.8);
+    doc.text('Grupo Ilha · Gestão Operacional NEXUS', titleX, 21.9);
 
-    const boxW = 54, boxH = 19, boxX = pageW - M - boxW, boxY = 7.3;
+    const boxW = 50, boxH = 15, boxX = pageW - M - boxW, boxY = 7;
     doc.setFillColor(255,255,255);
     doc.setDrawColor(...BD);
-    doc.setLineWidth(0.3);
-    doc.roundedRect(boxX, boxY, boxW, boxH, 2.3, 2.3, 'FD');
+    doc.setLineWidth(0.25);
+    doc.roundedRect(boxX, boxY, boxW, boxH, 2.2, 2.2, 'FD');
     doc.setTextColor(...S2);
     doc.setFont(undefined, 'bold');
-    doc.setFontSize(6.1);
-    doc.text('DOCUMENTO', boxX + 4, boxY + 4.8);
+    doc.setFontSize(5.8);
+    doc.text('DOCUMENTO', boxX + 4, boxY + 4.2);
     doc.setTextColor(...INK);
-    doc.setFontSize(9.5);
-    doc.text(String(numStr), boxX + 4, boxY + 10.7);
+    doc.setFontSize(9.1);
+    doc.text(String(numStr), boxX + 4, boxY + 8.9);
     doc.setFillColor(...statusMeta.fill);
     doc.setDrawColor(...statusMeta.color);
-    doc.roundedRect(boxX + 4, boxY + 12.4, boxW - 8, 5.1, 2.5, 2.5, 'FD');
+    doc.roundedRect(boxX + 4, boxY + 10, boxW - 8, 3.7, 1.8, 1.8, 'FD');
     doc.setTextColor(...statusMeta.color);
-    doc.setFontSize(statusMeta.label.length > 16 ? 5.4 : 6.7);
-    doc.text(statusMeta.label, boxX + boxW / 2, boxY + 15.9, { align: 'center' });
+    doc.setFontSize(statusMeta.label.length > 16 ? 5.2 : 6.2);
+    doc.text(statusMeta.label, boxX + boxW / 2, boxY + 12.7, { align: 'center' });
 
     doc.setDrawColor(...BD);
-    doc.line(M, 31.8, pageW - M, 31.8);
+    doc.line(M, 26, pageW - M, 26);
   }
 
   function sectionTitle(title) {
-    ensureSpace(11, 'Continuação do registro');
+    ensureSpace(7);
     doc.setFillColor(...OR);
-    doc.roundedRect(M, y - 3.6, 2, 7.2, 0.9, 0.9, 'F');
+    doc.roundedRect(M, y - 3.2, 1.8, 6, 0.8, 0.8, 'F');
     doc.setTextColor(...INK);
     doc.setFont(undefined, 'bold');
-    doc.setFontSize(10.8);
-    doc.text(String(title), M + 5, y + 0.5);
-    const lineStart = M + 38;
+    doc.setFontSize(9.8);
+    doc.text(String(title), M + 4.5, y + 0.1);
     doc.setDrawColor(...BD);
-    doc.setLineWidth(0.25);
-    doc.line(Math.min(lineStart, pageW - M - 6), y + 0.2, pageW - M, y + 0.2);
-    y += 6.4;
+    doc.setLineWidth(0.2);
+    const lineStart = Math.min(pageW - M - 5, M + 4.5 + doc.getTextWidth(String(title)) + 4);
+    doc.line(lineStart, y - 0.2, pageW - M, y - 0.2);
+    y += 4.2;
   }
 
-  function drawInfoPanel(fields, cols = 2, options = {}) {
+  function drawGrid(fields, cols = 2, options = {}) {
     const colW = CW / cols;
-    const labelSize = 6.1;
-    const valueSize = options.valueSize || 8.8;
-    const minRowH = options.rowH || 13.5;
     const rows = [];
     for (let i = 0; i < fields.length; i += cols) rows.push(fields.slice(i, i + cols));
-    const rowMeta = rows.map(row => row.map(item => {
-      const text = normalize(item[1]);
-      const lines = doc.splitTextToSize(text, colW - 11).slice(0, options.maxLines || 3);
-      return { item, lines };
-    }));
-    const rowHeights = rowMeta.map(row => Math.max(minRowH, ...row.map(cell => 7.8 + cell.lines.length * 3.9)));
-    const totalH = 4 + rowHeights.reduce((a, b) => a + b, 0);
-    ensureSpace(totalH + 5, 'Continuação do registro');
+    const labelSize = options.labelSize || 5.5;
+    const valueSize = options.valueSize || 8.2;
+    const basePad = options.basePad || 4.2;
+    const rowHeights = rows.map(row => {
+      return Math.max(options.minRowH || 11, ...row.map(item => {
+        const text = cleanValue(item[1], '—');
+        const lines = doc.splitTextToSize(text, colW - 10).slice(0, options.maxLines || 3);
+        return 6.8 + lines.length * 3.3;
+      }));
+    });
+    const totalH = basePad + rowHeights.reduce((a,b)=>a+b,0);
+    ensureSpace(totalH + 3.2, options.context || 'Continuação do registro');
     doc.setFillColor(...(options.fill || [255,255,255]));
     doc.setDrawColor(...BD);
-    doc.setLineWidth(0.25);
-    doc.roundedRect(M, y, CW, totalH, 2.4, 2.4, 'FD');
-    let yy = y + 4.8;
-    rowMeta.forEach((row, rIdx) => {
-      const rowH = rowHeights[rIdx];
-      row.forEach((cell, cIdx) => {
-        const x = M + cIdx * colW + 5;
+    doc.setLineWidth(0.22);
+    doc.roundedRect(M, y, CW, totalH, 1.8, 1.8, 'FD');
+    let yy = y + 4.2;
+    rows.forEach((row, ridx) => {
+      row.forEach((item, cidx) => {
+        const x = M + cidx * colW + 4.3;
         doc.setTextColor(...S2);
         doc.setFont(undefined, 'bold');
         doc.setFontSize(labelSize);
-        doc.text(String(cell.item[0]).toUpperCase(), x, yy);
-        doc.setTextColor(...(cell.item[2] || INK));
-        doc.setFont(undefined, cell.item[3] ? 'bold' : 'normal');
-        doc.setFontSize(cell.item[4] || valueSize);
-        doc.text(cell.lines, x, yy + 4.1);
+        doc.text(String(item[0]).toUpperCase(), x, yy);
+        doc.setTextColor(...(item[2] || INK));
+        doc.setFont(undefined, item[3] ? 'bold' : 'normal');
+        doc.setFontSize(item[4] || valueSize);
+        const lines = doc.splitTextToSize(cleanValue(item[1], '—'), colW - 10).slice(0, options.maxLines || 3);
+        doc.text(lines, x, yy + 3.5);
       });
-      yy += rowH;
-      if (rIdx < rowMeta.length - 1) {
+      yy += rowHeights[ridx];
+      if (ridx < rows.length - 1) {
         doc.setDrawColor(...BD);
-        doc.line(M + 3.5, yy - 2.8, M + CW - 3.5, yy - 2.8);
+        doc.line(M + 3, yy - 2.3, M + CW - 3, yy - 2.3);
       }
     });
-    y += totalH + 4.5;
+    y += totalH + 3.2;
   }
 
   function drawFullField(label, value, options = {}) {
-    const text = normalize(value);
-    const lines = doc.splitTextToSize(text, CW - 14);
-    const h = Math.max(options.minH || 15, 9.5 + lines.length * (options.lineH || 4.1));
-    ensureSpace(h + 4.5, 'Continuação do registro');
+    const lines = doc.splitTextToSize(cleanValue(value, '—'), CW - 12);
+    const h = Math.max(options.minH || 12.5, 8.3 + lines.length * (options.lineH || 3.6));
+    ensureSpace(h + 3.2, options.context || 'Continuação do registro');
     doc.setFillColor(...(options.fill || [255,255,255]));
     doc.setDrawColor(...(options.border || BD));
-    doc.setLineWidth(options.lineWidth || 0.25);
-    doc.roundedRect(M, y, CW, h, 2.4, 2.4, 'FD');
+    doc.setLineWidth(0.22);
+    doc.roundedRect(M, y, CW, h, 1.8, 1.8, 'FD');
     if (options.accent) {
       doc.setFillColor(...options.accent);
-      doc.roundedRect(M, y, 2, h, 0.9, 0.9, 'F');
+      doc.roundedRect(M, y, 1.8, h, 0.8, 0.8, 'F');
     }
     doc.setTextColor(...(options.labelColor || S2));
     doc.setFont(undefined, 'bold');
-    doc.setFontSize(6.2);
-    doc.text(String(label).toUpperCase(), M + 6, y + 5.2);
+    doc.setFontSize(5.8);
+    doc.text(String(label).toUpperCase(), M + 5.2, y + 4.6);
     doc.setTextColor(...(options.textColor || INK));
     doc.setFont(undefined, options.bold ? 'bold' : 'normal');
-    doc.setFontSize(options.size || 9.1);
-    doc.text(lines, M + 6, y + 9.8);
-    y += h + 4.5;
+    doc.setFontSize(options.size || 8.7);
+    doc.text(lines, M + 5.2, y + 8.2);
+    y += h + 3.2;
   }
 
-  function drawStatusNote(text, options = {}) {
-    const lines = doc.splitTextToSize(String(text), CW - 16);
-    const h = Math.max(13, 8 + lines.length * 3.9);
-    ensureSpace(h + 4.5, options.context || 'Continuação do acompanhamento');
-    doc.setFillColor(...(options.fill || BL_BG));
-    doc.setDrawColor(...(options.border || BD));
-    doc.setLineWidth(0.25);
-    doc.roundedRect(M, y, CW, h, 2.4, 2.4, 'FD');
-    if (options.accent) {
-      doc.setFillColor(...options.accent);
-      doc.roundedRect(M, y, 2, h, 0.9, 0.9, 'F');
-    }
-    doc.setTextColor(...(options.color || S1));
-    doc.setFont(undefined, options.bold ? 'bold' : 'normal');
-    doc.setFontSize(8.8);
-    doc.text(lines, M + 7, y + 7.2);
-    y += h + 4.5;
+  function drawBadge(text, color, fill) {
+    const w = Math.min(CW, doc.getTextWidth(text) + 12);
+    ensureSpace(8, 'Continuação do registro');
+    doc.setFillColor(...fill);
+    doc.setDrawColor(...color);
+    doc.setLineWidth(0.22);
+    doc.roundedRect(M, y, w, 6.5, 3.1, 3.1, 'FD');
+    doc.setTextColor(...color);
+    doc.setFont(undefined, 'bold');
+    doc.setFontSize(6.8);
+    doc.text(String(text), M + 4.7, y + 4.3);
+    y += 8.4;
   }
 
-  function drawActionBox(action, details) {
-    const detailsText = String(details || '').trim();
-    drawFullField('Solicitação', action || '—', {
-      fill: OR_SOFT,
-      border: OR,
-      accent: OR,
-      textColor: OR_D,
-      bold: true,
-      size: 10,
-      minH: 15
+  function drawStatusBox(label, text, color, fill) {
+    const lines = doc.splitTextToSize(text, CW - 14);
+    const h = Math.max(11.5, 7 + lines.length * 3.4);
+    ensureSpace(h + 3.2, 'Continuação do acompanhamento');
+    doc.setFillColor(...fill);
+    doc.setDrawColor(...color);
+    doc.setLineWidth(0.22);
+    doc.roundedRect(M, y, CW, h, 1.8, 1.8, 'FD');
+    doc.setFillColor(...color);
+    doc.roundedRect(M, y, 1.8, h, 0.8, 0.8, 'F');
+    doc.setTextColor(...S2);
+    doc.setFont(undefined, 'bold');
+    doc.setFontSize(5.8);
+    doc.text(String(label).toUpperCase(), M + 5.2, y + 4.6);
+    doc.setTextColor(...INK);
+    doc.setFont(undefined, 'bold');
+    doc.setFontSize(8.4);
+    doc.text(lines, M + 5.2, y + 8.4);
+    y += h + 3.2;
+  }
+
+  function drawSignatures() {
+    const sigH = 17.5, gap = 4.5, sigW = (CW - gap) / 2;
+    ensureSpace(sigH + 3.2, 'Validação do registro');
+    const boxes = [
+      { x: M, label: 'Responsável pelo registro', value: cleanValue(r.responsavel, '—') },
+      { x: M + sigW + gap, label: 'Ciência da gestão', value: '' },
+    ];
+    boxes.forEach(b => {
+      doc.setFillColor(255,255,255);
+      doc.setDrawColor(...BD);
+      doc.setLineWidth(0.22);
+      doc.roundedRect(b.x, y, sigW, sigH, 1.8, 1.8, 'FD');
+      doc.setLineDashPattern([1.1, 1.1], 0);
+      doc.line(b.x + 6, y + 9.4, b.x + sigW - 6, y + 9.4);
+      doc.setLineDashPattern([], 0);
+      if (b.x === M && r.assinatura) {
+        try { doc.addImage(r.assinatura, 'PNG', b.x + 4.5, y + 1.5, sigW - 9, 7.2); } catch(e) {}
+      }
+      doc.setTextColor(...S2);
+      doc.setFont(undefined, 'bold');
+      doc.setFontSize(5.6);
+      doc.text(String(b.label).toUpperCase(), b.x + 4.5, y + 12.6);
+      if (b.value) {
+        doc.setTextColor(...INK);
+        doc.setFont(undefined, 'normal');
+        doc.setFontSize(7.8);
+        doc.text(doc.splitTextToSize(b.value, sigW - 9).slice(0,1), b.x + 4.5, y + 15.4);
+      }
     });
-    if (detailsText) {
-      drawFullField('Detalhes da solicitação', detailsText, { minH: 15 });
-    }
+    y += sigH + 3.2;
   }
 
   drawHeader();
 
   sectionTitle('Identificação');
-  drawInfoPanel([
+  drawGrid([
     ['Origem do produto', origemLabel, INK, true],
-    ['Setor de origem', (r.setor || '').trim() || '—', INK, true],
+    ['Setor de origem', cleanValue(r.setor, '—'), INK, true],
     ['Data da ocorrência', fDate(r.data) || '—'],
-    ['Responsável pelo registro', r.responsavel || '—'],
-  ], 2, { rowH: 14 });
+    ['Responsável pelo registro', cleanValue(r.responsavel, '—')],
+  ], 2, { minRowH: 10.5, basePad: 4.1 });
 
   sectionTitle('Produto e rastreabilidade');
-  drawFullField('Produto / item afetado', r.produto || '—', { minH: 14, bold: true, size: 10.1 });
-  const qtdResumo = r.quantidade ? `${r.quantidade} ${r.unidade || ''}` : '—';
-  const fabVal = [r.fabricacao ? fDate(r.fabricacao) : '', r.validade ? fDate(r.validade) : ''].filter(Boolean).join(' / ') || '—';
-  const nfLote = [r.notaFiscal ? `NF ${r.notaFiscal}` : '', r.lote ? `Lote ${r.lote}` : ''].filter(Boolean).join(' · ') || '—';
-  const temp = r.temperatura == null || r.temperatura === '' ? '—' : `${r.temperatura} °C`;
-  const qtds = `Pedida: ${r.qtdPedida ?? 0} · Recebida: ${r.qtdRecebida ?? 0} · Recusada: ${r.qtdRecusada ?? 0} ${r.unidade || ''}`;
-  const impacto = `${r.gravidade || '—'} · ${fMoeda(r.impactoFinanceiro || 0)}`;
-  drawInfoPanel([
-    ['Quantidade afetada', qtdResumo],
-    ['Fornecedor', r.fornecedor || '—'],
-    ['Nota fiscal / lote', nfLote],
-    ['Fabricação / validade', fabVal],
-    ['Temperatura', temp],
-    ['Gravidade / impacto', impacto],
-  ], 2, { rowH: 14, maxLines: 3 });
-  if (Number(r.qtdPedida || 0) || Number(r.qtdRecebida || 0) || Number(r.qtdRecusada || 0)) {
-    drawStatusNote(qtds, { bold: true, fill: BG });
-  }
+  drawFullField('Produto / item afetado', cleanValue(r.produto, '—'), { minH: 11.8, bold: true, size: 9.5 });
+  drawGrid([
+    ['Fornecedor', cleanValue(r.fornecedor, '—')],
+    ['Quantidade afetada', qtdAfectada],
+    ['Nota fiscal', nfTxt],
+    ['Lote', loteTxt],
+    ['Fabricação', fabricacaoTxt],
+    ['Validade', validadeTxt],
+    ['Temperatura', tempTxt],
+    ['Gravidade / impacto', impactoTxt],
+  ], 2, { minRowH: 10.8, maxLines: 2, basePad: 4.1 });
+  drawGrid([
+    ['Pedida', `${Number(r.qtdPedida || 0)} ${r.unidade || ''}`],
+    ['Recebida', `${Number(r.qtdRecebida || 0)} ${r.unidade || ''}`],
+    ['Recusada', `${Number(r.qtdRecusada || 0)} ${r.unidade || ''}`],
+    ['Aceita', `${quantidadeAceita} ${r.unidade || ''}`],
+  ], 4, { minRowH: 9.8, valueSize: 8.2, labelSize: 5.2, basePad: 4, maxLines: 1, fill: BG });
 
   sectionTitle('Não conformidade identificada');
-  const tipoTxt = (r.tipoCustom && r.tipo === 'Outro (descrever)') ? r.tipoCustom : (r.tipo || 'Não informado');
-  const badgeW = Math.min(CW, doc.getTextWidth(tipoTxt) + 18);
-  doc.setFillColor(...RD_BG);
-  doc.setDrawColor(...RD);
-  doc.setLineWidth(0.25);
-  doc.roundedRect(M, y, badgeW, 7.4, 3.7, 3.7, 'FD');
-  doc.setTextColor(...RD);
-  doc.setFont(undefined, 'bold');
-  doc.setFontSize(7.7);
-  doc.text(tipoTxt, M + 5.6, y + 4.8);
-  y += 10.8;
-  drawFullField('Descrição da ocorrência', r.descricao || 'Sem descrição registrada.', { accent: RD, minH: 16 });
+  drawBadge(tipoTxt, RD, RD_BG);
+  drawFullField('Descrição da ocorrência', cleanValue(r.descricao, 'Sem descrição registrada.'), { accent: RD, minH: 13.8 });
 
   sectionTitle('Providência solicitada ao fornecedor');
-  drawActionBox(r.acao || '—', r.obsAcao || '');
+  drawFullField('Solicitação', cleanValue(r.acao, '—'), { accent: OR, fill: OR_BG, border: OR, textColor: OR_D, bold: true, size: 9.3, minH: 12.5 });
+  if (String(r.obsAcao || '').trim()) {
+    drawFullField('Detalhes da solicitação', r.obsAcao, { minH: 12.5 });
+  }
 
   sectionTitle('Acompanhamento');
   if (String(r.respostaFornecedor || '').trim()) {
-    drawFullField('Retorno do fornecedor', r.respostaFornecedor, { minH: 15 });
+    drawFullField('Retorno do fornecedor', r.respostaFornecedor, { minH: 12.5 });
   } else {
-    drawStatusNote('Aguardando resposta do fornecedor.', { bold: true, accent: OR, fill: BG });
+    drawStatusBox('Situação atual', 'Aguardando resposta do fornecedor.', OR, BG);
   }
   if (String(r.medidaRealizada || '').trim()) {
     const medidaPdf = r.status === 'resolvida' && r.encerradoEm
       ? `${r.medidaRealizada}
 Concluída em ${fDateTime(r.encerradoEm)}.`
       : r.medidaRealizada;
-    drawFullField('Medida efetivamente realizada', medidaPdf, { accent: GR, fill: GR_BG, border: GR, textColor: [21, 128, 61], minH: 16 });
+    drawFullField('Medida efetivamente realizada', medidaPdf, { accent: GR, fill: GR_BG, border: GR, textColor: [21, 128, 61], minH: 12.8, bold: true });
   } else if (r.status === 'analise') {
-    drawStatusNote('Resposta recebida. Reposição, crédito ou correção ainda em acompanhamento.', { color: AM, bold: true, fill: AM_BG, border: [253, 230, 138], accent: AM });
-  }
-  if (r.status === 'cancelada' && (r.motivoCancelamento || r.obsAcao)) {
-    drawStatusNote(`Motivo do cancelamento: ${r.motivoCancelamento || r.obsAcao}`, { color: S1, bold: true });
+    drawStatusBox('Situação atual', 'Resposta recebida. Reposição, crédito ou correção ainda em acompanhamento.', AM, AM_BG);
+  } else if (r.status === 'cancelada' && (r.motivoCancelamento || r.obsAcao)) {
+    drawStatusBox('Situação atual', `Motivo do cancelamento: ${r.motivoCancelamento || r.obsAcao}`, S1, BG);
   }
 
   sectionTitle('Validação do registro');
-  const sigH = 20.5, sigGap = 6, sigW = (CW - sigGap) / 2;
-  ensureSpace(sigH + 5, 'Validação do registro');
-  doc.setFillColor(255,255,255);
-  doc.setDrawColor(...BD);
-  doc.setLineWidth(0.25);
-  doc.roundedRect(M, y, sigW, sigH, 2.4, 2.4, 'FD');
-  if (r.assinatura) {
-    try { doc.addImage(r.assinatura, 'PNG', M + 5, y + 2, sigW - 10, 10.6); } catch (e) {}
-  } else {
-    doc.setLineDashPattern([1.2, 1.2], 0);
-    doc.line(M + 7, y + 11.1, M + sigW - 7, y + 11.1);
-    doc.setLineDashPattern([], 0);
-  }
-  doc.setTextColor(...S2);
-  doc.setFont(undefined, 'bold');
-  doc.setFontSize(6.2);
-  doc.text('RESPONSÁVEL PELO REGISTRO', M + 5, y + 15.3);
-  doc.setTextColor(...INK);
-  doc.setFont(undefined, 'normal');
-  doc.setFontSize(8.5);
-  doc.text(doc.splitTextToSize(String(r.responsavel || '—'), sigW - 10).slice(0, 1), M + 5, y + 18.6);
-
-  const sx = M + sigW + sigGap;
-  doc.setFillColor(255,255,255);
-  doc.setDrawColor(...BD);
-  doc.roundedRect(sx, y, sigW, sigH, 2.4, 2.4, 'FD');
-  doc.setLineDashPattern([1.2, 1.2], 0);
-  doc.line(sx + 7, y + 11.1, sx + sigW - 7, y + 11.1);
-  doc.setLineDashPattern([], 0);
-  doc.setTextColor(...S2);
-  doc.setFont(undefined, 'bold');
-  doc.setFontSize(6.2);
-  doc.text('CIÊNCIA DA GESTÃO', sx + 5, y + 16.1);
-  y += sigH + 4.5;
+  drawSignatures();
 
   const fotos = Array.isArray(r.fotos) ? r.fotos : [];
   const medirImg = src => new Promise(resolve => {
@@ -2052,13 +2061,14 @@ Concluída em ${fDateTime(r.encerradoEm)}.`
   for (let i = 0; i < fotos.length; i++) {
     doc.addPage();
     drawHeader(`Evidência fotográfica ${i + 1} de ${fotos.length}`);
-    y = 39;
+    y = 33;
     sectionTitle(`Evidência fotográfica ${i + 1}`);
-    const areaX = M, areaY = y, areaW = CW, areaH = pageH - y - 26;
+    const areaX = M, areaY = y, areaW = CW, areaH = pageH - y - 22;
     doc.setFillColor(255,255,255);
     doc.setDrawColor(...BD);
-    doc.roundedRect(areaX, areaY, areaW, areaH, 2.4, 2.4, 'FD');
-    const pad = 7.5, labelH = 10;
+    doc.setLineWidth(0.22);
+    doc.roundedRect(areaX, areaY, areaW, areaH, 1.8, 1.8, 'FD');
+    const pad = 7, labelH = 8;
     const maxW = areaW - pad * 2, maxH = areaH - pad * 2 - labelH;
     const d = dims[i];
     let drawW = maxW, drawH = maxH;
@@ -2079,27 +2089,27 @@ Concluída em ${fDateTime(r.encerradoEm)}.`
     if (!ok) {
       doc.setTextColor(...S3);
       doc.setFont(undefined, 'normal');
-      doc.setFontSize(9);
+      doc.setFontSize(8.6);
       doc.text('Imagem indisponível', areaX + areaW / 2, areaY + areaH / 2, { align: 'center' });
     }
     doc.setTextColor(...S2);
     doc.setFont(undefined, 'bold');
-    doc.setFontSize(7);
-    doc.text(`EVIDÊNCIA ${i + 1}`, areaX + pad, areaY + areaH - 5.5);
+    doc.setFontSize(6.4);
+    doc.text(`EVIDÊNCIA ${i + 1}`, areaX + pad, areaY + areaH - 4.6);
   }
 
   const totalPages = doc.internal.getNumberOfPages();
   for (let p = 1; p <= totalPages; p++) {
     doc.setPage(p);
     doc.setDrawColor(...BD);
-    doc.setLineWidth(0.2);
-    doc.line(M, footerLineY, pageW - M, footerLineY);
+    doc.setLineWidth(0.18);
+    doc.line(M, footerY, pageW - M, footerY);
     doc.setTextColor(...S3);
     doc.setFont(undefined, 'normal');
-    doc.setFontSize(6.8);
-    doc.text(`NEXUS · Grupo Ilha · ${numStr}`, M, pageH - 9.6);
-    doc.text(`Emitido em ${new Date().toLocaleString('pt-BR')}`, M, pageH - 5.2);
-    doc.text(`Página ${p} de ${totalPages}`, pageW - M, pageH - 9.6, { align: 'right' });
+    doc.setFontSize(6.4);
+    doc.text(`NEXUS · Grupo Ilha · ${numStr}`, M, pageH - 9.1);
+    doc.text(`Emitido em ${new Date().toLocaleString('pt-BR')}`, M, pageH - 5.1);
+    doc.text(`Página ${p} de ${totalPages}`, pageW - M, pageH - 9.1, { align: 'right' });
   }
 
   doc.save(`NEXUS_RNC_${(numStr || r.id || '').replace(/[\/:*?"<>|]+/g, '_')}.pdf`);
@@ -2490,7 +2500,7 @@ function ConfigTab({ toast }) {
     <div style=${{ marginTop: 32, marginBottom: 24, textAlign: 'center', padding: '20px 0', borderTop: '1px solid var(--bd)' }}>
       <div style=${{ fontSize: 10, fontWeight: 700, letterSpacing: '.12em', color: 'var(--s3)', textTransform: 'uppercase', marginBottom: 6 }}>Desenvolvido por</div>
       <div style=${{ fontSize: 15, fontWeight: 800, color: 'var(--ink)', marginBottom: 2, fontFamily: "'Plus Jakarta Sans',sans-serif" }}>Vinicius Candido dos Santos</div>
-      <div style=${{ fontSize: 12, color: 'var(--s2)' }}>NEXUS v2.6.2 · Grupo Ilha · ${new Date().getFullYear()}</div>
+      <div style=${{ fontSize: 12, color: 'var(--s2)' }}>NEXUS v2.6.3 · Grupo Ilha · ${new Date().getFullYear()}</div>
     </div>
 
     ${addingItem && html`<${AddItemModal} orig=${addingItem.orig} cat=${addingItem.cat} defUnit=${addingItem.unit} onClose=${() => setAddingItem(null)} onConfirm=${addItem}/>`}
@@ -2731,7 +2741,7 @@ function WeekControl({ toast }) {
    DATA MIGRATION
 ══════════════════════════════════════ */
 function migrateLocalData() {
-  const target='2.6.2';
+  const target='2.6.3';
   if (LS.get('schemaVersion') === target) return true;
   const now=new Date().toISOString();
   let pedidos=LS.get('pedidos') || [];

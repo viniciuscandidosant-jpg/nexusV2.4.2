@@ -188,7 +188,7 @@ function downloadJson(filename, data) {
   const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = filename; a.click(); setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 function exportBackup() {
-  const data = { app:'NEXUS', version:'2.6.3', exportedAt:new Date().toISOString(), stores:{} };
+  const data = { app:'NEXUS', version:'2.7.0', exportedAt:new Date().toISOString(), stores:{} };
   for (let i=0;i<localStorage.length;i++) { const k=localStorage.key(i); if (k?.startsWith('nx:')) { try { data.stores[k.slice(3)] = JSON.parse(localStorage.getItem(k)); } catch (error) { console.warn('Backup ignorou uma chave inválida:', k, error); } } }
   downloadJson(`NEXUS_backup_${todayISO()}.json`, data);
   auditLog('Backup exportado', `${Object.keys(data.stores).length} conjuntos de dados`);
@@ -277,6 +277,31 @@ function flatCatalog(cat, opts = {}) {
     }
   }
   return all;
+}
+
+
+const DEFAULT_UNIDADES = [
+  { id:'ilha-vix', nome:'Ilha do Caranguejo - VIX', ativo:true },
+  { id:'ilha-vv', nome:'Ilha do Caranguejo - VV', ativo:true },
+];
+function normalizeUnidades(list) {
+  const raw = Array.isArray(list) && list.length ? list : DEFAULT_UNIDADES;
+  const normalized = raw.map((u,idx)=> typeof u === 'string'
+    ? { id:`unidade-${idx+1}-${u.toLowerCase().replace(/[^a-z0-9]+/g,'-')}`, nome:u.trim(), ativo:true }
+    : { id:u?.id || uid(), nome:String(u?.nome || '').trim(), ativo:u?.ativo !== false }
+  ).filter(u=>u.nome);
+  const out=[]; const names=new Set();
+  for (const u of normalized) {
+    const key=u.nome.toLowerCase();
+    if(names.has(key)) continue;
+    names.add(key); out.push(u);
+  }
+  return out;
+}
+function getUnidades(opts={}) {
+  const config=LS.get('config') || {};
+  const units=normalizeUnidades(config.unidades);
+  return opts.includeInactive ? units : units.filter(u=>u.ativo !== false);
 }
 
 /* ══════════════════════════════════════
@@ -380,12 +405,13 @@ function BottomNav({ tab, setTab }) {
 const ST_PED = { pendente: { l: 'Aguardando', c: 'bgy' }, recebido: { l: 'Recebido', c: 'bgr2' }, parcial: { l: 'Parcial', c: 'bam' }, cancelado: { l: 'Cancelado', c: 'brd2' } };
 const ST_RNC = { aberta: { l: 'Aberta', c: 'brd2' }, analise: { l: 'Em acompanhamento', c: 'bam' }, resolvida: { l: 'Concluída', c: 'bgr2' }, cancelada: { l: 'Cancelada', c: 'bgy' } };
 
-function RecordsFilter({ busca, setBusca, origem, setOrigem, status, setStatus, statusOpts=[] }) {
+function RecordsFilter({ busca, setBusca, origem, setOrigem, status, setStatus, statusOpts=[], unidade, setUnidade, unidades=[] }) {
   return html`<div class="card" style=${{ padding:12, marginBottom:14 }}>
     <div style=${{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(160px,1fr))', gap:8 }}>
       <input class="inp" value=${busca} onInput=${e=>setBusca(e.target.value)} placeholder="Buscar por semana, produto ou responsável..."/>
       <select class="inp" value=${origem} onChange=${e=>setOrigem(e.target.value)}><option value="TODOS">CD + CP</option><option value="CD">CD</option><option value="CP">CP</option></select>
       <select class="inp" value=${status} onChange=${e=>setStatus(e.target.value)}><option value="TODOS">Todos os status</option>${statusOpts.map(o=>html`<option key=${o.v} value=${o.v}>${o.l}</option>`)}</select>
+      ${setUnidade && html`<select class="inp" value=${unidade||'TODAS'} onChange=${e=>setUnidade(e.target.value)}><option value="TODAS">Todas as unidades</option>${unidades.map(u=>html`<option key=${u.nome||u} value=${u.nome||u}>${u.nome||u}</option>`)}</select>`}
     </div>
   </div>`;
 }
@@ -451,7 +477,7 @@ function OrcamentoTab({ toast }) {
   const [view, setView] = useState('lista');
   const [orcamentos, setOrcamentos] = useState(() => LS.get('orcamentos') || []);
   const [editing, setEditing] = useState(null);
-  const [fBusca, setFBusca] = useState(''); const [fOrig, setFOrig] = useState('TODOS'); const [fStatus, setFStatus] = useState('TODOS'); const [limit, setLimit] = useState(30);
+  const [fBusca, setFBusca] = useState(''); const [fOrig, setFOrig] = useState('TODOS'); const [fStatus, setFStatus] = useState('TODOS'); const [fUnidade,setFUnidade]=useState('TODAS'); const [limit, setLimit] = useState(30);
   useEffect(() => { const openTarget=()=>{ const t=LS.get('openTarget'); if(t?.tab==='orcamento'){ const rec=(LS.get('orcamentos')||[]).find(x=>x.id===t.id); if(rec){ setEditing(rec); setView('editor'); } LS.del('openTarget'); } }; openTarget(); window.addEventListener('nx-open-target',openTarget); return()=>window.removeEventListener('nx-open-target',openTarget); }, []);
   const cat = useMemo(getCatalog, []);
   const allItems = useMemo(() => flatCatalog(cat), [cat]);
@@ -868,10 +894,13 @@ function syncAutoRncsForReceipt(pedido, recebimento, allowCreate) {
     if (!existente || existente.status !== novoStatus) historicoStatus.push({ de:existente?.status || null, para:novoStatus, em:now, usuario });
     const base = {
       ...(existente || {}), id:existente?.id || uid(), numero:existente?.numero || nextRncNumber(pedido.origem, rncs, recebimento.data || todayISO()),
-      data:recebimento.data || todayISO(), semana:pedido.semana, origem:pedido.origem, setor:'Recebimento', responsavel:usuario,
+      data:recebimento.data || todayISO(), dataIdentificacao:recebimento.data || todayISO(), dataRecebimento:recebimento.data || todayISO(), semana:pedido.semana, origem:pedido.origem,
+      unidadeOrigem:(LS.get('config')||{}).unidadePadrao || getUnidades()[0]?.nome || '', setor:'Recebimento', setorIdentificacao:'Recebimento', responsavel:usuario,
+      momentoIdentificacao:'No recebimento', etapaIdentificacao:'Recebimento', condicaoRecebimento:'Problema já identificado no recebimento',
       produto:d.nome, fornecedor:pedido.origem === 'CD' ? 'Centro de Distribuição (CD)' : 'Cozinha de Produção (CP)', unidade:d.unit || 'UND', quantidade,
-      qtdPedida:Number(d.qtd || 0), qtdRecebida:Number(d.qtdRecebida || 0), qtdRecusada:d.diferenca > 0 ? quantidade : 0,
-      tipo:'Quantidade incorreta', naturezaDivergencia:natureza,
+      qtdAfetadaInicial:quantidade, qtdAfetadaConfirmada:quantidade, qtdPedida:Number(d.qtd || 0), qtdRecebida:Number(d.qtdRecebida || 0), qtdRecusada:d.diferenca > 0 ? quantidade : 0,
+      qtdUtilizadaAntes:0, qtdSegregada:0, qtdSobObservacao:0, qtdDescartadaDevolvida:d.diferenca > 0 ? quantidade : 0,
+      tipo:'Quantidade incorreta', naturezaDivergencia:natureza, abrangencia:'Uma unidade isolada', contencoes:['Registro realizado no recebimento'], riscos:['Perda financeira'],
       descricao:`RNC automática por ${natureza.toLowerCase()}. Pedido ${wLbl(pedido.semana)}: solicitado ${d.qtd} ${d.unit || ''}, recebido ${d.qtdRecebida} ${d.unit || ''}, diferença ${d.diferenca > 0 ? '+' : ''}${d.diferenca}.`,
       acao:existente?.acao || 'Apenas registrar ocorrência', obsAcao:existente?.obsAcao || recebimento.observacoes || '',
       status:novoStatus, historicoStatus,
@@ -1054,7 +1083,7 @@ function RncTab({ toast }) {
     onSave=${r => { if (save(r)) { toast.show('RNC salva'); setView('lista'); setEditing(null); } }}
     onDelete=${id => { if (del(id)) { toast.show('Excluída'); setView('lista'); setEditing(null); } }}/>`;
   const term=fBusca.trim().toLowerCase();
-  const filtradas=rncs.filter(r=>(fOrig==='TODOS'||r.origem===fOrig)&&(fStatus==='TODOS'||r.status===fStatus)&&(!term||`${r.numero||''} ${r.produto||''} ${r.fornecedor||''} ${r.responsavel||''} ${r.tipo||''} ${r.lote||''} ${r.notaFiscal||''}`.toLowerCase().includes(term)));
+  const filtradas=rncs.filter(r=>(fOrig==='TODOS'||r.origem===fOrig)&&(fStatus==='TODOS'||r.status===fStatus)&&(fUnidade==='TODAS'||r.unidadeOrigem===fUnidade)&&(!term||`${r.numero||''} ${r.produto||''} ${r.fornecedor||''} ${r.responsavel||''} ${r.tipo||''} ${r.lote||''} ${r.notaFiscal||''} ${r.unidadeOrigem||''} ${r.setorIdentificacao||r.setor||''} ${r.etapaIdentificacao||''}`.toLowerCase().includes(term)));
   const abertasAll=filtradas.filter(r=>r.status==='aberta'||r.status==='analise').sort((a,b)=>new Date(b.data||0)-new Date(a.data||0));
   const resAll=filtradas.filter(r=>r.status==='resolvida'||r.status==='cancelada').sort((a,b)=>new Date(b.encerradoEm||b.atualizadoEm||b.data||0)-new Date(a.encerradoEm||a.atualizadoEm||a.data||0));
   const abertas=abertasAll.slice(0,limit), res=resAll.slice(0,limit);
@@ -1064,7 +1093,7 @@ function RncTab({ toast }) {
       <div><h2 style=${{ fontSize: 20, fontWeight: 800, fontFamily: "'Plus Jakarta Sans',sans-serif", margin: 0 }}>RNC</h2><p style=${{ fontSize: 13, color: 'var(--s2)', margin: '2px 0 0' }}>Registros de Não Conformidade</p></div>
       <button class="btn bp bsm" onClick=${() => { setEditing(null); setView('editor'); }}><${Ic} n="plus" s=${14}/>Nova RNC</button>
     </div>
-    ${rncs.length>0 && html`<${RecordsFilter} busca=${fBusca} setBusca=${resetLimit(setFBusca)} origem=${fOrig} setOrigem=${resetLimit(setFOrig)} status=${fStatus} setStatus=${resetLimit(setFStatus)} statusOpts=${[{v:'aberta',l:'Aberta'},{v:'analise',l:'Em acompanhamento'},{v:'resolvida',l:'Concluída'},{v:'cancelada',l:'Cancelada'}]}/>`}
+    ${rncs.length>0 && html`<${RecordsFilter} busca=${fBusca} setBusca=${resetLimit(setFBusca)} origem=${fOrig} setOrigem=${resetLimit(setFOrig)} status=${fStatus} setStatus=${resetLimit(setFStatus)} unidade=${fUnidade} setUnidade=${resetLimit(setFUnidade)} unidades=${getUnidades({includeInactive:true})} statusOpts=${[{v:'aberta',l:'Aberta'},{v:'analise',l:'Em acompanhamento'},{v:'resolvida',l:'Concluída'},{v:'cancelada',l:'Cancelada'}]}/>`}
     ${rncs.length === 0 && html`<div class="empty"><${Ic} n="rnc" s=${40} style=${{ color: 'var(--s3)' }}/><p>Nenhuma RNC registrada.</p><button class="btn bp" style=${{ marginTop: 8 }} onClick=${() => setView('editor')}><${Ic} n="plus" s=${16}/>Abrir RNC</button></div>`}
     ${rncs.length>0 && filtradas.length===0 && html`<div class="empty"><p>Nenhuma RNC corresponde aos filtros.</p></div>`}
     ${abertasAll.length > 0 && html`<span class="slbl">Em aberto (${abertasAll.length})</span><div style=${{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 16 }}>${abertas.map(r => html`<${RncCard} key=${r.id} rnc=${r} onClick=${() => { setEditing(r); setView('editor'); }}/>`)}<${MoreResults} total=${abertasAll.length} shown=${abertas.length} onMore=${()=>setLimit(v=>v+30)}/></div>`}
@@ -1075,7 +1104,7 @@ function RncTab({ toast }) {
 function RncCard({ rnc, onClick }) {
   const st = ST_RNC[rnc.status] || { l: rnc.status, c: 'bgy' };
   return html`<button class="card" style=${{ padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 12, border: 'none', textAlign: 'left', width: '100%', cursor: 'pointer', opacity: ['resolvida','cancelada'].includes(rnc.status) ? .85 : 1 }} onClick=${onClick}>
-    <div style=${{ flex: 1, minWidth: 0 }}><div class="row" style=${{ gap: 6, marginBottom: 4 }}><span class=${`badge ${st.c}`}>${st.l}</span>${rnc.origem && html`<span class="badge bor">${rnc.origem}</span>`}</div><div style=${{ fontWeight: 700, fontSize: 14 }}>${rnc.numero}</div><div style=${{ fontSize: 12, color: 'var(--s2)', marginTop: 2 }}>${rnc.produto || '—'} · ${fDate(rnc.data)}</div></div>
+    <div style=${{ flex: 1, minWidth: 0 }}><div class="row" style=${{ gap: 6, marginBottom: 4 }}><span class=${`badge ${st.c}`}>${st.l}</span>${rnc.origem && html`<span class="badge bor">${rnc.origem}</span>`}</div><div style=${{ fontWeight: 700, fontSize: 14 }}>${rnc.numero}</div><div style=${{ fontSize: 12, color: 'var(--s2)', marginTop: 2 }}>${rnc.produto || '—'} · ${fDate(rnc.dataIdentificacao || rnc.data)}</div><div style=${{ fontSize: 10, color: 'var(--s3)', marginTop: 2 }}>${rnc.unidadeOrigem || 'Unidade não informada'}${rnc.etapaIdentificacao ? ` · ${rnc.etapaIdentificacao}` : ''}</div></div>
     <${Ic} n="cr" s=${16} style=${{ color: 'var(--s3)' }}/>
   </button>`;
 }
@@ -1181,72 +1210,93 @@ function SignaturePad({ value, onChange, label='Assinatura' }) {
 function RncEditor({ rnc, allItems, toast, genNum, onBack, onSave, onDelete }) {
   const isEdit = !!rnc?.id;
   const [step, setStep] = useState(1);
+  const config = LS.get('config') || {};
+  const unidades = getUnidades();
+  const recebimentosDisponiveis = useMemo(() => (LS.get('pedidos') || []).filter(p => p.recebimento).sort((a,b)=>new Date(b.recebimento?.finalizadoEm||0)-new Date(a.recebimento?.finalizadoEm||0)), []);
 
-  // --- Estado dos campos ---
+  const unidadeInicial = rnc?.unidadeOrigem || config.unidadePadrao || unidades[0]?.nome || '';
   const [orig, setOrig] = useState(rnc?.origem || 'CD');
-  const [setor, setSetor] = useState(rnc?.setor || '');
-  const [setorCustom, setSetorCustom] = useState(!!(rnc?.setor && !['CD','CP'].includes(rnc.setor)));
-  const [data, setData] = useState(rnc?.data || todayISO());
+  const [unidadeOrigem, setUnidadeOrigem] = useState(unidadeInicial);
+  const [setor, setSetor] = useState(rnc?.setorIdentificacao || rnc?.setor || '');
+  const [momentoIdentificacao, setMomentoIdentificacao] = useState(rnc?.momentoIdentificacao || (rnc?.recebimentoId ? 'No recebimento' : 'Após o recebimento'));
+  const [etapaIdentificacao, setEtapaIdentificacao] = useState(rnc?.etapaIdentificacao || (rnc?.recebimentoId ? 'Recebimento' : 'Durante a produção'));
+  const [dataRecebimento, setDataRecebimento] = useState(rnc?.dataRecebimento || '');
+  const [data, setData] = useState(rnc?.dataIdentificacao || rnc?.data || todayISO());
+  const [condicaoRecebimento, setCondicaoRecebimento] = useState(rnc?.condicaoRecebimento || 'Sem anormalidade aparente');
   const [status, setStatus] = useState(rnc?.status || 'aberta');
-  const [resp, setResp] = useState(rnc?.responsavel || (LS.get('config') || {}).responsavel || '');
+  const [resp, setResp] = useState(rnc?.responsavel || config.responsavel || '');
+
+  const [pedidoRelacionadoId, setPedidoRelacionadoId] = useState(rnc?.pedidoId || '');
+  const [recebimentoRelacionadoId, setRecebimentoRelacionadoId] = useState(rnc?.recebimentoId || '');
+  const [orcamentoRelacionadoId, setOrcamentoRelacionadoId] = useState(rnc?.orcamentoId || '');
 
   const [produto, setProduto] = useState(rnc?.produto || '');
   const [fornecedor, setFornecedor] = useState(rnc?.fornecedor || '');
   const [unit, setUnit] = useState(rnc?.unidade || 'UND');
-  const [qtd, setQtd] = useState(String(rnc?.quantidade || ''));
+  const [qtdAfetadaInicial, setQtdAfetadaInicial] = useState(String(rnc?.qtdAfetadaInicial ?? rnc?.quantidade ?? ''));
+  const [qtdPedida, setQtdPedida] = useState(String(rnc?.qtdPedida ?? ''));
+  const [qtdRecebida, setQtdRecebida] = useState(String(rnc?.qtdRecebida ?? ''));
+  const [qtdUtilizada, setQtdUtilizada] = useState(String(rnc?.qtdUtilizadaAntes ?? ''));
+  const [qtdSegregada, setQtdSegregada] = useState(String(rnc?.qtdSegregada ?? ''));
+  const [qtdObservacao, setQtdObservacao] = useState(String(rnc?.qtdSobObservacao ?? ''));
+  const [qtdDescartadaDevolvida, setQtdDescartadaDevolvida] = useState(String(rnc?.qtdDescartadaDevolvida ?? rnc?.qtdRecusada ?? ''));
 
-  const [tipo, setTipo] = useState(rnc?.tipo || '');
-  const [tipoCustom, setTipoCustom] = useState(rnc?.tipoCustom || '');
-  const [desc, setDesc] = useState(rnc?.descricao || '');
-
-  const [acao, setAcao] = useState(rnc?.acao || '');
-  const [obsAcao, setObsAcao] = useState(rnc?.obsAcao || '');
   const [notaFiscal, setNotaFiscal] = useState(rnc?.notaFiscal || '');
   const [lote, setLote] = useState(rnc?.lote || '');
   const [fabricacao, setFabricacao] = useState(rnc?.fabricacao || '');
   const [validade, setValidade] = useState(rnc?.validade || '');
   const [temperatura, setTemperatura] = useState(rnc?.temperatura ?? '');
-  const [qtdPedida, setQtdPedida] = useState(String(rnc?.qtdPedida ?? ''));
-  const [qtdRecebida, setQtdRecebida] = useState(String(rnc?.qtdRecebida ?? ''));
-  const [qtdRecusada, setQtdRecusada] = useState(String(rnc?.qtdRecusada ?? ''));
+
+  const [tipo, setTipo] = useState(rnc?.tipo || '');
+  const [tipoCustom, setTipoCustom] = useState(rnc?.tipoCustom || '');
+  const [desc, setDesc] = useState(rnc?.descricao || '');
+  const [abrangencia, setAbrangencia] = useState(rnc?.abrangencia || 'Abrangência ainda não determinada');
+  const [contencoes, setContencoes] = useState(Array.isArray(rnc?.contencoes) ? rnc.contencoes : (rnc?.contencao ? [rnc.contencao] : []));
+  const [riscos, setRiscos] = useState(Array.isArray(rnc?.riscos) ? rnc.riscos : (rnc?.riscoOcorrencia ? [rnc.riscoOcorrencia] : []));
+  const [impactoOperacional, setImpactoOperacional] = useState(rnc?.impactoOperacional || '');
   const [gravidade, setGravidade] = useState(rnc?.gravidade || 'Média');
   const [impactoFinanceiro, setImpactoFinanceiro] = useState(String(rnc?.impactoFinanceiro ?? ''));
+
+  const [acao, setAcao] = useState(rnc?.acao || '');
+  const [obsAcao, setObsAcao] = useState(rnc?.obsAcao || '');
   const [respostaFornecedor, setRespostaFornecedor] = useState(rnc?.respostaFornecedor || '');
-  const [medidaRealizada, setMedidaRealizada] = useState(rnc?.medidaRealizada || (rnc?.status === 'resolvida' ? (rnc?.verificacaoEficacia || rnc?.planoAcao || '') : ''));
+  const [medidaRealizada, setMedidaRealizada] = useState(rnc?.medidaRealizada || '');
 
   const [fotos, setFotos] = useState(rnc?.fotos || []);
   const [assinatura, setAssinatura] = useState(rnc?.assinatura || null);
+  const [constatacoes, setConstatacoes] = useState(Array.isArray(rnc?.constatacoes) ? rnc.constatacoes : []);
+  const [novaConstatacao, setNovaConstatacao] = useState({ data:todayISO(), quantidade:'', descricao:'', responsavel:resp || '', destino:'', foto:null });
   const fotoRef = useRef(null);
+  const constFotoRef = useRef(null);
 
   const TIPOS = [
-    { v: 'Produto fora do prazo', ic: 'orc' },
-    { v: 'Produto com avaria', ic: 'rnc' },
-    { v: 'Quantidade incorreta', ic: 'recv' },
-    { v: 'Produto fora do padrão de qualidade', ic: 'rnc' },
-    { v: 'Temperatura inadequada', ic: 'rnc' },
-    { v: 'Embalagem danificada', ic: 'rnc' },
-    { v: 'Outro (descrever)', ic: 'pen' },
+    'Produto fora do prazo','Produto com avaria','Quantidade incorreta','Produto fora do padrão de qualidade',
+    'Temperatura inadequada','Embalagem danificada','Alteração de odor, cor ou textura','Outro (descrever)'
   ];
+  const MOMENTOS = ['No recebimento','Após o recebimento'];
+  const ETAPAS = ['Recebimento','Armazenamento','Descongelamento','Pré-preparo','Durante a produção','Durante o serviço','Outro'];
+  const ABRANGENCIAS = ['Uma unidade isolada','Algumas unidades do mesmo lote','Lote parcialmente comprometido','Todo o lote','Abrangência ainda não determinada'];
+  const CONTENCOES = ['Uso interrompido','Produto segregado','Lote bloqueado','Produto descartado','Produto mantido para análise','Amostra preservada','Equipe orientada','Nenhuma contenção necessária'];
+  const RISCOS = ['Qualidade sensorial','Segurança alimentar','Perda financeira','Interrupção operacional','Reclamação de cliente','Risco ainda não avaliado'];
   const ACOES = [
-    { v: 'Devolução ao fornecedor', desc: 'Material será devolvido na próxima entrega' },
-    { v: 'Substituição imediata', desc: 'Fornecedor deve repor o item' },
-    { v: 'Crédito em nota', desc: 'Abatimento no próximo faturamento' },
-    { v: 'Desconto na próxima entrega', desc: 'Negociar abatimento futuro' },
-    { v: 'Apenas registrar ocorrência', desc: 'Sem providência imediata, apenas histórico' },
+    { v:'Devolução ao fornecedor', desc:'Material deve ser recolhido ou devolvido' },
+    { v:'Substituição imediata', desc:'Fornecedor deve repor o item afetado' },
+    { v:'Crédito em nota', desc:'Abatimento financeiro no faturamento' },
+    { v:'Avaliação e retorno do fornecedor', desc:'Solicitar análise e definição da providência' },
+    { v:'Apenas registrar ocorrência', desc:'Sem providência imediata, somente histórico' },
   ];
   const STATUS_OPTS = [
-    { v: 'aberta', l: 'Aberta', desc: 'PDF enviado ou aguardando resposta do fornecedor', c: 'brd2' },
-    { v: 'analise', l: 'Em acompanhamento', desc: 'Fornecedor respondeu; troca, crédito ou correção ainda está pendente', c: 'bam' },
-    { v: 'resolvida', l: 'Concluída', desc: 'A providência foi efetivada e a RNC pode ser encerrada', c: 'bgr2' },
-    { v: 'cancelada', l: 'Cancelada', desc: 'Registro encerrado sem prosseguimento', c: 'bgy' },
+    { v:'aberta', l:'Aberta', desc:'PDF enviado ou aguardando resposta do fornecedor', c:'brd2' },
+    { v:'analise', l:'Em acompanhamento', desc:'Fornecedor respondeu; reposição, crédito ou correção ainda pendente', c:'bam' },
+    { v:'resolvida', l:'Concluída', desc:'A providência foi efetivamente realizada', c:'bgr2' },
+    { v:'cancelada', l:'Cancelada', desc:'Registro encerrado sem prosseguimento', c:'bgy' },
   ];
 
-  const addFoto = file => {
+  const compressImage = (file, cb) => {
     if (!file) return;
-    if (fotos.length >= 3) { toast.show('Limite de 3 fotos por RNC.'); return; }
     if (file.size > 12 * 1024 * 1024) { toast.show('A imagem excede 12 MB.'); return; }
-    const r = new FileReader();
-    r.onload = e => {
+    const reader = new FileReader();
+    reader.onload = e => {
       const img = new Image();
       img.onload = () => {
         const c = document.createElement('canvas');
@@ -1255,361 +1305,173 @@ function RncEditor({ rnc, allItems, toast, genNum, onBack, onSave, onDelete }) {
         if (w > max) { h = Math.round(h * max / w); w = max; }
         if (h > max) { w = Math.round(w * max / h); h = max; }
         c.width = w; c.height = h;
-        c.getContext('2d').drawImage(img, 0, 0, w, h);
-        let data = c.toDataURL('image/webp', .68);
-        if (!data.startsWith('data:image/webp')) data = c.toDataURL('image/jpeg', .68);
-        const projectedMb = storageUsage().mb + (data.length * 2 / 1024 / 1024);
-        if (projectedMb > 4.5) { toast.show('A foto não foi adicionada porque o armazenamento local está quase cheio. Exporte um backup e remova fotos antigas.'); return; }
-        setFotos(p => [...p, data].slice(0,3));
+        c.getContext('2d').drawImage(img,0,0,w,h);
+        let data = c.toDataURL('image/webp',.66);
+        if (!data.startsWith('data:image/webp')) data = c.toDataURL('image/jpeg',.66);
+        const projectedMb = storageUsage().mb + data.length * 2 / 1024 / 1024;
+        if (projectedMb > 4.5) { toast.show('Armazenamento local quase cheio. Exporte um backup antes de adicionar mais fotos.'); return; }
+        cb(data);
       };
       img.onerror = () => toast.show('Não foi possível processar a imagem.');
       img.src = e.target.result;
     };
-    r.onerror = () => toast.show('Não foi possível ler a imagem.');
-    r.readAsDataURL(file);
+    reader.onerror = () => toast.show('Não foi possível ler a imagem.');
+    reader.readAsDataURL(file);
+  };
+  const addFoto = file => {
+    if (fotos.length >= 3) { toast.show('Limite de 3 fotos principais por RNC.'); return; }
+    compressImage(file, data => setFotos(p=>[...p,data].slice(0,3)));
   };
 
-  const itemsOrig = allItems.filter(i => i.orig === orig);
+  const pedidoRelacionado = recebimentosDisponiveis.find(p=>p.id===pedidoRelacionadoId);
+  const itensRelacionados = pedidoRelacionado?.recebimento?.itens || [];
+  const itemsOrig = allItems.filter(i=>i.orig===orig);
+  const produtosDisponiveis = [...new Map([...itensRelacionados.map(i=>({name:i.nome,unit:i.unit||'UND',orig:pedidoRelacionado?.origem||orig,cat:i.cat||''})),...itemsOrig].map(i=>[i.name,i])).values()];
 
-  // --- Validações por etapa ---
-  const v1 = !!(orig && data && resp.trim());
-  const v2 = !!(produto.trim() && parseFloat(qtd) > 0 && (tipo && (tipo !== 'Outro (descrever)' || tipoCustom.trim())) && desc.trim());
-  const conclusaoOk = status !== 'resolvida' || !!medidaRealizada.trim();
-  const cancelamentoOk = status !== 'cancelada' || !!obsAcao.trim();
-  const v3 = !!(acao && conclusaoOk && cancelamentoOk);
-  const podeRegistrar = v1 && v2 && v3;
+  const aplicarProdutoRelacionado = nome => {
+    setProduto(nome);
+    const item = itensRelacionados.find(i=>i.nome===nome);
+    if (item) {
+      setUnit(item.unit || 'UND');
+      setQtdPedida(String(item.qtd ?? ''));
+      setQtdRecebida(String(item.qtdRecebida ?? item.qtd ?? ''));
+    } else {
+      const catItem=allItems.find(i=>i.name===nome);
+      if(catItem) setUnit(catItem.unit || 'UND');
+    }
+  };
+  const selecionarRecebimento = id => {
+    setPedidoRelacionadoId(id);
+    const p=recebimentosDisponiveis.find(x=>x.id===id);
+    if(!p){ setRecebimentoRelacionadoId(''); setOrcamentoRelacionadoId(''); return; }
+    setRecebimentoRelacionadoId(p.recebimento?.id || '');
+    setOrcamentoRelacionadoId(p.orcamentoId || '');
+    setOrig(p.origem || orig);
+    const dr=String(p.recebimento?.data || p.recebimento?.finalizadoEm || p.data || '').slice(0,10);
+    if(dr) setDataRecebimento(dr);
+    setFornecedor(p.origem==='CD'?'Centro de Distribuição (CD)':'Cozinha de Produção (CP)');
+    if((p.recebimento?.itens||[]).length===1) { const item=p.recebimento.itens[0]; setProduto(item.nome||''); setUnit(item.unit||'UND'); setQtdPedida(String(item.qtd??'')); setQtdRecebida(String(item.qtdRecebida??item.qtd??'')); }
+  };
+
+  const toggleArray = (value, setter) => setter(list=>list.includes(value)?list.filter(x=>x!==value):[...list,value]);
+  const adicionarConstatacao = () => {
+    if (!novaConstatacao.data || !novaConstatacao.descricao.trim() || nonNeg(novaConstatacao.quantidade)<=0) {
+      toast.show('Informe data, quantidade e descrição da nova constatação.'); return;
+    }
+    setConstatacoes(p=>[...p,{...novaConstatacao,id:uid(),quantidade:nonNeg(novaConstatacao.quantidade),responsavel:novaConstatacao.responsavel.trim()||resp.trim(),criadoEm:new Date().toISOString()}]);
+    setNovaConstatacao({data:todayISO(),quantidade:'',descricao:'',responsavel:resp||'',destino:'',foto:null});
+  };
+
+  const totalConstatacoes = constatacoes.reduce((s,c)=>s+nonNeg(c.quantidade),0);
+  const totalAfetado = nonNeg(qtdAfetadaInicial) + totalConstatacoes;
+  const v1 = !!(orig && unidadeOrigem && setor.trim() && data && resp.trim() && momentoIdentificacao && etapaIdentificacao);
+  const v2 = !!(produto.trim() && totalAfetado>0);
+  const v3 = !!(tipo && (tipo!=='Outro (descrever)' || tipoCustom.trim()) && desc.trim() && abrangencia && contencoes.length && riscos.length);
+  const conclusaoOk = status!=='resolvida' || !!medidaRealizada.trim();
+  const cancelamentoOk = status!=='cancelada' || !!obsAcao.trim();
+  const v4 = !!(acao && conclusaoOk && cancelamentoOk);
+  const podeRegistrar = v1 && v2 && v3 && v4;
   const semanaRegistro = rnc?.pedidoId && rnc?.semana ? rnc.semana : dateToWeek(data);
   const locked = isWeekClosed(semanaRegistro);
+  const tipoFinal = tipo==='Outro (descrever)' && tipoCustom ? tipoCustom : tipo;
 
-  const tipoFinal = tipo === 'Outro (descrever)' && tipoCustom ? tipoCustom : tipo;
-
-  const snapshot = JSON.stringify({ orig,setor,setorCustom,data,status,resp,produto,fornecedor,unit,qtd,tipo,tipoCustom,desc,acao,obsAcao,notaFiscal,lote,fabricacao,validade,temperatura,qtdPedida,qtdRecebida,qtdRecusada,gravidade,impactoFinanceiro,respostaFornecedor,medidaRealizada,fotos,assinatura });
+  const snapshot = JSON.stringify({orig,unidadeOrigem,setor,momentoIdentificacao,etapaIdentificacao,dataRecebimento,data,condicaoRecebimento,status,resp,pedidoRelacionadoId,produto,fornecedor,unit,qtdAfetadaInicial,qtdPedida,qtdRecebida,qtdUtilizada,qtdSegregada,qtdObservacao,qtdDescartadaDevolvida,notaFiscal,lote,fabricacao,validade,temperatura,tipo,tipoCustom,desc,abrangencia,contencoes,riscos,impactoOperacional,gravidade,impactoFinanceiro,acao,obsAcao,respostaFornecedor,medidaRealizada,fotos,assinatura,constatacoes});
   const guard = useDirtyGuard(snapshot);
+
   const salvar = () => {
-    if (!ensureWeekOpen(semanaRegistro, toast, 'salvar a RNC')) return;
+    if (!ensureWeekOpen(semanaRegistro,toast,'salvar a RNC')) return;
     if (!podeRegistrar) {
-      toast.show(status === 'resolvida' && !conclusaoOk ? 'Para concluir, informe a medida que foi efetivamente realizada.' : status === 'cancelada' && !cancelamentoOk ? 'Informe o motivo do cancelamento nas observações da solicitação.' : 'Preencha os campos obrigatórios');
+      toast.show(status==='resolvida'&&!conclusaoOk?'Informe a medida efetivamente realizada.':status==='cancelada'&&!cancelamentoOk?'Informe o motivo do cancelamento nos detalhes da solicitação.':'Preencha os campos obrigatórios.');
       return;
     }
-    const agora = new Date().toISOString();
-    const historicoAnterior = Array.isArray(rnc?.historicoStatus) ? rnc.historicoStatus : [];
-    const historicoStatus = (!rnc || rnc.status !== status)
-      ? [...historicoAnterior, { de:rnc?.status || null, para:status, em:agora, usuario:resp.trim() || 'Usuário local' }]
-      : (historicoAnterior.length ? historicoAnterior : [{ de:null, para:status, em:rnc?.criadoEm || agora, usuario:resp.trim() || 'Usuário local' }]);
+    const agora=new Date().toISOString();
+    const hist=Array.isArray(rnc?.historicoStatus)?rnc.historicoStatus:[];
+    const historicoStatus=(!rnc||rnc.status!==status)?[...hist,{de:rnc?.status||null,para:status,em:agora,usuario:resp.trim()||'Usuário local'}]:(hist.length?hist:[{de:null,para:status,em:rnc?.criadoEm||agora,usuario:resp.trim()||'Usuário local'}]);
     guard.clean();
     onSave({
-      ...(rnc || {}),
-      id: rnc?.id || uid(),
-      numero: rnc?.numero || genNum(orig),
-      data, semana:semanaRegistro, responsavel: resp, origem: orig, setor: (setor || '').trim(),
-      produto: produto.trim(), fornecedor: fornecedor.trim(), unidade: unit, quantidade: nonNeg(qtd),
-      qtdPedida:nonNeg(qtdPedida), qtdRecebida:nonNeg(qtdRecebida), qtdRecusada:nonNeg(qtdRecusada),
-      notaFiscal:notaFiscal.trim(), lote:lote.trim(), fabricacao, validade, temperatura:temperatura === '' ? null : parseFloat(temperatura),
-      gravidade, impactoFinanceiro:nonNeg(impactoFinanceiro),
-      tipo: tipoFinal, tipoCustom, descricao: desc.trim(),
-      acao, obsAcao: obsAcao.trim(),
-      respostaFornecedor:respostaFornecedor.trim(), medidaRealizada:medidaRealizada.trim(),
-      causaRaiz:undefined, planoAcao:undefined, responsavelAcao:undefined, prazoAcao:undefined, verificacaoEficacia:undefined,
-      status, encerradoEm:status === 'resolvida' ? (rnc?.encerradoEm || agora) : null, motivoCancelamento:status==='cancelada' ? obsAcao.trim() : '', historicoStatus,
-      fotos, assinatura,
-      criadoEm: rnc?.criadoEm || agora, atualizadoEm: agora,
+      ...(rnc||{}), id:rnc?.id||uid(), numero:rnc?.numero||genNum(orig),
+      data, dataIdentificacao:data, dataRecebimento, semana:semanaRegistro, responsavel:resp.trim(), origem:orig,
+      unidadeOrigem, setor:setor.trim(), setorIdentificacao:setor.trim(), momentoIdentificacao, etapaIdentificacao, condicaoRecebimento,
+      pedidoId:pedidoRelacionadoId||null, recebimentoId:recebimentoRelacionadoId||null, orcamentoId:orcamentoRelacionadoId||null,
+      produto:produto.trim(), fornecedor:fornecedor.trim(), unidade:unit,
+      quantidade:totalAfetado, qtdAfetadaInicial:nonNeg(qtdAfetadaInicial), qtdAfetadaConfirmada:totalAfetado,
+      qtdPedida:nonNeg(qtdPedida), qtdRecebida:nonNeg(qtdRecebida), qtdUtilizadaAntes:nonNeg(qtdUtilizada),
+      qtdSegregada:nonNeg(qtdSegregada), qtdSobObservacao:nonNeg(qtdObservacao), qtdDescartadaDevolvida:nonNeg(qtdDescartadaDevolvida), qtdRecusada:nonNeg(qtdDescartadaDevolvida),
+      notaFiscal:notaFiscal.trim(), lote:lote.trim(), fabricacao, validade, temperatura:temperatura===''?null:parseFloat(temperatura),
+      tipo:tipoFinal, tipoCustom, descricao:desc.trim(), abrangencia, contencoes, riscos, impactoOperacional:impactoOperacional.trim(),
+      gravidade, impactoFinanceiro:nonNeg(impactoFinanceiro), acao, obsAcao:obsAcao.trim(),
+      respostaFornecedor:respostaFornecedor.trim(), medidaRealizada:medidaRealizada.trim(), constatacoes,
+      status, encerradoEm:status==='resolvida'?(rnc?.encerradoEm||agora):null, motivoCancelamento:status==='cancelada'?obsAcao.trim():'', historicoStatus,
+      fotos, assinatura, criadoEm:rnc?.criadoEm||agora, atualizadoEm:agora,
     });
   };
 
-  // --- Helpers visuais ---
-  const stepHeader = (n, label) => html`<div class="row" style=${{ gap: 10, marginBottom: 14 }}>
-    <div style=${{ width: 30, height: 30, borderRadius: '50%', background: 'var(--or)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: 13, flexShrink: 0 }}>${n}</div>
-    <div style=${{ fontWeight: 800, fontSize: 16, fontFamily: "'Plus Jakarta Sans',sans-serif" }}>${label}</div>
-  </div>`;
+  const labelObrig=txt=>html`<label style=${{fontSize:11,fontWeight:700,color:'var(--s2)',textTransform:'uppercase',letterSpacing:'.06em',display:'block',marginBottom:6}}>${txt} <span style=${{color:'var(--rd)'}}>*</span></label>`;
+  const labelOpt=txt=>html`<label style=${{fontSize:11,fontWeight:700,color:'var(--s2)',textTransform:'uppercase',letterSpacing:'.06em',display:'block',marginBottom:6}}>${txt}</label>`;
+  const stepHeader=(n,label)=>html`<div class="row" style=${{gap:10,marginBottom:14}}><div style=${{width:30,height:30,borderRadius:'50%',background:'var(--or)',color:'#fff',display:'flex',alignItems:'center',justifyContent:'center',fontWeight:800,fontSize:13}}>${n}</div><div style=${{fontWeight:800,fontSize:16,fontFamily:"'Plus Jakarta Sans',sans-serif"}}>${label}</div></div>`;
+  const chip=(text,active,onClick)=>html`<button type="button" onClick=${onClick} style=${{padding:'8px 12px',borderRadius:20,border:`1.5px solid ${active?'var(--or)':'var(--bd)'}`,background:active?'var(--or3)':'#fff',fontWeight:700,fontSize:12,cursor:'pointer',color:active?'var(--or2)':'var(--ink)'}}>${text}</button>`;
+  const stStat=ST_RNC[status]||{l:status,c:'bgy'};
+  const stepData=[{n:1,l:'Contexto',ok:v1},{n:2,l:'Produto',ok:v2},{n:3,l:'Ocorrência',ok:v3},{n:4,l:'Ação',ok:v4},{n:5,l:'Evidências',ok:true}];
 
-  const labelObrig = (txt) => html`<label style=${{ fontSize: 11, fontWeight: 700, color: 'var(--s2)', textTransform: 'uppercase', letterSpacing: '.06em', display: 'block', marginBottom: 6 }}>${txt} <span style=${{ color: 'var(--rd)' }}>*</span></label>`;
-  const labelOpt = (txt) => html`<label style=${{ fontSize: 11, fontWeight: 700, color: 'var(--s2)', textTransform: 'uppercase', letterSpacing: '.06em', display: 'block', marginBottom: 6 }}>${txt}</label>`;
-
-  const stStat = ST_RNC[status] || { l: status, c: 'bgy' };
-
-  return html`<div style=${{ maxWidth: 'none', margin: '0 auto' }}>
-    <div class="stk" style=${{ padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 12 }}>
-      <button class="btn bg0 bic" onClick=${() => guard.leave(onBack)}><${Ic} n="left" s=${20}/></button>
-      <div style=${{ flex: 1, minWidth: 0 }}>
-        <div class="row" style=${{ gap: 6, marginBottom: 2 }}>
-          <span class=${`badge ${stStat.c}`}>${stStat.l}</span>
-          ${orig && html`<span class="badge bor">${orig}</span>`}
-        </div>
-        <div style=${{ fontWeight: 800, fontSize: 15, fontFamily: "'Plus Jakarta Sans',sans-serif" }}>${isEdit ? rnc.numero : 'Nova RNC'}</div>
-        <div style=${{ fontSize: 11, color: 'var(--s2)' }}>Registro de Não Conformidade</div>
-      </div>
-      ${isEdit && !locked && html`<button class="btn bg0 bic" style=${{ color: 'var(--rd)' }} onClick=${() => { if (strongConfirm('Excluir registro')) onDelete(rnc.id); }}><${Ic} n="trash" s=${18}/></button>`}
+  return html`<div style=${{maxWidth:'none',margin:'0 auto'}}>
+    <div class="stk" style=${{padding:'12px 16px',display:'flex',alignItems:'center',gap:12}}>
+      <button class="btn bg0 bic" onClick=${()=>guard.leave(onBack)}><${Ic} n="left" s=${20}/></button>
+      <div style=${{flex:1,minWidth:0}}><div class="row" style=${{gap:6,marginBottom:2}}><span class=${`badge ${stStat.c}`}>${stStat.l}</span><span class="badge bor">${orig}</span>${unidadeOrigem&&html`<span class="badge bgy">${unidadeOrigem}</span>`}</div><div style=${{fontWeight:800,fontSize:15}}>${isEdit?rnc.numero:'Nova RNC'}</div><div style=${{fontSize:11,color:'var(--s2)'}}>Registro de Não Conformidade</div></div>
+      ${isEdit&&!locked&&html`<button class="btn bg0 bic" style=${{color:'var(--rd)'}} onClick=${()=>{if(strongConfirm('Excluir registro'))onDelete(rnc.id)}}><${Ic} n="trash" s=${18}/></button>`}
     </div>
+    ${locked&&html`<div class="nx-lock-note">Esta semana está fechada. A RNC está em modo somente leitura.</div>`}
+    <div style=${{padding:'10px 12px 3px',background:'#fff',borderBottom:'1px solid var(--bd)',overflowX:'auto'}}><div class="row" style=${{gap:2,minWidth:520}}>${stepData.map(s=>html`<button key=${s.n} onClick=${()=>setStep(s.n)} style=${{flex:1,padding:'6px 3px',background:'none',border:'none',cursor:'pointer',borderBottom:`3px solid ${step===s.n?'var(--or)':'transparent'}`,opacity:step===s.n?1:.58}}><div style=${{width:18,height:18,borderRadius:'50%',background:s.ok?'var(--gr)':(step===s.n?'var(--or)':'var(--bd)'),color:'#fff',display:'flex',alignItems:'center',justifyContent:'center',fontSize:10,fontWeight:800,margin:'0 auto 2px'}}>${s.ok?'✓':s.n}</div><div style=${{fontSize:10,fontWeight:700}}>${s.l}</div></button>`)}</div></div>
 
-    ${locked && html`<div class="nx-lock-note">Esta semana está fechada. A RNC está em modo somente leitura.</div>`}
-
-    <!-- Stepper visual -->
-    <div style=${{ padding: '12px 16px 4px', background: '#fff', borderBottom: '1px solid var(--bd)' }}>
-      <div class="row" style=${{ gap: 4, justifyContent: 'space-between' }}>
-        ${[
-          { n: 1, l: 'Identificação', ok: v1 },
-          { n: 2, l: 'Ocorrência', ok: v2 },
-          { n: 3, l: 'Ação', ok: v3 },
-          { n: 4, l: 'Evidências', ok: true },
-        ].map(s => html`<button key=${s.n} onClick=${() => setStep(s.n)} style=${{
-          flex: 1, padding: '6px 4px', background: 'none', border: 'none', cursor: 'pointer',
-          borderBottom: `3px solid ${step === s.n ? 'var(--or)' : 'transparent'}`,
-          opacity: step === s.n ? 1 : .55,
-        }}>
-          <div class="row" style=${{ gap: 4, justifyContent: 'center', marginBottom: 2 }}>
-            <div style=${{ width: 18, height: 18, borderRadius: '50%', background: s.ok ? 'var(--gr)' : (step === s.n ? 'var(--or)' : 'var(--bd)'), color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 800 }}>${s.ok ? '✓' : s.n}</div>
-          </div>
-          <div style=${{ fontSize: 10, fontWeight: 700, color: step === s.n ? 'var(--ink)' : 'var(--s2)' }}>${s.l}</div>
-        </button>`)}
-      </div>
-    </div>
-
-    <fieldset disabled=${locked} class="page" style=${{ paddingBottom:140, border:'none', minWidth:0, pointerEvents:locked?'none':'auto', opacity:locked?.82:1 }}>
-
-      ${step === 1 && html`<div>
-        ${stepHeader(1, 'Identificação do registro')}
-
-        <div class="card" style=${{ padding: 16, marginBottom: 12 }}>
-          ${labelObrig('Origem do produto')}
-          <div style=${{ fontSize: 11, color: 'var(--s2)', margin: '-2px 0 8px' }}>De onde o produto é. Define o código da RNC (RNC-CD ou RNC-CP).</div>
-          <div style=${{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 16 }}>
-            ${['CD','CP'].map(o => html`<button key=${o} onClick=${() => setOrig(o)} style=${{
-              padding: '12px', borderRadius: 10,
-              border: `2px solid ${orig === o ? 'var(--or)' : 'var(--bd)'}`,
-              background: orig === o ? 'var(--or3)' : '#fff',
-              fontWeight: 800, fontSize: 13, cursor: 'pointer',
-              color: orig === o ? 'var(--or2)' : 'var(--ink)',
-              display: 'flex', flexDirection: 'column', gap: 2, alignItems: 'flex-start',
-            }}>
-              <span>${o}</span>
-              <span style=${{ fontSize: 10, fontWeight: 500, color: 'var(--s2)' }}>${o === 'CD' ? 'Centro de Distribuição' : 'Cozinha de Produção'}</span>
-            </button>`)}
-          </div>
-
-          ${labelOpt('Setor de origem')}
-          <div style=${{ fontSize: 11, color: 'var(--s2)', margin: '-2px 0 8px' }}>Onde a não conformidade foi identificada. Escolha ou escreva.</div>
-          <div style=${{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 8 }}>
-            ${['CD','CP','Outro'].map(s => {
-              const active = s === 'Outro' ? setorCustom : (!setorCustom && setor === s);
-              return html`<button key=${s} onClick=${() => {
-                if (s === 'Outro') {
-                  setSetorCustom(true);
-                  if (['CD','CP'].includes(setor)) setSetor('');
-                } else {
-                  setSetorCustom(false);
-                  setSetor(s);
-                }
-              }} style=${{
-                padding: '9px 16px', borderRadius: 20,
-                border: `1.5px solid ${active ? 'var(--or)' : 'var(--bd)'}`,
-                background: active ? 'var(--or3)' : '#fff',
-                fontWeight: 700, fontSize: 13, cursor: 'pointer',
-                color: active ? 'var(--or2)' : 'var(--ink)',
-              }}>${s}</button>`;
-            })}
-          </div>
-          ${setorCustom && html`<input class="inp" value=${setor} onInput=${e => setSetor(e.target.value)} placeholder="Digite o setor (ex: Recebimento, Salão, Câmara fria...)" style=${{ marginBottom: 4 }}/>`}
-
-          <div style=${{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 12 }}>
-            <div>${labelObrig('Data da ocorrência')}<input type="date" class="inp" value=${data} onInput=${e => setData(e.target.value)}/></div>
-            <div>${labelObrig('Status')}<select class="inp" value=${status} onChange=${e => setStatus(e.target.value)}>${STATUS_OPTS.map(s => html`<option key=${s.v} value=${s.v}>${s.l}</option>`)}</select></div>
-          </div>
-          <div style=${{ fontSize: 11, color: 'var(--s2)', marginTop: 6 }}>${STATUS_OPTS.find(s => s.v === status)?.desc || ''}</div>
-        </div>
-
-        <div class="card" style=${{ padding: 16, marginBottom: 12 }}>
-          <div style=${{fontWeight:800,fontSize:14,marginBottom:12}}>Rastreabilidade do produto</div>
-          <div style=${{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,marginBottom:10}}>
-            <div>${labelOpt('Nota fiscal')}<input class="inp" value=${notaFiscal} onInput=${e=>setNotaFiscal(e.target.value)} placeholder="Número da NF"/></div>
-            <div>${labelOpt('Lote')}<input class="inp" value=${lote} onInput=${e=>setLote(e.target.value)} placeholder="Lote do produto"/></div>
-            <div>${labelOpt('Fabricação')}<input type="date" class="inp" value=${fabricacao} onInput=${e=>setFabricacao(e.target.value)}/></div>
-            <div>${labelOpt('Validade')}<input type="date" class="inp" value=${validade} onInput=${e=>setValidade(e.target.value)}/></div>
-          </div>
-          ${labelOpt('Temperatura no recebimento (°C)')}<input type="number" step="0.1" class="inp" value=${temperatura} onInput=${e=>setTemperatura(e.target.value)} placeholder="Ex: -12,5"/>
-          ${(rnc?.pedidoId || rnc?.recebimentoId || rnc?.orcamentoId) && html`<div style=${{fontSize:11,color:'var(--s2)',marginTop:10}}>Vínculos: Pedido ${rnc?.pedidoId || '—'} · Recebimento ${rnc?.recebimentoId || '—'} · Orçamento ${rnc?.orcamentoId || '—'}</div>`}
-        </div>
-
-        <div class="card" style=${{ padding: 16, marginBottom: 12 }}>
-          ${labelObrig('Responsável pelo registro')}
-          <input class="inp" value=${resp} onInput=${e => setResp(e.target.value)} placeholder="Nome completo"/>
-          <div style=${{ fontSize: 11, color: 'var(--s2)', marginTop: 6 }}>Quem identificou a não conformidade e está registrando este documento.</div>
+    <fieldset disabled=${locked} class="page" style=${{paddingBottom:140,border:'none',minWidth:0,pointerEvents:locked?'none':'auto',opacity:locked?.82:1}}>
+      ${step===1&&html`<div>${stepHeader(1,'Contexto da identificação')}
+        <div class="card" style=${{padding:16,marginBottom:12}}>
+          ${labelOpt('Vincular a um recebimento anterior')}
+          <select class="inp" value=${pedidoRelacionadoId} onChange=${e=>selecionarRecebimento(e.target.value)} style=${{marginBottom:12}}><option value="">Sem vínculo / abertura manual</option>${recebimentosDisponiveis.map(p=>html`<option key=${p.id} value=${p.id}>${fDate(p.recebimento?.finalizadoEm||p.recebimento?.data)} · ${p.origem} · ${wLbl(p.semana)} · ${(p.recebimento?.itens||[]).length} item(ns)</option>`)}</select>
+          <div style=${{fontSize:11,color:'var(--s2)',margin:'-6px 0 14px'}}>O vínculo é opcional e preenche automaticamente parte da rastreabilidade.</div>
+          ${labelObrig('Origem do produto')}<div style=${{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginBottom:14}}>${['CD','CP'].map(o=>html`<button type="button" key=${o} onClick=${()=>setOrig(o)} style=${{padding:12,borderRadius:10,border:`2px solid ${orig===o?'var(--or)':'var(--bd)'}`,background:orig===o?'var(--or3)':'#fff',fontWeight:800,cursor:'pointer',textAlign:'left'}}>${o}<div style=${{fontSize:10,fontWeight:500,color:'var(--s2)',marginTop:2}}>${o==='CD'?'Centro de Distribuição':'Cozinha de Produção'}</div></button>`)}</div>
+          <div style=${{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,marginBottom:12}}><div>${labelObrig('Unidade de origem')}<select class="inp" value=${unidadeOrigem} onChange=${e=>setUnidadeOrigem(e.target.value)}><option value="">Selecione</option>${unidades.map(u=>html`<option key=${u.id} value=${u.nome}>${u.nome}</option>`)}</select></div><div>${labelObrig('Setor que identificou')}<input class="inp" value=${setor} onInput=${e=>setSetor(e.target.value)} placeholder="Ex.: Cozinha, estoque, bar..."/></div></div>
+          <div style=${{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,marginBottom:12}}><div>${labelObrig('Momento da identificação')}<select class="inp" value=${momentoIdentificacao} onChange=${e=>setMomentoIdentificacao(e.target.value)}>${MOMENTOS.map(x=>html`<option>${x}</option>`)}</select></div><div>${labelObrig('Etapa da identificação')}<select class="inp" value=${etapaIdentificacao} onChange=${e=>setEtapaIdentificacao(e.target.value)}>${ETAPAS.map(x=>html`<option>${x}</option>`)}</select></div></div>
+          <div style=${{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,marginBottom:12}}><div>${labelOpt('Data do recebimento')}<input type="date" class="inp" value=${dataRecebimento} onInput=${e=>setDataRecebimento(e.target.value)}/></div><div>${labelObrig('Data da identificação')}<input type="date" class="inp" value=${data} onInput=${e=>setData(e.target.value)}/></div></div>
+          ${labelObrig('Condição aparente no recebimento')}<select class="inp" value=${condicaoRecebimento} onChange=${e=>setCondicaoRecebimento(e.target.value)} style=${{marginBottom:12}}>${['Sem anormalidade aparente','Problema já identificado no recebimento','Não foi possível avaliar no recebimento','Não se aplica'].map(x=>html`<option>${x}</option>`)}</select>
+          <div style=${{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}><div>${labelObrig('Responsável pelo registro')}<input class="inp" value=${resp} onInput=${e=>setResp(e.target.value)} placeholder="Nome completo"/></div><div>${labelObrig('Status')}<select class="inp" value=${status} onChange=${e=>setStatus(e.target.value)}>${STATUS_OPTS.map(s=>html`<option value=${s.v}>${s.l}</option>`)}</select></div></div><div style=${{fontSize:11,color:'var(--s2)',marginTop:6}}>${STATUS_OPTS.find(s=>s.v===status)?.desc} A data de abertura é registrada automaticamente pelo NEXUS.</div>
         </div>
       </div>`}
 
-      ${step === 2 && html`<div>
-        ${stepHeader(2, 'Detalhes da ocorrência')}
-
-        <div class="card" style=${{ padding: 16, marginBottom: 12 }}>
-          ${labelObrig('Produto')}
-          <input
-            class="inp"
-            list="rnc-produtos"
-            value=${produto}
-            onInput=${e => setProduto(e.target.value)}
-            placeholder="Selecione ou digite o nome do produto"
-            style=${{ marginBottom: 12 }}
-          />
-          <datalist id="rnc-produtos">
-            ${itemsOrig.map(i => html`<option key=${i.name} value=${i.name}/>`)}
-          </datalist>
-
-          <div style=${{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: 10, marginBottom: 12 }}>
-            <div>${labelObrig('Quantidade afetada')}<input type="number" min="0" step="any" class="inp" value=${qtd} onInput=${e => setQtd(e.target.value)} placeholder="0"/></div>
-            <div>${labelObrig('Unidade')}<select class="inp" value=${unit} onChange=${e => setUnit(e.target.value)}>${['UND','KG','G','L','ML','PCT','CX','PCS'].map(u => html`<option key=${u} value=${u}>${u}</option>`)}</select></div>
-          </div>
-          <div style=${{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:8,marginBottom:12}}>
-            <div>${labelOpt('Qtd. pedida')}<input type="number" min="0" step="any" class="inp" value=${qtdPedida} onInput=${e=>setQtdPedida(e.target.value)}/></div>
-            <div>${labelOpt('Qtd. recebida')}<input type="number" min="0" step="any" class="inp" value=${qtdRecebida} onInput=${e=>setQtdRecebida(e.target.value)}/></div>
-            <div>${labelOpt('Qtd. recusada')}<input type="number" min="0" step="any" class="inp" value=${qtdRecusada} onInput=${e=>setQtdRecusada(e.target.value)}/></div>
-          </div>
-          <div style=${{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,marginBottom:12}}>
-            <div>${labelObrig('Gravidade')}<select class="inp" value=${gravidade} onChange=${e=>setGravidade(e.target.value)}>${['Baixa','Média','Alta','Crítica'].map(g=>html`<option key=${g}>${g}</option>`)}</select></div>
-            <div>${labelOpt('Impacto financeiro (R$)')}<input type="number" min="0" step="0.01" class="inp" value=${impactoFinanceiro} onInput=${e=>setImpactoFinanceiro(e.target.value)} placeholder="0,00"/></div>
-          </div>
-
-          ${labelOpt('Fornecedor')}
-          <div style=${{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 8 }}>
-            ${[['CD','Centro de Distribuição (CD)'],['CP','Cozinha de Produção (CP)']].map(([k,full]) => html`<button key=${k} onClick=${() => setFornecedor(fornecedor === full ? '' : full)} style=${{
-              padding: '8px 14px', borderRadius: 20,
-              border: `1.5px solid ${fornecedor === full ? 'var(--or)' : 'var(--bd)'}`,
-              background: fornecedor === full ? 'var(--or3)' : '#fff',
-              fontWeight: 700, fontSize: 12, cursor: 'pointer',
-              color: fornecedor === full ? 'var(--or2)' : 'var(--ink)',
-            }}>${k}</button>`)}
-          </div>
-          <input class="inp" value=${fornecedor} onInput=${e => setFornecedor(e.target.value)} placeholder="Nome do fornecedor (opcional) — ou use CD/CP acima"/>
+      ${step===2&&html`<div>${stepHeader(2,'Produto, lote e quantidades')}
+        <div class="card" style=${{padding:16,marginBottom:12}}>
+          ${labelObrig('Produto')}<input class="inp" list="rnc-produtos" value=${produto} onInput=${e=>aplicarProdutoRelacionado(e.target.value)} placeholder="Selecione ou digite o produto" style=${{marginBottom:12}}/><datalist id="rnc-produtos">${produtosDisponiveis.map(i=>html`<option value=${i.name}/>` )}</datalist>
+          ${labelOpt('Fornecedor')}<input class="inp" value=${fornecedor} onInput=${e=>setFornecedor(e.target.value)} placeholder="Centro de Distribuição, Cozinha de Produção ou outro" style=${{marginBottom:12}}/>
+          <div style=${{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:8,marginBottom:12}}><div>${labelObrig('Afetada inicialmente')}<input type="number" min="0" step="any" class="inp" value=${qtdAfetadaInicial} onInput=${e=>setQtdAfetadaInicial(e.target.value)}/></div><div>${labelObrig('Unidade')}<select class="inp" value=${unit} onChange=${e=>setUnit(e.target.value)}>${['UND','KG','G','L','ML','PCT','CX','PCS'].map(u=>html`<option>${u}</option>`)}</select></div><div><label style=${{fontSize:11,fontWeight:700,color:'var(--s2)',textTransform:'uppercase',display:'block',marginBottom:6}}>Total confirmado</label><div class="inp" style=${{background:'var(--or3)',fontWeight:800,color:'var(--or2)'}}>${totalAfetado} ${unit}</div></div></div>
+          <div style=${{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:8,marginBottom:12}}><div>${labelOpt('Recebida')}<input type="number" min="0" step="any" class="inp" value=${qtdRecebida} onInput=${e=>setQtdRecebida(e.target.value)}/></div><div>${labelOpt('Utilizada antes')}<input type="number" min="0" step="any" class="inp" value=${qtdUtilizada} onInput=${e=>setQtdUtilizada(e.target.value)}/></div><div>${labelOpt('Segregada')}<input type="number" min="0" step="any" class="inp" value=${qtdSegregada} onInput=${e=>setQtdSegregada(e.target.value)}/></div><div>${labelOpt('Sob observação')}<input type="number" min="0" step="any" class="inp" value=${qtdObservacao} onInput=${e=>setQtdObservacao(e.target.value)}/></div><div>${labelOpt('Descartada/devolvida')}<input type="number" min="0" step="any" class="inp" value=${qtdDescartadaDevolvida} onInput=${e=>setQtdDescartadaDevolvida(e.target.value)}/></div><div>${labelOpt('Pedida')}<input type="number" min="0" step="any" class="inp" value=${qtdPedida} onInput=${e=>setQtdPedida(e.target.value)}/></div></div>
         </div>
-
-        <div class="card" style=${{ padding: 16, marginBottom: 12 }}>
-          ${labelObrig('Tipo de não conformidade')}
-          <div style=${{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 12 }}>
-            ${TIPOS.map(t => html`<button key=${t.v} onClick=${() => setTipo(t.v)} style=${{
-              padding: '12px 14px', borderRadius: 10,
-              border: `1.5px solid ${tipo === t.v ? 'var(--or)' : 'var(--bd)'}`,
-              background: tipo === t.v ? 'var(--or3)' : '#fff',
-              textAlign: 'left', fontSize: 13,
-              fontWeight: tipo === t.v ? 700 : 500,
-              color: tipo === t.v ? 'var(--or2)' : 'var(--ink)',
-              cursor: 'pointer',
-              display: 'flex', alignItems: 'center', gap: 10,
-            }}>
-              <${Ic} n=${t.ic} s=${16}/>
-              <span style=${{ flex: 1 }}>${t.v}</span>
-              ${tipo === t.v && html`<${Ic} n="chk" s=${16}/>`}
-            </button>`)}
-          </div>
-          ${tipo === 'Outro (descrever)' && html`<input class="inp" value=${tipoCustom} onInput=${e => setTipoCustom(e.target.value)} placeholder="Descreva brevemente o tipo do problema..." style=${{ marginBottom: 12 }}/>`}
-
-          ${labelObrig('Descrição')}
-          <textarea class="inp" value=${desc} onInput=${e => setDesc(e.target.value)} rows="4" placeholder="Descreva o que foi identificado: o que estava errado, quando notou, em que estado o produto chegou, etc."/>
-          <div style=${{ fontSize: 11, color: 'var(--s2)', marginTop: 6 }}>Quanto mais detalhado, mais útil para a gestão e o fornecedor.</div>
-        </div>
+        <div class="card" style=${{padding:16,marginBottom:12}}><div style=${{fontWeight:800,fontSize:14,marginBottom:12}}>Rastreabilidade</div><div style=${{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,marginBottom:10}}><div>${labelOpt('Nota fiscal')}<input class="inp" value=${notaFiscal} onInput=${e=>setNotaFiscal(e.target.value)}/></div><div>${labelOpt('Lote')}<input class="inp" value=${lote} onInput=${e=>setLote(e.target.value)}/></div><div>${labelOpt('Fabricação')}<input type="date" class="inp" value=${fabricacao} onInput=${e=>setFabricacao(e.target.value)}/></div><div>${labelOpt('Validade')}<input type="date" class="inp" value=${validade} onInput=${e=>setValidade(e.target.value)}/></div></div>${labelOpt('Temperatura no recebimento (°C)')}<input type="number" step="0.1" class="inp" value=${temperatura} onInput=${e=>setTemperatura(e.target.value)}/></div>
       </div>`}
 
-      ${step === 3 && html`<div>
-        ${stepHeader(3, 'Providência e acompanhamento')}
-
-        <div class="card" style=${{ padding: 16, marginBottom: 12 }}>
-          ${labelObrig('Providência solicitada ao fornecedor')}
-          <div style=${{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 12 }}>
-            ${ACOES.map(a => html`<button key=${a.v} onClick=${() => setAcao(a.v)} style=${{
-              padding: '12px 14px', borderRadius: 10,
-              border: `1.5px solid ${acao === a.v ? 'var(--or)' : 'var(--bd)'}`,
-              background: acao === a.v ? 'var(--or3)' : '#fff',
-              textAlign: 'left', cursor: 'pointer',
-              display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 2,
-            }}>
-              <span style=${{ fontWeight: acao === a.v ? 800 : 700, fontSize: 13, color: acao === a.v ? 'var(--or2)' : 'var(--ink)' }}>${a.v}</span>
-              <span style=${{ fontSize: 11, color: 'var(--s2)' }}>${a.desc}</span>
-            </button>`)}
-          </div>
-
-          ${labelOpt('Detalhes da solicitação')}
-          <textarea class="inp" value=${obsAcao} onInput=${e => setObsAcao(e.target.value)} rows="3" placeholder="Ex.: substituir até determinada data, retirar o produto, lançar crédito ou apenas registrar a ocorrência."/>
-        </div>
-
-        <div class="card" style=${{ padding: 16, marginBottom: 12 }}>
-          <div style=${{fontWeight:800,fontSize:14,marginBottom:4}}>Acompanhamento interno do Ilha</div>
-          <div style=${{fontSize:11,color:'var(--s2)',marginBottom:14}}>Registre apenas o retorno recebido pelo WhatsApp e o que foi efetivamente cumprido. O plano de ação interno do fornecedor não faz parte do NEXUS.</div>
-          ${labelOpt('Retorno do fornecedor')}
-          <textarea class="inp" value=${respostaFornecedor} onInput=${e=>setRespostaFornecedor(e.target.value)} rows="3" placeholder="Ex.: A troca será efetuada; o valor será abonado porque não há estoque; ainda não houve retorno." style=${{marginBottom:12}}/>
-          ${status === 'resolvida' ? labelObrig('Medida efetivamente realizada') : labelOpt('Medida efetivamente realizada')}
-          <textarea class="inp" value=${medidaRealizada} onInput=${e=>setMedidaRealizada(e.target.value)} rows="3" placeholder="Preencha quando a providência for concluída. Ex.: 200 unidades substituídas; crédito lançado na NF; produto recolhido."/>
-          ${status !== 'resolvida' && html`<div style=${{fontSize:11,color:'var(--s2)',marginTop:6}}>Enquanto a troca, o crédito ou a correção não forem efetivados, mantenha a RNC aberta ou em acompanhamento.</div>`}
-        </div>
+      ${step===3&&html`<div>${stepHeader(3,'Ocorrência, abrangência e contenção')}
+        <div class="card" style=${{padding:16,marginBottom:12}}>${labelObrig('Tipo de não conformidade')}<div style=${{display:'flex',flexWrap:'wrap',gap:7,marginBottom:12}}>${TIPOS.map(t=>chip(t,tipo===t,()=>setTipo(t)))}</div>${tipo==='Outro (descrever)'&&html`<input class="inp" value=${tipoCustom} onInput=${e=>setTipoCustom(e.target.value)} placeholder="Descreva o tipo" style=${{marginBottom:12}}/>`}${labelObrig('Descrição')}<textarea class="inp" rows="4" value=${desc} onInput=${e=>setDesc(e.target.value)} placeholder="Explique como o problema foi percebido e em quais condições."/></div>
+        <div class="card" style=${{padding:16,marginBottom:12}}>${labelObrig('Abrangência identificada')}<select class="inp" value=${abrangencia} onChange=${e=>setAbrangencia(e.target.value)} style=${{marginBottom:14}}>${ABRANGENCIAS.map(x=>html`<option>${x}</option>`)}</select>${labelObrig('Contenção realizada pelo Ilha')}<div style=${{display:'flex',flexWrap:'wrap',gap:7,marginBottom:14}}>${CONTENCOES.map(x=>chip(x,contencoes.includes(x),()=>toggleArray(x,setContencoes)))}</div>${labelObrig('Risco da ocorrência')}<div style=${{display:'flex',flexWrap:'wrap',gap:7,marginBottom:14}}>${RISCOS.map(x=>chip(x,riscos.includes(x),()=>toggleArray(x,setRiscos)))}</div>${labelOpt('Impacto operacional')}<textarea class="inp" rows="3" value=${impactoOperacional} onInput=${e=>setImpactoOperacional(e.target.value)} placeholder="Ex.: produção suspensa, item indisponível ou sem impacto no atendimento."/></div>
+        <div class="card" style=${{padding:16,marginBottom:12}}><div style=${{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}><div>${labelObrig('Gravidade')}<select class="inp" value=${gravidade} onChange=${e=>setGravidade(e.target.value)}>${['Baixa','Média','Alta','Crítica'].map(g=>html`<option>${g}</option>`)}</select></div><div>${labelOpt('Impacto financeiro (R$)')}<input type="number" min="0" step="0.01" class="inp" value=${impactoFinanceiro} onInput=${e=>setImpactoFinanceiro(e.target.value)}/></div></div></div>
       </div>`}
 
-      ${step === 4 && html`<div>
-        ${stepHeader(4, 'Evidências e assinatura')}
-
-        <div class="card" style=${{ padding: 16, marginBottom: 12 }}>
-          <div class="row" style=${{ justifyContent: 'space-between', marginBottom: 12 }}>
-            <div>
-              <div style=${{ fontSize: 13, fontWeight: 700, color: 'var(--ink)' }}>Fotos da ocorrência</div>
-              <div style=${{ fontSize: 11, color: 'var(--s2)', marginTop: 2 }}>${fotos.length}/3 ${fotos.length === 1 ? 'evidência anexada' : 'evidências anexadas'}</div>
-            </div>
-            <button class="btn bs bsm" disabled=${fotos.length >= 3} onClick=${() => fotoRef.current?.click()}><${Ic} n="img" s=${14}/>Adicionar</button>
-          </div>
-          <input ref=${fotoRef} type="file" accept="image/*" capture="environment" style=${{ display: 'none' }} onChange=${e => { addFoto(e.target.files[0]); e.target.value = ''; }}/>
-          ${fotos.length === 0
-            ? html`<div style=${{ padding: '24px 12px', textAlign: 'center', border: '1.5px dashed var(--bd)', borderRadius: 10, color: 'var(--s2)' }}>
-                <${Ic} n="img" s=${28} style=${{ color: 'var(--s3)' }}/>
-                <div style=${{ fontSize: 12, marginTop: 6 }}>Anexe fotos do produto, da embalagem ou do prazo de validade</div>
-              </div>`
-            : html`<div style=${{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 8 }}>${fotos.map((f, i) => html`<div key=${i} style=${{ position: 'relative', aspectRatio: '1', borderRadius: 10, overflow: 'hidden', border: '1px solid var(--bd)' }}>
-                <img src=${f} style=${{ width: '100%', height: '100%', objectFit: 'cover' }}/>
-                <div style=${{ position: 'absolute', top: 4, left: 4, background: 'rgba(0,0,0,.65)', color: '#fff', borderRadius: 6, padding: '2px 6px', fontSize: 10, fontWeight: 700 }}>#${i+1}</div>
-                <button onClick=${() => setFotos(p => p.filter((_, j) => j !== i))} style=${{ position: 'absolute', top: 4, right: 4, background: 'rgba(0,0,0,.7)', border: 'none', borderRadius: '50%', width: 24, height: 24, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#fff' }}><${Ic} n="x" s=${12}/></button>
-              </div>`)}</div>`
-          }
-        </div>
-
-        <div class="card" style=${{ padding: 16, marginBottom: 12 }}>
-          <div style=${{ fontSize: 13, fontWeight: 700, color: 'var(--ink)', marginBottom: 2 }}>Assinatura do responsável</div>
-          <div style=${{ fontSize: 11, color: 'var(--s2)', marginBottom: 12 }}>Opcional — confere autenticidade ao registro impresso.</div>
-          <${SignaturePad} value=${assinatura} onChange=${setAssinatura}/>
-        </div>
-
-        ${isEdit && Array.isArray(rnc?.historicoStatus) && rnc.historicoStatus.length > 0 && html`<div class="card" style=${{padding:16,marginBottom:12}}><div style=${{fontSize:13,fontWeight:800,marginBottom:10}}>Histórico de status</div><div style=${{display:'flex',flexDirection:'column',gap:8}}>${[...rnc.historicoStatus].reverse().map((h,i)=>html`<div key=${i} style=${{display:'grid',gridTemplateColumns:'140px 1fr',gap:10,fontSize:12,borderTop:i?'1px solid var(--bd)':'none',paddingTop:i?8:0}}><span style=${{color:'var(--s2)'}}>${fDateTime(h.em)}</span><span><strong>${h.de ? (ST_RNC[h.de]?.l || h.de) : 'Criação'}</strong> → <strong>${ST_RNC[h.para]?.l || h.para}</strong><br/><small style=${{color:'var(--s3)'}}>${h.usuario || 'Usuário local'}</small></span></div>`)}</div></div>`}
-
-        <!-- Resumo final -->
-        <div class="card" style=${{ padding: 16, marginBottom: 12, background: 'var(--or3)', border: '1.5px solid var(--or)' }}>
-          <div style=${{ fontSize: 11, fontWeight: 800, color: 'var(--or2)', textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: 10 }}>Resumo do registro</div>
-          ${[
-            ['Número', rnc?.numero || '(será gerado ao salvar)'],
-            ['Origem', orig],
-            ['Data', fDate(data)],
-            ['Responsável', resp || '—'],
-            ['Produto', produto || '—'],
-            ['Quantidade', qtd ? `${qtd} ${unit}` : '—'],
-            ['Gravidade', gravidade],
-            ['NF / Lote', [notaFiscal,lote].filter(Boolean).join(' / ') || '—'],
-            ['Tipo', tipoFinal || '—'],
-            ['Providência solicitada', acao || '—'],
-            ['Evidências', `${fotos.length} foto(s)${assinatura ? ' · assinado' : ''}`],
-          ].map(([k, v]) => html`<div key=${k} class="row" style=${{ padding: '6px 0', borderBottom: '1px dashed rgba(201, 120, 0, .25)', fontSize: 12 }}>
-            <span style=${{ fontWeight: 700, color: 'var(--s2)', minWidth: 110 }}>${k}</span>
-            <span style=${{ color: 'var(--ink)', fontWeight: 500, textAlign: 'right', flex: 1 }}>${v}</span>
-          </div>`)}
-        </div>
+      ${step===4&&html`<div>${stepHeader(4,'Providência e acompanhamento')}
+        <div class="card" style=${{padding:16,marginBottom:12}}>${labelObrig('Providência solicitada ao fornecedor')}<div style=${{display:'flex',flexDirection:'column',gap:8,marginBottom:12}}>${ACOES.map(a=>html`<button type="button" onClick=${()=>setAcao(a.v)} style=${{padding:'11px 13px',borderRadius:10,border:`1.5px solid ${acao===a.v?'var(--or)':'var(--bd)'}`,background:acao===a.v?'var(--or3)':'#fff',textAlign:'left',cursor:'pointer'}}><strong>${a.v}</strong><div style=${{fontSize:11,color:'var(--s2)',marginTop:2}}>${a.desc}</div></button>`)}</div>${labelOpt('Detalhes da solicitação')}<textarea class="inp" rows="3" value=${obsAcao} onInput=${e=>setObsAcao(e.target.value)} placeholder="Prazo desejado, quantidade a substituir, crédito ou recolhimento."/></div>
+        <div class="card" style=${{padding:16,marginBottom:12}}><div style=${{fontWeight:800,fontSize:14,marginBottom:4}}>Acompanhamento interno do Ilha</div><div style=${{fontSize:11,color:'var(--s2)',marginBottom:14}}>Registre apenas o retorno recebido pelo WhatsApp e o que foi efetivamente cumprido.</div>${labelOpt('Retorno do fornecedor')}<textarea class="inp" rows="3" value=${respostaFornecedor} onInput=${e=>setRespostaFornecedor(e.target.value)} placeholder="Ex.: troca será efetuada; valor será abonado; ainda não houve retorno." style=${{marginBottom:12}}/>${status==='resolvida'?labelObrig('Medida efetivamente realizada'):labelOpt('Medida efetivamente realizada')}<textarea class="inp" rows="3" value=${medidaRealizada} onInput=${e=>setMedidaRealizada(e.target.value)} placeholder="Ex.: unidades substituídas, crédito lançado ou produto recolhido."/></div>
       </div>`}
 
+      ${step===5&&html`<div>${stepHeader(5,'Novas constatações e evidências')}
+        <div class="card" style=${{padding:16,marginBottom:12}}><div class="row" style=${{justifyContent:'space-between',marginBottom:10}}><div><div style=${{fontWeight:800,fontSize:14}}>Evolução da ocorrência</div><div style=${{fontSize:11,color:'var(--s2)',marginTop:2}}>Adicione novas embalagens ou unidades afetadas sem abrir outra RNC.</div></div><span class="badge bor">${constatacoes.length} atualização(ões)</span></div>
+          ${constatacoes.map((c,i)=>html`<div key=${c.id} style=${{padding:'10px 0',borderTop:i?'1px solid var(--bd)':'none',display:'grid',gridTemplateColumns:'90px 1fr auto',gap:10,alignItems:'start'}}><div style=${{fontSize:11,color:'var(--s2)'}}>${fDate(c.data)}<br/><strong>${c.quantidade} ${unit}</strong></div><div style=${{fontSize:12}}><strong>${c.descricao}</strong>${c.destino&&html`<div style=${{color:'var(--s2)',marginTop:3}}>Destino: ${c.destino}</div>`}<div style=${{fontSize:10,color:'var(--s3)',marginTop:3}}>${c.responsavel||'—'}</div></div><button class="btn bg0 bic" style=${{color:'var(--rd)'}} onClick=${()=>setConstatacoes(p=>p.filter(x=>x.id!==c.id))}><${Ic} n="trash" s=${14}/></button></div>`)}
+          <div style=${{marginTop:12,padding:12,border:'1px dashed var(--bd)',borderRadius:10,background:'#FAFAFA'}}><div style=${{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginBottom:8}}><div>${labelObrig('Data')}<input type="date" class="inp" value=${novaConstatacao.data} onInput=${e=>setNovaConstatacao(p=>({...p,data:e.target.value}))}/></div><div>${labelObrig('Quantidade adicional')}<input type="number" min="0" step="any" class="inp" value=${novaConstatacao.quantidade} onInput=${e=>setNovaConstatacao(p=>({...p,quantidade:e.target.value}))}/></div></div>${labelObrig('Descrição')}<textarea class="inp" rows="2" value=${novaConstatacao.descricao} onInput=${e=>setNovaConstatacao(p=>({...p,descricao:e.target.value}))} placeholder="Ex.: mais 3 pacotes apresentaram alteração ao serem abertos." style=${{marginBottom:8}}/>${labelOpt('Destino dado')}<input class="inp" value=${novaConstatacao.destino} onInput=${e=>setNovaConstatacao(p=>({...p,destino:e.target.value}))} placeholder="Segregado, descartado, devolvido..." style=${{marginBottom:8}}/>${labelOpt('Responsável')}<input class="inp" value=${novaConstatacao.responsavel} onInput=${e=>setNovaConstatacao(p=>({...p,responsavel:e.target.value}))} style=${{marginBottom:8}}/><div class="row" style=${{gap:8,justifyContent:'space-between'}}><button class="btn bs bsm" onClick=${()=>constFotoRef.current?.click()}><${Ic} n="img" s=${14}/>${novaConstatacao.foto?'Trocar foto':'Anexar foto'}</button><input ref=${constFotoRef} type="file" accept="image/*" capture="environment" style=${{display:'none'}} onChange=${e=>{compressImage(e.target.files?.[0],foto=>setNovaConstatacao(p=>({...p,foto})));e.target.value=''}}/><button class="btn bp bsm" onClick=${adicionarConstatacao}><${Ic} n="plus" s=${14}/>Adicionar constatação</button></div></div>
+        </div>
+        <div class="card" style=${{padding:16,marginBottom:12}}><div class="row" style=${{justifyContent:'space-between',marginBottom:12}}><div><div style=${{fontWeight:800,fontSize:14}}>Fotos principais da ocorrência</div><div style=${{fontSize:11,color:'var(--s2)'}}>${fotos.length}/3 anexadas</div></div><button class="btn bs bsm" disabled=${fotos.length>=3} onClick=${()=>fotoRef.current?.click()}><${Ic} n="img" s=${14}/>Adicionar</button></div><input ref=${fotoRef} type="file" accept="image/*" capture="environment" style=${{display:'none'}} onChange=${e=>{addFoto(e.target.files?.[0]);e.target.value=''}}/>${fotos.length?html`<div style=${{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:8}}>${fotos.map((f,i)=>html`<div style=${{position:'relative',aspectRatio:'1',borderRadius:10,overflow:'hidden',border:'1px solid var(--bd)'}}><img src=${f} style=${{width:'100%',height:'100%',objectFit:'cover'}}/><button onClick=${()=>setFotos(p=>p.filter((_,j)=>j!==i))} style=${{position:'absolute',top:4,right:4,width:24,height:24,borderRadius:'50%',border:'none',background:'rgba(0,0,0,.7)',color:'#fff'}}><${Ic} n="x" s=${12}/></button></div>`)}</div>`:html`<div style=${{padding:22,textAlign:'center',border:'1.5px dashed var(--bd)',borderRadius:10,color:'var(--s2)'}}>Nenhuma foto principal anexada.</div>`}</div>
+        <div class="card" style=${{padding:16,marginBottom:12}}><div style=${{fontWeight:800,fontSize:14,marginBottom:8}}>Assinatura do responsável</div><${SignaturePad} value=${assinatura} onChange=${setAssinatura}/></div>
+        ${isEdit&&Array.isArray(rnc?.historicoStatus)&&rnc.historicoStatus.length>0&&html`<div class="card" style=${{padding:16,marginBottom:12}}><div style=${{fontWeight:800,fontSize:14,marginBottom:10}}>Histórico de status</div>${[...rnc.historicoStatus].reverse().map((h,i)=>html`<div style=${{padding:'8px 0',borderTop:i?'1px solid var(--bd)':'none',fontSize:12}}><strong>${h.de?(ST_RNC[h.de]?.l||h.de):'Criação'}</strong> → <strong>${ST_RNC[h.para]?.l||h.para}</strong><div style=${{fontSize:10,color:'var(--s2)',marginTop:2}}>${fDateTime(h.em)} · ${h.usuario||'Usuário local'}</div></div>`)}</div>`}
+      </div>`}
     </fieldset>
 
-    <!-- Footer fixo -->
-    ${!locked && html`<div style=${{ position: 'sticky', bottom: 72, background: '#fff', borderTop: '1px solid var(--bd)', padding: '12px 16px', display: 'flex', gap: 8 }}>
-      ${step > 1
-        ? html`<button class="btn bs" style=${{ flex: 1 }} onClick=${() => setStep(s => s - 1)}><${Ic} n="left" s=${14}/>Voltar</button>`
-        : html`<button class="btn bs" style=${{ flex: 1 }} onClick=${() => guard.leave(onBack)}>Cancelar</button>`
-      }
-      ${step < 4
-        ? html`<button class="btn bp" style=${{ flex: 2, padding: 14, borderRadius: 12 }} onClick=${() => setStep(s => s + 1)}>Próxima etapa<${Ic} n="cr" s=${14}/></button>`
-        : html`<button class="btn bp" style=${{ flex: 2, padding: 14, borderRadius: 12, opacity: podeRegistrar ? 1 : .55 }} onClick=${salvar}><${Ic} n="save" s=${16}/>${isEdit ? 'Salvar alterações' : `Registrar como ${stStat.l}`}</button>`
-      }
-    </div>`}
+    ${!locked&&html`<div style=${{position:'sticky',bottom:72,background:'#fff',borderTop:'1px solid var(--bd)',padding:'12px 16px',display:'flex',gap:8}}>${step>1?html`<button class="btn bs" style=${{flex:1}} onClick=${()=>setStep(s=>s-1)}><${Ic} n="left" s=${14}/>Voltar</button>`:html`<button class="btn bs" style=${{flex:1}} onClick=${()=>guard.leave(onBack)}>Cancelar</button>`}${step<5?html`<button class="btn bp" style=${{flex:2,padding:14}} onClick=${()=>setStep(s=>s+1)}>Próxima etapa<${Ic} n="cr" s=${14}/></button>`:html`<button class="btn bp" style=${{flex:2,padding:14,opacity:podeRegistrar?1:.55}} onClick=${salvar}><${Ic} n="save" s=${16}/>${isEdit?'Salvar alterações':`Registrar como ${stStat.l}`}</button>`}</div>`}
   </div>`;
 }
-
 
 /* ══════════════════════════════════════
    PDFS — geração segura local
@@ -1752,19 +1614,21 @@ async function pdfRnc(r) {
     if (value == null) return fallback;
     const txt = String(value).trim();
     if (!txt) return fallback;
-    if (/^(sem|não|nao)/i.test(txt)) return fallback;
+    if (/^(sem|não|nao)\b/i.test(txt)) return fallback;
     return txt;
   };
   const normalize = (value, fallback = '—') => cleanValue(value, fallback);
   const nfTxt = normalize(r.notaFiscal, 'Não informada');
   const loteTxt = normalize(r.lote, 'Não informado');
   const tempTxt = r.temperatura == null || String(r.temperatura).trim() === '' ? '—' : `${r.temperatura} °C`;
-  const qtdAfectada = r.quantidade ? `${r.quantidade} ${r.unidade || ''}` : '—';
+  const qtdAfetada = (r.qtdAfetadaConfirmada ?? r.quantidade) ? `${r.qtdAfetadaConfirmada ?? r.quantidade} ${r.unidade || ''}` : '—';
   const fabricacaoTxt = r.fabricacao ? fDate(r.fabricacao) : '—';
   const validadeTxt = r.validade ? fDate(r.validade) : '—';
   const impactoTxt = `${r.gravidade || '—'} · ${fMoeda(r.impactoFinanceiro || 0)}`;
-  const quantidadeAceita = Math.max(0, Number(r.qtdRecebida || 0) - Number(r.qtdRecusada || 0));
   const tipoTxt = (r.tipoCustom && r.tipo === 'Outro (descrever)') ? r.tipoCustom : (r.tipo || 'Não informado');
+  const contencaoTxt = Array.isArray(r.contencoes) && r.contencoes.length ? r.contencoes.join(' · ') : cleanValue(r.contencao,'—');
+  const riscosTxt = Array.isArray(r.riscos) && r.riscos.length ? r.riscos.join(' · ') : cleanValue(r.riscoOcorrencia,'—');
+  const constatacoesPdf = Array.isArray(r.constatacoes) ? r.constatacoes : [];
 
   let y = 33;
 
@@ -1988,65 +1852,79 @@ async function pdfRnc(r) {
 
   drawHeader();
 
-  sectionTitle('Identificação');
+  sectionTitle('Contexto da identificação');
   drawGrid([
     ['Origem do produto', origemLabel, INK, true],
-    ['Setor de origem', cleanValue(r.setor, '—'), INK, true],
-    ['Data da ocorrência', fDate(r.data) || '—'],
+    ['Unidade de origem', cleanValue(r.unidadeOrigem, 'Não informada'), INK, true],
+    ['Setor que identificou', cleanValue(r.setorIdentificacao || r.setor, '—')],
+    ['Etapa da identificação', cleanValue(r.etapaIdentificacao, '—')],
+    ['Data do recebimento', r.dataRecebimento ? fDate(r.dataRecebimento) : 'Não informada'],
+    ['Data da identificação', fDate(r.dataIdentificacao || r.data) || '—'],
+    ['Data de abertura', fDate(r.criadoEm || r.data) || '—'],
+    ['Momento da identificação', cleanValue(r.momentoIdentificacao, '—')],
     ['Responsável pelo registro', cleanValue(r.responsavel, '—')],
-  ], 2, { minRowH: 10.5, basePad: 4.1 });
+  ], 2, { minRowH: 10.2, basePad: 4, maxLines: 2 });
+  drawFullField('Condição aparente no recebimento', cleanValue(r.condicaoRecebimento, 'Não informada'), { minH: 11.5, fill: BG });
 
   sectionTitle('Produto e rastreabilidade');
   drawFullField('Produto / item afetado', cleanValue(r.produto, '—'), { minH: 11.8, bold: true, size: 9.5 });
   drawGrid([
     ['Fornecedor', cleanValue(r.fornecedor, '—')],
-    ['Quantidade afetada', qtdAfectada],
+    ['Quantidade afetada confirmada', qtdAfetada],
     ['Nota fiscal', nfTxt],
     ['Lote', loteTxt],
     ['Fabricação', fabricacaoTxt],
     ['Validade', validadeTxt],
     ['Temperatura', tempTxt],
     ['Gravidade / impacto', impactoTxt],
-  ], 2, { minRowH: 10.8, maxLines: 2, basePad: 4.1 });
+  ], 2, { minRowH: 10.4, maxLines: 2, basePad: 4 });
   drawGrid([
-    ['Pedida', `${Number(r.qtdPedida || 0)} ${r.unidade || ''}`],
     ['Recebida', `${Number(r.qtdRecebida || 0)} ${r.unidade || ''}`],
-    ['Recusada', `${Number(r.qtdRecusada || 0)} ${r.unidade || ''}`],
-    ['Aceita', `${quantidadeAceita} ${r.unidade || ''}`],
-  ], 4, { minRowH: 9.8, valueSize: 8.2, labelSize: 5.2, basePad: 4, maxLines: 1, fill: BG });
+    ['Utilizada antes', `${Number(r.qtdUtilizadaAntes || 0)} ${r.unidade || ''}`],
+    ['Afetada confirmada', `${Number((r.qtdAfetadaConfirmada ?? r.quantidade) || 0)} ${r.unidade || ''}`],
+    ['Segregada', `${Number(r.qtdSegregada || 0)} ${r.unidade || ''}`],
+    ['Sob observação', `${Number(r.qtdSobObservacao || 0)} ${r.unidade || ''}`],
+    ['Descartada / devolvida', `${Number((r.qtdDescartadaDevolvida ?? r.qtdRecusada) || 0)} ${r.unidade || ''}`],
+  ], 3, { minRowH: 9.8, valueSize: 7.8, labelSize: 4.9, basePad: 3.8, maxLines: 1, fill: BG });
 
   sectionTitle('Não conformidade identificada');
   drawBadge(tipoTxt, RD, RD_BG);
-  drawFullField('Descrição da ocorrência', cleanValue(r.descricao, 'Sem descrição registrada.'), { accent: RD, minH: 13.8 });
+  drawFullField('Descrição da ocorrência', cleanValue(r.descricao, 'Sem descrição registrada.'), { accent: RD, minH: 13.5 });
+  drawGrid([
+    ['Abrangência', cleanValue(r.abrangencia, 'Não determinada')],
+    ['Riscos identificados', riscosTxt],
+  ], 2, { minRowH: 10.4, maxLines: 3, basePad: 4 });
+  drawFullField('Contenção realizada pelo Ilha', contencaoTxt, { accent: AM, fill: AM_BG, border: AM, minH: 12 });
+  if (String(r.impactoOperacional || '').trim()) drawFullField('Impacto operacional', r.impactoOperacional, { minH: 12 });
+
+  if (constatacoesPdf.length) {
+    sectionTitle('Evolução da ocorrência');
+    constatacoesPdf.forEach((c,idx)=>{
+      const texto=[c.descricao,c.destino?`Destino: ${c.destino}`:'',c.responsavel?`Responsável: ${c.responsavel}`:''].filter(Boolean).join('\n');
+      drawFullField(`${fDate(c.data)} · +${Number(c.quantidade||0)} ${r.unidade||''}`, texto, { minH: 12, fill: idx%2?BG:[255,255,255] });
+    });
+  }
 
   sectionTitle('Providência solicitada ao fornecedor');
   drawFullField('Solicitação', cleanValue(r.acao, '—'), { accent: OR, fill: OR_BG, border: OR, textColor: OR_D, bold: true, size: 9.3, minH: 12.5 });
-  if (String(r.obsAcao || '').trim()) {
-    drawFullField('Detalhes da solicitação', r.obsAcao, { minH: 12.5 });
-  }
+  if (String(r.obsAcao || '').trim()) drawFullField('Detalhes da solicitação', r.obsAcao, { minH: 12 });
 
   sectionTitle('Acompanhamento');
-  if (String(r.respostaFornecedor || '').trim()) {
-    drawFullField('Retorno do fornecedor', r.respostaFornecedor, { minH: 12.5 });
-  } else {
-    drawStatusBox('Situação atual', 'Aguardando resposta do fornecedor.', OR, BG);
-  }
+  if (String(r.respostaFornecedor || '').trim()) drawFullField('Retorno do fornecedor', r.respostaFornecedor, { minH: 12 });
+  else drawStatusBox('Situação atual', 'Aguardando resposta do fornecedor.', OR, BG);
   if (String(r.medidaRealizada || '').trim()) {
-    const medidaPdf = r.status === 'resolvida' && r.encerradoEm
-      ? `${r.medidaRealizada}
-Concluída em ${fDateTime(r.encerradoEm)}.`
-      : r.medidaRealizada;
-    drawFullField('Medida efetivamente realizada', medidaPdf, { accent: GR, fill: GR_BG, border: GR, textColor: [21, 128, 61], minH: 12.8, bold: true });
-  } else if (r.status === 'analise') {
-    drawStatusBox('Situação atual', 'Resposta recebida. Reposição, crédito ou correção ainda em acompanhamento.', AM, AM_BG);
-  } else if (r.status === 'cancelada' && (r.motivoCancelamento || r.obsAcao)) {
-    drawStatusBox('Situação atual', `Motivo do cancelamento: ${r.motivoCancelamento || r.obsAcao}`, S1, BG);
-  }
+    const medidaPdf = r.status === 'resolvida' && r.encerradoEm ? `${r.medidaRealizada}
+Concluída em ${fDateTime(r.encerradoEm)}.` : r.medidaRealizada;
+    drawFullField('Medida efetivamente realizada', medidaPdf, { accent: GR, fill: GR_BG, border: GR, textColor: [21,128,61], minH: 12.5, bold: true });
+  } else if (r.status === 'analise') drawStatusBox('Situação atual', 'Resposta recebida. Reposição, crédito ou correção ainda em acompanhamento.', AM, AM_BG);
+  else if (r.status === 'cancelada' && (r.motivoCancelamento || r.obsAcao)) drawStatusBox('Situação atual', `Motivo do cancelamento: ${r.motivoCancelamento || r.obsAcao}`, S1, BG);
 
   sectionTitle('Validação do registro');
   drawSignatures();
 
-  const fotos = Array.isArray(r.fotos) ? r.fotos : [];
+  const fotosPrincipais = Array.isArray(r.fotos) ? r.fotos.map((src,i)=>({src,label:`Evidência principal ${i+1}`})) : [];
+  const fotosConstatacoes = constatacoesPdf.filter(c=>c.foto).map((c,i)=>({src:c.foto,label:`Constatação de ${fDate(c.data)} · ${c.quantidade || 0} ${r.unidade || ''}`}));
+  const fotos = [...fotosPrincipais,...fotosConstatacoes];
   const medirImg = src => new Promise(resolve => {
     try {
       const im = new Image();
@@ -2056,7 +1934,7 @@ Concluída em ${fDateTime(r.encerradoEm)}.`
     } catch (e) { resolve(null); }
   });
   const dims = [];
-  for (let i = 0; i < fotos.length; i++) dims[i] = await medirImg(fotos[i]);
+  for (let i = 0; i < fotos.length; i++) dims[i] = await medirImg(fotos[i].src);
 
   for (let i = 0; i < fotos.length; i++) {
     doc.addPage();
@@ -2081,10 +1959,10 @@ Concluída em ${fDateTime(r.encerradoEm)}.`
     const imgY = areaY + pad + (maxH - drawH) / 2;
     let ok = false;
     for (const format of ['JPEG', 'PNG', 'WEBP']) {
-      try { doc.addImage(fotos[i], format, imgX, imgY, drawW, drawH); ok = true; break; } catch (e) {}
+      try { doc.addImage(fotos[i].src, format, imgX, imgY, drawW, drawH); ok = true; break; } catch (e) {}
     }
     if (!ok) {
-      try { doc.addImage(fotos[i], imgX, imgY, drawW, drawH); ok = true; } catch (e) {}
+      try { doc.addImage(fotos[i].src, imgX, imgY, drawW, drawH); ok = true; } catch (e) {}
     }
     if (!ok) {
       doc.setTextColor(...S3);
@@ -2095,7 +1973,7 @@ Concluída em ${fDateTime(r.encerradoEm)}.`
     doc.setTextColor(...S2);
     doc.setFont(undefined, 'bold');
     doc.setFontSize(6.4);
-    doc.text(`EVIDÊNCIA ${i + 1}`, areaX + pad, areaY + areaH - 4.6);
+    doc.text(fotos[i].label || `EVIDÊNCIA ${i + 1}`, areaX + pad, areaY + areaH - 4.6);
   }
 
   const totalPages = doc.internal.getNumberOfPages();
@@ -2148,7 +2026,7 @@ function RelatoriosTab({ toast }) {
       ${rncs.length === 0 && html`<div class="empty"><${Ic} n="rnc" s=${32} style=${{ color: 'var(--s3)' }}/><p>Nenhuma RNC.</p></div>`}
       ${[...rncs].sort((a,b)=>new Date(b.criadoEm||0)-new Date(a.criadoEm||0)).map(r => { const st = ST_RNC[r.status] || { l: r.status, c: 'bgy' }; return html`
         <div key=${r.id} class="card" style=${{ padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 12 }}>
-          <div style=${{ flex: 1, minWidth: 0 }}><div class="row" style=${{ gap: 6, marginBottom: 4 }}><span class=${`badge ${st.c}`}>${st.l}</span>${r.origem&&html`<span class="badge bor">${r.origem}</span>`}</div><div style=${{ fontWeight: 700, fontSize: 14 }}>${r.numero}</div><div style=${{ fontSize: 12, color: 'var(--s2)' }}>${r.produto||'—'} · ${fDate(r.data)}</div></div>
+          <div style=${{ flex: 1, minWidth: 0 }}><div class="row" style=${{ gap: 6, marginBottom: 4 }}><span class=${`badge ${st.c}`}>${st.l}</span>${r.origem&&html`<span class="badge bor">${r.origem}</span>`}</div><div style=${{ fontWeight: 700, fontSize: 14 }}>${r.numero}</div><div style=${{ fontSize: 12, color: 'var(--s2)' }}>${r.produto||'—'} · ${fDate(r.dataIdentificacao||r.data)}</div><div style=${{fontSize:10,color:'var(--s3)',marginTop:2}}>${r.unidadeOrigem||'Unidade não informada'}</div></div>
           <button class="btn bs bsm" onClick=${async () => { try { await pdfRnc(r); toast.show('PDF gerado'); } catch(e) { toast.show('Erro'); } }}><${Ic} n="pdf" s=${14}/>PDF</button>
         </div>`; })}
     </div>`}
@@ -2400,19 +2278,20 @@ function AnaliseTab() {
    CONFIG
 ══════════════════════════════════════ */
 function ConfigTab({ toast }) {
-  const cat = useMemo(getCatalog, []);
   const [custom, setCustom] = useState(() => LS.get('catalog') || { added: [], removed: [], addedCats: [] });
-  const [config, setConfig] = useState(() => LS.get('config') || { responsavel: '', empresa: 'Grupo Ilha' });
+  const cat = useMemo(getCatalog, [custom]);
+  const [config, setConfig] = useState(() => { const c=LS.get('config') || { responsavel:'', empresa:'Grupo Ilha' }; return {...c,unidades:normalizeUnidades(c.unidades),unidadePadrao:c.unidadePadrao||normalizeUnidades(c.unidades)[0]?.nome||''}; });
   const [addingItem, setAddingItem] = useState(null);
   const [addingCat, setAddingCat] = useState(null);
   const [confirmDel, setConfirmDel] = useState(null);
+  const [novaUnidade, setNovaUnidade] = useState('');
   const backupRef = useRef(null);
   const [usage, setUsage] = useState(() => storageUsage());
   const allItems = useMemo(() => flatCatalog(cat, { includeInactive: true }), [cat, custom]);
 
   const refreshUsage = () => setUsage(storageUsage());
   const saveCustom = c => { if (!LS.set('catalog', c)) return false; setCustom(c); refreshUsage(); return true; };
-  const saveConfig = c => { if (!LS.set('config', c)) return false; setConfig(c); refreshUsage(); return true; };
+  const saveConfig = c => { const next={...c,unidades:normalizeUnidades(c.unidades)}; if (!LS.set('config', next)) return false; setConfig(next); refreshUsage(); return true; };
 
   const isCustomItem = (orig, cat, name) => (custom.added || []).some(a => a.orig === orig && a.cat === cat && a.name === name);
   const isRemoved = (orig, cat, name) => (custom.removed || []).some(r => r.orig === orig && r.cat === cat && r.name === name);
@@ -2428,6 +2307,9 @@ function ConfigTab({ toast }) {
   const restoreItem = ({ orig, cat, name }) => { if(allItems.some(i=>i.name.toLowerCase()===name.toLowerCase() && !(i.orig===orig && i.cat===cat))){ toast.show('Não é possível restaurar: já existe outro produto com este nome.'); return; } if(saveCustom({ ...custom, removed: (custom.removed || []).filter(r => !(r.orig === orig && r.cat === cat && r.name === name)) })){ auditLog('Item restaurado no catálogo', `${orig} · ${cat} · ${name}`); toast.show('Restaurado'); } };
   const addCat = ({ orig, cat, unit }) => { const clean=cat.trim(); if (!clean) return; if(Object.keys(getCatalog()[orig]?.cats||{}).some(c=>c.toLowerCase()===clean.toLowerCase())){ toast.show('Esta categoria já existe.'); return; } const next = { ...custom, addedCats: [...(custom.addedCats || []), { orig, cat: clean, unit }] }; if(saveCustom(next)){ auditLog('Categoria criada', `${orig} · ${clean} · ${unit}`); toast.show('Categoria criada'); setAddingCat(null); } };
   const removeCat = (orig, cat) => { if (!confirm(`Excluir categoria "${cat}"?`)) return; const next = { ...custom, addedCats: (custom.addedCats || []).filter(c => !(c.orig === orig && c.cat === cat)), added: (custom.added || []).filter(a => !(a.orig === orig && a.cat === cat)) }; if(saveCustom(next)){ auditLog('Categoria excluída', `${orig} · ${cat}`); toast.show('Categoria excluída'); } };
+  const addUnidade = () => { const nome=novaUnidade.trim(); if(!nome) return; const units=normalizeUnidades(config.unidades); if(units.some(u=>u.nome.toLowerCase()===nome.toLowerCase())){ toast.show('Esta unidade já está cadastrada.'); return; } const item={id:uid(),nome,ativo:true}; if(saveConfig({...config,unidades:[...units,item],unidadePadrao:config.unidadePadrao||nome})){ auditLog('Unidade cadastrada',nome); setNovaUnidade(''); toast.show('Unidade cadastrada'); } };
+  const editUnidade = u => { const nome=prompt('Novo nome da unidade:',u.nome); if(!String(nome||'').trim()) return; const clean=String(nome).trim(); const units=normalizeUnidades(config.unidades); if(units.some(x=>x.id!==u.id&&x.nome.toLowerCase()===clean.toLowerCase())){ toast.show('Já existe uma unidade com esse nome.'); return; } const next=units.map(x=>x.id===u.id?{...x,nome:clean}:x); const padrao=config.unidadePadrao===u.nome?clean:config.unidadePadrao; if(saveConfig({...config,unidades:next,unidadePadrao:padrao})){ auditLog('Unidade renomeada',`${u.nome} → ${clean}`); toast.show('Unidade atualizada'); } };
+  const toggleUnidade = u => { const units=normalizeUnidades(config.unidades).map(x=>x.id===u.id?{...x,ativo:x.ativo===false}:x); const ativos=units.filter(x=>x.ativo!==false); if(!ativos.length){ toast.show('Mantenha ao menos uma unidade ativa.'); return; } const padrao=(u.nome===config.unidadePadrao&&u.ativo!==false)?ativos[0].nome:config.unidadePadrao; if(saveConfig({...config,unidades:units,unidadePadrao:padrao})){ auditLog(u.ativo===false?'Unidade reativada':'Unidade inativada',u.nome); toast.show(u.ativo===false?'Unidade reativada':'Unidade inativada'); } };
   const importar = async file => { if(!file) return; try { if(await importBackupFile(file)){ toast.show('Backup importado. Recarregando...'); setTimeout(()=>location.reload(),350); } } catch(e){ toast.show(e.message || 'Falha ao importar backup.'); } finally { if(backupRef.current) backupRef.current.value=''; } };
 
   return html`<div class="page">
@@ -2443,6 +2325,14 @@ function ConfigTab({ toast }) {
       <select class="inp" value=${config.abrirRncDivergencia || 'perguntar'} onChange=${e=>saveConfig({...config, abrirRncDivergencia:e.target.value})}>
         <option value="perguntar">Perguntar ao finalizar</option><option value="sempre">Gerar automaticamente</option><option value="nunca">Não gerar automaticamente</option>
       </select>
+    </div>
+
+    <div class="card" style=${{ padding:16, marginBottom:12 }}>
+      <div class="row" style=${{ justifyContent:'space-between', gap:12, marginBottom:10 }}><div><div style=${{fontWeight:800,fontSize:14}}>Unidades do Grupo Ilha</div><div style=${{fontSize:11,color:'var(--s2)',marginTop:3}}>Usadas no campo “Unidade de origem” das RNCs. Os cadastros ficam prontos para futura migração ao banco.</div></div><span class="badge bor">${normalizeUnidades(config.unidades).filter(u=>u.ativo!==false).length} ativa(s)</span></div>
+      <label style=${{fontSize:11,fontWeight:700,color:'var(--s2)',textTransform:'uppercase',letterSpacing:'.06em',display:'block',marginBottom:6}}>Unidade padrão</label>
+      <select class="inp" value=${config.unidadePadrao||''} onChange=${e=>saveConfig({...config,unidadePadrao:e.target.value})} style=${{marginBottom:12}}>${normalizeUnidades(config.unidades).filter(u=>u.ativo!==false).map(u=>html`<option value=${u.nome}>${u.nome}</option>`)}</select>
+      <div style=${{display:'flex',gap:8,marginBottom:12}}><input class="inp" value=${novaUnidade} onInput=${e=>setNovaUnidade(e.target.value)} onKeyDown=${e=>{if(e.key==='Enter')addUnidade()}} placeholder="Nome da nova unidade"/><button class="btn bp bsm" onClick=${addUnidade}><${Ic} n="plus" s=${14}/>Cadastrar</button></div>
+      <div style=${{display:'flex',flexDirection:'column',gap:7}}>${normalizeUnidades(config.unidades).map(u=>html`<div key=${u.id} class="row" style=${{padding:'9px 10px',border:'1px solid var(--bd)',borderRadius:10,opacity:u.ativo===false?.55:1}}><div style=${{flex:1,minWidth:0}}><div style=${{fontSize:13,fontWeight:700}}>${u.nome}</div><div style=${{fontSize:10,color:'var(--s2)'}}>${u.ativo===false?'Inativa':'Ativa'}${config.unidadePadrao===u.nome?' · padrão':''}</div></div><button class="btn bs bsm" onClick=${()=>editUnidade(u)}>Editar</button><button class="btn bs bsm" onClick=${()=>toggleUnidade(u)}>${u.ativo===false?'Reativar':'Inativar'}</button></div>`)}</div>
     </div>
 
     <div class="card" style=${{ padding:16, marginBottom:12 }}>
@@ -2500,7 +2390,7 @@ function ConfigTab({ toast }) {
     <div style=${{ marginTop: 32, marginBottom: 24, textAlign: 'center', padding: '20px 0', borderTop: '1px solid var(--bd)' }}>
       <div style=${{ fontSize: 10, fontWeight: 700, letterSpacing: '.12em', color: 'var(--s3)', textTransform: 'uppercase', marginBottom: 6 }}>Desenvolvido por</div>
       <div style=${{ fontSize: 15, fontWeight: 800, color: 'var(--ink)', marginBottom: 2, fontFamily: "'Plus Jakarta Sans',sans-serif" }}>Vinicius Candido dos Santos</div>
-      <div style=${{ fontSize: 12, color: 'var(--s2)' }}>NEXUS v2.6.3 · Grupo Ilha · ${new Date().getFullYear()}</div>
+      <div style=${{ fontSize: 12, color: 'var(--s2)' }}>NEXUS v2.7.0 · Grupo Ilha · ${new Date().getFullYear()}</div>
     </div>
 
     ${addingItem && html`<${AddItemModal} orig=${addingItem.orig} cat=${addingItem.cat} defUnit=${addingItem.unit} onClose=${() => setAddingItem(null)} onConfirm=${addItem}/>`}
@@ -2663,7 +2553,7 @@ function GlobalSearch({ setTab }) {
   const resultados = term.length < 2 ? [] : [
     ...pedidos.filter(p => `${wLbl(p.semana)} ${p.origem||''} ${p.responsavel||''} ${(p.itens||[]).map(i=>i.nome).join(' ')}`.toLowerCase().includes(term)).slice(0,5).map(p => ({ label: `Pedido · ${wLbl(p.semana)} · ${p.origem}`, tab: 'pedidos', id:p.id })),
     ...pedidos.filter(p => p.recebimento && `${wLbl(p.semana)} ${p.origem||''} ${p.recebimento?.responsavel||''} ${(p.itens||[]).map(i=>i.nome).join(' ')}`.toLowerCase().includes(term)).slice(0,5).map(p => ({ label: `Recebimento · ${wLbl(p.semana)} · ${p.origem}`, tab: 'recebimento', id:p.id })),
-    ...rncs.filter(r => `${r.numero||''} ${r.produto||''} ${r.fornecedor||''} ${r.responsavel||''} ${r.tipo||''}`.toLowerCase().includes(term)).slice(0,5).map(r => ({ label: `RNC · ${r.numero} · ${r.produto||''}`, tab: 'rnc', id:r.id })),
+    ...rncs.filter(r => `${r.numero||''} ${r.produto||''} ${r.fornecedor||''} ${r.responsavel||''} ${r.tipo||''} ${r.unidadeOrigem||''} ${r.setorIdentificacao||r.setor||''}`.toLowerCase().includes(term)).slice(0,5).map(r => ({ label: `RNC · ${r.numero} · ${r.produto||''}`, tab: 'rnc', id:r.id })),
     ...orcamentos.filter(o => `${wLbl(o.semana)} ${o.origem||''} ${o.responsavel||''} ${(o.itens||[]).map(i=>i.nome).join(' ')}`.toLowerCase().includes(term)).slice(0,5).map(o => ({ label: `Orçamento · ${wLbl(o.semana)} · ${o.origem}`, tab: 'orcamento', id:o.id })),
   ].slice(0,15);
   const abrir = r => {
@@ -2741,12 +2631,15 @@ function WeekControl({ toast }) {
    DATA MIGRATION
 ══════════════════════════════════════ */
 function migrateLocalData() {
-  const target='2.6.3';
+  const target='2.7.0';
   if (LS.get('schemaVersion') === target) return true;
   const now=new Date().toISOString();
   let pedidos=LS.get('pedidos') || [];
   let orcamentos=LS.get('orcamentos') || [];
   let rncs=LS.get('rncs') || [];
+  let config=LS.get('config') || { responsavel:'', empresa:'Grupo Ilha' };
+  const unidadesNorm=normalizeUnidades(config.unidades);
+  config={...config,unidades:unidadesNorm,unidadePadrao:config.unidadePadrao||unidadesNorm[0]?.nome||''};
   pedidos=pedidos.map(p=>{
     const itens=(p.itens||[]).map(i=>({...i,qtd:nonNeg(i.qtd)}));
     const base={...p,id:p.id||uid(),semana:p.semana||dateToWeek(p.data||p.criadoEm||todayISO()),criadoEm:p.criadoEm||now,itens};
@@ -2765,12 +2658,19 @@ function migrateLocalData() {
   const rebuilt=[]; const usedNumbers=new Set();
   rncs.forEach(r=>{
     const data=r.data||todayISO(); const origem=r.origem||'CD'; const status=r.status||'aberta';
-    const base={...r,id:r.id||uid(),data,semana:r.semana||dateToWeek(data),origem,status,gravidade:r.gravidade||'Média',quantidade:nonNeg(r.quantidade),qtdPedida:nonNeg(r.qtdPedida),qtdRecebida:nonNeg(r.qtdRecebida),qtdRecusada:nonNeg(r.qtdRecusada),impactoFinanceiro:nonNeg(r.impactoFinanceiro),medidaRealizada:r.medidaRealizada||(status==='resolvida'?(r.verificacaoEficacia||r.planoAcao||''):''),criadoEm:r.criadoEm||now,historicoStatus:(r.historicoStatus||[]).length?r.historicoStatus:[{de:null,para:status,em:r.criadoEm||now,usuario:r.responsavel||(LS.get('config')||{}).responsavel||'Usuário local'}]};
+    const unidadeInferida=r.unidadeOrigem || (/VILA VELHA|\bVV\b/i.test(r.setor||'')?'Ilha do Caranguejo - VV':(/VIX|VITÓRIA|VITORIA/i.test(r.setor||'')?'Ilha do Caranguejo - VIX':config.unidadePadrao||''));
+    const qtdAfetada=nonNeg(r.qtdAfetadaConfirmada ?? r.quantidade);
+    const base={...r,id:r.id||uid(),data,dataIdentificacao:r.dataIdentificacao||data,dataRecebimento:r.dataRecebimento||'',semana:r.semana||dateToWeek(data),origem,status,
+      unidadeOrigem:unidadeInferida,setorIdentificacao:r.setorIdentificacao||r.setor||'',momentoIdentificacao:r.momentoIdentificacao||(r.recebimentoId?'No recebimento':'Após o recebimento'),etapaIdentificacao:r.etapaIdentificacao||(r.recebimentoId?'Recebimento':'Durante a produção'),condicaoRecebimento:r.condicaoRecebimento||(r.recebimentoId?'Problema já identificado no recebimento':'Sem anormalidade aparente'),
+      gravidade:r.gravidade||'Média',quantidade:qtdAfetada,qtdAfetadaInicial:nonNeg(r.qtdAfetadaInicial ?? r.quantidade),qtdAfetadaConfirmada:qtdAfetada,
+      qtdPedida:nonNeg(r.qtdPedida),qtdRecebida:nonNeg(r.qtdRecebida),qtdRecusada:nonNeg(r.qtdRecusada),qtdUtilizadaAntes:nonNeg(r.qtdUtilizadaAntes),qtdSegregada:nonNeg(r.qtdSegregada),qtdSobObservacao:nonNeg(r.qtdSobObservacao),qtdDescartadaDevolvida:nonNeg(r.qtdDescartadaDevolvida ?? r.qtdRecusada),
+      abrangencia:r.abrangencia||'Abrangência ainda não determinada',contencoes:Array.isArray(r.contencoes)?r.contencoes:(r.contencao?[r.contencao]:[]),riscos:Array.isArray(r.riscos)?r.riscos:(r.riscoOcorrencia?[r.riscoOcorrencia]:[]),impactoOperacional:r.impactoOperacional||'',constatacoes:Array.isArray(r.constatacoes)?r.constatacoes:[],
+      impactoFinanceiro:nonNeg(r.impactoFinanceiro),medidaRealizada:r.medidaRealizada||(status==='resolvida'?(r.verificacaoEficacia||r.planoAcao||''):''),criadoEm:r.criadoEm||now,historicoStatus:(r.historicoStatus||[]).length?r.historicoStatus:[{de:null,para:status,em:r.criadoEm||now,usuario:r.responsavel||config.responsavel||'Usuário local'}]};
     if(!base.numero || usedNumbers.has(base.numero)) base.numero=nextRncNumber(origem,[...rebuilt,...rncs],data);
     usedNumbers.add(base.numero); rebuilt.push(base);
   });
   const closed=[...new Set((LS.get('closedWeeks')||[]).filter(w=>/^\d{4}-W\d{2}$/.test(String(w))))].sort();
-  return commitLocal({pedidos,orcamentos,rncs:rebuilt,closedWeeks:closed,schemaVersion:target});
+  return commitLocal({pedidos,orcamentos,rncs:rebuilt,config,closedWeeks:closed,schemaVersion:target});
 }
 
 migrateLocalData();

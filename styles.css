@@ -194,7 +194,7 @@ header{background:var(--or);position:sticky;top:0;z-index:40;box-shadow:0 2px 8p
 
 
 
-/* v2.6.3 — fluxo de RNC, PDF simplificado e correções de usabilidade */
+/* v2.7.0 — fluxo de RNC, PDF simplificado e correções de usabilidade */
 @media (min-width:900px){
   .bnav{
     top:220px!important;

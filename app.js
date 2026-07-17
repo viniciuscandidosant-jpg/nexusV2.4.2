@@ -188,7 +188,7 @@ function downloadJson(filename, data) {
   const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = filename; a.click(); setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 function exportBackup() {
-  const data = { app:'NEXUS', version:'2.6.0', exportedAt:new Date().toISOString(), stores:{} };
+  const data = { app:'NEXUS', version:'2.6.2', exportedAt:new Date().toISOString(), stores:{} };
   for (let i=0;i<localStorage.length;i++) { const k=localStorage.key(i); if (k?.startsWith('nx:')) { try { data.stores[k.slice(3)] = JSON.parse(localStorage.getItem(k)); } catch (error) { console.warn('Backup ignorou uma chave inválida:', k, error); } } }
   downloadJson(`NEXUS_backup_${todayISO()}.json`, data);
   auditLog('Backup exportado', `${Object.keys(data.stores).length} conjuntos de dados`);
@@ -378,7 +378,7 @@ function BottomNav({ tab, setTab }) {
    STATUS MAPS
 ══════════════════════════════════════ */
 const ST_PED = { pendente: { l: 'Aguardando', c: 'bgy' }, recebido: { l: 'Recebido', c: 'bgr2' }, parcial: { l: 'Parcial', c: 'bam' }, cancelado: { l: 'Cancelado', c: 'brd2' } };
-const ST_RNC = { aberta: { l: 'Aberta', c: 'brd2' }, analise: { l: 'Em análise', c: 'bam' }, resolvida: { l: 'Resolvida', c: 'bgr2' }, cancelada: { l: 'Cancelada', c: 'bgy' } };
+const ST_RNC = { aberta: { l: 'Aberta', c: 'brd2' }, analise: { l: 'Em acompanhamento', c: 'bam' }, resolvida: { l: 'Concluída', c: 'bgr2' }, cancelada: { l: 'Cancelada', c: 'bgy' } };
 
 function RecordsFilter({ busca, setBusca, origem, setOrigem, status, setStatus, statusOpts=[] }) {
   return html`<div class="card" style=${{ padding:12, marginBottom:14 }}>
@@ -403,8 +403,7 @@ function InicioTab({ setTab }) {
   const orcamentos = LS.get('orcamentos') || [];
   const pend = pedidos.filter(p => p.status === 'pendente').length;
   const rncA = rncs.filter(r => r.status === 'aberta' || r.status === 'analise').length;
-  const hoje = todayISO();
-  const vencidas = rncs.filter(r => ['aberta','analise'].includes(r.status) && r.prazoAcao && r.prazoAcao < hoje).length;
+  const aguardandoRetorno = rncs.filter(r => r.status === 'aberta' && !String(r.respostaFornecedor || '').trim()).length;
   const parcial = pedidos.filter(p => p.status === 'parcial').length;
   const orcPend = orcamentos.filter(o => o.status !== 'autorizado').length;
   const recentes = [...pedidos].sort((a, b) => new Date(b.criadoEm || 0) - new Date(a.criadoEm || 0)).slice(0, 4);
@@ -425,7 +424,7 @@ function InicioTab({ setTab }) {
           <div style=${{ fontSize: 30, fontWeight: 800, color: c, fontFamily: "'Plus Jakarta Sans',sans-serif" }}>${v}</div>
         </button>`)}
     </div>
-    ${vencidas > 0 && html`<button class="card" style=${{ width:'100%', border:'1.5px solid var(--rd)', background:'var(--rd3)', padding:'13px 16px', marginBottom:12, display:'flex', justifyContent:'space-between', alignItems:'center', cursor:'pointer', textAlign:'left' }} onClick=${()=>setTab('rnc')}><span><strong style=${{color:'var(--rd)'}}>${vencidas} RNC${vencidas!==1?'s':''} com prazo vencido</strong><br/><span style=${{fontSize:12,color:'var(--s2)'}}>Abra a área de RNC para revisar os planos de ação.</span></span><${Ic} n="cr" s=${18} style=${{color:'var(--rd)'}}/></button>`}
+    ${aguardandoRetorno > 0 && html`<button class="card" style=${{ width:'100%', border:'1.5px solid var(--rd)', background:'var(--rd3)', padding:'13px 16px', marginBottom:12, display:'flex', justifyContent:'space-between', alignItems:'center', cursor:'pointer', textAlign:'left' }} onClick=${()=>setTab('rnc')}><span><strong style=${{color:'var(--rd)'}}>${aguardandoRetorno} RNC${aguardandoRetorno!==1?'s':''} aguardando retorno</strong><br/><span style=${{fontSize:12,color:'var(--s2)'}}>Confira as ocorrências que ainda não tiveram resposta do fornecedor.</span></span><${Ic} n="cr" s=${18} style=${{color:'var(--rd)'}}/></button>`}
     <button class="btn bp" style=${{ width: '100%', padding: 14, fontSize: 15, borderRadius: 12, marginBottom: 20 }} onClick=${() => setTab('pedidos')}>
       <${Ic} n="plus" s=${20}/>Novo Pedido
     </button>
@@ -1065,19 +1064,18 @@ function RncTab({ toast }) {
       <div><h2 style=${{ fontSize: 20, fontWeight: 800, fontFamily: "'Plus Jakarta Sans',sans-serif", margin: 0 }}>RNC</h2><p style=${{ fontSize: 13, color: 'var(--s2)', margin: '2px 0 0' }}>Registros de Não Conformidade</p></div>
       <button class="btn bp bsm" onClick=${() => { setEditing(null); setView('editor'); }}><${Ic} n="plus" s=${14}/>Nova RNC</button>
     </div>
-    ${rncs.length>0 && html`<${RecordsFilter} busca=${fBusca} setBusca=${resetLimit(setFBusca)} origem=${fOrig} setOrigem=${resetLimit(setFOrig)} status=${fStatus} setStatus=${resetLimit(setFStatus)} statusOpts=${[{v:'aberta',l:'Aberta'},{v:'analise',l:'Em análise'},{v:'resolvida',l:'Resolvida'},{v:'cancelada',l:'Cancelada'}]}/>`}
+    ${rncs.length>0 && html`<${RecordsFilter} busca=${fBusca} setBusca=${resetLimit(setFBusca)} origem=${fOrig} setOrigem=${resetLimit(setFOrig)} status=${fStatus} setStatus=${resetLimit(setFStatus)} statusOpts=${[{v:'aberta',l:'Aberta'},{v:'analise',l:'Em acompanhamento'},{v:'resolvida',l:'Concluída'},{v:'cancelada',l:'Cancelada'}]}/>`}
     ${rncs.length === 0 && html`<div class="empty"><${Ic} n="rnc" s=${40} style=${{ color: 'var(--s3)' }}/><p>Nenhuma RNC registrada.</p><button class="btn bp" style=${{ marginTop: 8 }} onClick=${() => setView('editor')}><${Ic} n="plus" s=${16}/>Abrir RNC</button></div>`}
     ${rncs.length>0 && filtradas.length===0 && html`<div class="empty"><p>Nenhuma RNC corresponde aos filtros.</p></div>`}
     ${abertasAll.length > 0 && html`<span class="slbl">Em aberto (${abertasAll.length})</span><div style=${{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 16 }}>${abertas.map(r => html`<${RncCard} key=${r.id} rnc=${r} onClick=${() => { setEditing(r); setView('editor'); }}/>`)}<${MoreResults} total=${abertasAll.length} shown=${abertas.length} onMore=${()=>setLimit(v=>v+30)}/></div>`}
-    ${resAll.length > 0 && html`<span class="slbl">Resolvidas / Canceladas (${resAll.length})</span><div style=${{ display: 'flex', flexDirection: 'column', gap: 8 }}>${res.map(r => html`<${RncCard} key=${r.id} rnc=${r} onClick=${() => { setEditing(r); setView('editor'); }}/>`)}<${MoreResults} total=${resAll.length} shown=${res.length} onMore=${()=>setLimit(v=>v+30)}/></div>`}
+    ${resAll.length > 0 && html`<span class="slbl">Concluídas / Canceladas (${resAll.length})</span><div style=${{ display: 'flex', flexDirection: 'column', gap: 8 }}>${res.map(r => html`<${RncCard} key=${r.id} rnc=${r} onClick=${() => { setEditing(r); setView('editor'); }}/>`)}<${MoreResults} total=${resAll.length} shown=${res.length} onMore=${()=>setLimit(v=>v+30)}/></div>`}
   </div>`;
 }
 
 function RncCard({ rnc, onClick }) {
   const st = ST_RNC[rnc.status] || { l: rnc.status, c: 'bgy' };
-  const vencida = ['aberta','analise'].includes(rnc.status) && rnc.prazoAcao && rnc.prazoAcao < todayISO();
   return html`<button class="card" style=${{ padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 12, border: 'none', textAlign: 'left', width: '100%', cursor: 'pointer', opacity: ['resolvida','cancelada'].includes(rnc.status) ? .85 : 1 }} onClick=${onClick}>
-    <div style=${{ flex: 1, minWidth: 0 }}><div class="row" style=${{ gap: 6, marginBottom: 4 }}><span class=${`badge ${st.c}`}>${st.l}</span>${rnc.origem && html`<span class="badge bor">${rnc.origem}</span>`}${vencida && html`<span class="badge brd2">Prazo vencido</span>`}</div><div style=${{ fontWeight: 700, fontSize: 14 }}>${rnc.numero}</div><div style=${{ fontSize: 12, color: 'var(--s2)', marginTop: 2 }}>${rnc.produto || '—'} · ${fDate(rnc.data)}</div></div>
+    <div style=${{ flex: 1, minWidth: 0 }}><div class="row" style=${{ gap: 6, marginBottom: 4 }}><span class=${`badge ${st.c}`}>${st.l}</span>${rnc.origem && html`<span class="badge bor">${rnc.origem}</span>`}</div><div style=${{ fontWeight: 700, fontSize: 14 }}>${rnc.numero}</div><div style=${{ fontSize: 12, color: 'var(--s2)', marginTop: 2 }}>${rnc.produto || '—'} · ${fDate(rnc.data)}</div></div>
     <${Ic} n="cr" s=${16} style=${{ color: 'var(--s3)' }}/>
   </button>`;
 }
@@ -1187,6 +1185,7 @@ function RncEditor({ rnc, allItems, toast, genNum, onBack, onSave, onDelete }) {
   // --- Estado dos campos ---
   const [orig, setOrig] = useState(rnc?.origem || 'CD');
   const [setor, setSetor] = useState(rnc?.setor || '');
+  const [setorCustom, setSetorCustom] = useState(!!(rnc?.setor && !['CD','CP'].includes(rnc.setor)));
   const [data, setData] = useState(rnc?.data || todayISO());
   const [status, setStatus] = useState(rnc?.status || 'aberta');
   const [resp, setResp] = useState(rnc?.responsavel || (LS.get('config') || {}).responsavel || '');
@@ -1212,12 +1211,8 @@ function RncEditor({ rnc, allItems, toast, genNum, onBack, onSave, onDelete }) {
   const [qtdRecusada, setQtdRecusada] = useState(String(rnc?.qtdRecusada ?? ''));
   const [gravidade, setGravidade] = useState(rnc?.gravidade || 'Média');
   const [impactoFinanceiro, setImpactoFinanceiro] = useState(String(rnc?.impactoFinanceiro ?? ''));
-  const [causaRaiz, setCausaRaiz] = useState(rnc?.causaRaiz || '');
-  const [planoAcao, setPlanoAcao] = useState(rnc?.planoAcao || '');
-  const [responsavelAcao, setResponsavelAcao] = useState(rnc?.responsavelAcao || '');
-  const [prazoAcao, setPrazoAcao] = useState(rnc?.prazoAcao || '');
   const [respostaFornecedor, setRespostaFornecedor] = useState(rnc?.respostaFornecedor || '');
-  const [verificacaoEficacia, setVerificacaoEficacia] = useState(rnc?.verificacaoEficacia || '');
+  const [medidaRealizada, setMedidaRealizada] = useState(rnc?.medidaRealizada || (rnc?.status === 'resolvida' ? (rnc?.verificacaoEficacia || rnc?.planoAcao || '') : ''));
 
   const [fotos, setFotos] = useState(rnc?.fotos || []);
   const [assinatura, setAssinatura] = useState(rnc?.assinatura || null);
@@ -1237,13 +1232,13 @@ function RncEditor({ rnc, allItems, toast, genNum, onBack, onSave, onDelete }) {
     { v: 'Substituição imediata', desc: 'Fornecedor deve repor o item' },
     { v: 'Crédito em nota', desc: 'Abatimento no próximo faturamento' },
     { v: 'Desconto na próxima entrega', desc: 'Negociar abatimento futuro' },
-    { v: 'Apenas registrar ocorrência', desc: 'Sem ação corretiva, apenas histórico' },
+    { v: 'Apenas registrar ocorrência', desc: 'Sem providência imediata, apenas histórico' },
   ];
   const STATUS_OPTS = [
-    { v: 'aberta', l: 'Aberta', desc: 'Aguardando análise', c: 'brd2' },
-    { v: 'analise', l: 'Em análise', desc: 'Sendo verificada pela gestão', c: 'bam' },
-    { v: 'resolvida', l: 'Resolvida', desc: 'Tratada e finalizada', c: 'bgr2' },
-    { v: 'cancelada', l: 'Cancelada', desc: 'Sem prosseguimento', c: 'bgy' },
+    { v: 'aberta', l: 'Aberta', desc: 'PDF enviado ou aguardando resposta do fornecedor', c: 'brd2' },
+    { v: 'analise', l: 'Em acompanhamento', desc: 'Fornecedor respondeu; troca, crédito ou correção ainda está pendente', c: 'bam' },
+    { v: 'resolvida', l: 'Concluída', desc: 'A providência foi efetivada e a RNC pode ser encerrada', c: 'bgr2' },
+    { v: 'cancelada', l: 'Cancelada', desc: 'Registro encerrado sem prosseguimento', c: 'bgy' },
   ];
 
   const addFoto = file => {
@@ -1279,21 +1274,21 @@ function RncEditor({ rnc, allItems, toast, genNum, onBack, onSave, onDelete }) {
   // --- Validações por etapa ---
   const v1 = !!(orig && data && resp.trim());
   const v2 = !!(produto.trim() && parseFloat(qtd) > 0 && (tipo && (tipo !== 'Outro (descrever)' || tipoCustom.trim())) && desc.trim());
-  const resolucaoOk = status !== 'resolvida' || !!(planoAcao.trim() && verificacaoEficacia.trim());
+  const conclusaoOk = status !== 'resolvida' || !!medidaRealizada.trim();
   const cancelamentoOk = status !== 'cancelada' || !!obsAcao.trim();
-  const v3 = !!(acao && resolucaoOk && cancelamentoOk);
+  const v3 = !!(acao && conclusaoOk && cancelamentoOk);
   const podeRegistrar = v1 && v2 && v3;
   const semanaRegistro = rnc?.pedidoId && rnc?.semana ? rnc.semana : dateToWeek(data);
   const locked = isWeekClosed(semanaRegistro);
 
   const tipoFinal = tipo === 'Outro (descrever)' && tipoCustom ? tipoCustom : tipo;
 
-  const snapshot = JSON.stringify({ orig,setor,data,status,resp,produto,fornecedor,unit,qtd,tipo,tipoCustom,desc,acao,obsAcao,notaFiscal,lote,fabricacao,validade,temperatura,qtdPedida,qtdRecebida,qtdRecusada,gravidade,impactoFinanceiro,causaRaiz,planoAcao,responsavelAcao,prazoAcao,respostaFornecedor,verificacaoEficacia,fotos,assinatura });
+  const snapshot = JSON.stringify({ orig,setor,setorCustom,data,status,resp,produto,fornecedor,unit,qtd,tipo,tipoCustom,desc,acao,obsAcao,notaFiscal,lote,fabricacao,validade,temperatura,qtdPedida,qtdRecebida,qtdRecusada,gravidade,impactoFinanceiro,respostaFornecedor,medidaRealizada,fotos,assinatura });
   const guard = useDirtyGuard(snapshot);
   const salvar = () => {
     if (!ensureWeekOpen(semanaRegistro, toast, 'salvar a RNC')) return;
     if (!podeRegistrar) {
-      toast.show(status === 'resolvida' && !resolucaoOk ? 'Para resolver, informe o plano de ação e a verificação de eficácia.' : status === 'cancelada' && !cancelamentoOk ? 'Informe o motivo do cancelamento nas observações da ação.' : 'Preencha os campos obrigatórios');
+      toast.show(status === 'resolvida' && !conclusaoOk ? 'Para concluir, informe a medida que foi efetivamente realizada.' : status === 'cancelada' && !cancelamentoOk ? 'Informe o motivo do cancelamento nas observações da solicitação.' : 'Preencha os campos obrigatórios');
       return;
     }
     const agora = new Date().toISOString();
@@ -1312,8 +1307,9 @@ function RncEditor({ rnc, allItems, toast, genNum, onBack, onSave, onDelete }) {
       notaFiscal:notaFiscal.trim(), lote:lote.trim(), fabricacao, validade, temperatura:temperatura === '' ? null : parseFloat(temperatura),
       gravidade, impactoFinanceiro:nonNeg(impactoFinanceiro),
       tipo: tipoFinal, tipoCustom, descricao: desc.trim(),
-      acao, obsAcao: obsAcao.trim(), causaRaiz:causaRaiz.trim(), planoAcao:planoAcao.trim(), responsavelAcao:responsavelAcao.trim(), prazoAcao,
-      respostaFornecedor:respostaFornecedor.trim(), verificacaoEficacia:verificacaoEficacia.trim(),
+      acao, obsAcao: obsAcao.trim(),
+      respostaFornecedor:respostaFornecedor.trim(), medidaRealizada:medidaRealizada.trim(),
+      causaRaiz:undefined, planoAcao:undefined, responsavelAcao:undefined, prazoAcao:undefined, verificacaoEficacia:undefined,
       status, encerradoEm:status === 'resolvida' ? (rnc?.encerradoEm || agora) : null, motivoCancelamento:status==='cancelada' ? obsAcao.trim() : '', historicoStatus,
       fotos, assinatura,
       criadoEm: rnc?.criadoEm || agora, atualizadoEm: agora,
@@ -1394,8 +1390,16 @@ function RncEditor({ rnc, allItems, toast, genNum, onBack, onSave, onDelete }) {
           <div style=${{ fontSize: 11, color: 'var(--s2)', margin: '-2px 0 8px' }}>Onde a não conformidade foi identificada. Escolha ou escreva.</div>
           <div style=${{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 8 }}>
             ${['CD','CP','Outro'].map(s => {
-              const active = (s === 'Outro') ? (setor !== '' && setor !== 'CD' && setor !== 'CP') : (setor === s);
-              return html`<button key=${s} onClick=${() => setSetor(s === 'Outro' ? ' ' : s)} style=${{
+              const active = s === 'Outro' ? setorCustom : (!setorCustom && setor === s);
+              return html`<button key=${s} onClick=${() => {
+                if (s === 'Outro') {
+                  setSetorCustom(true);
+                  if (['CD','CP'].includes(setor)) setSetor('');
+                } else {
+                  setSetorCustom(false);
+                  setSetor(s);
+                }
+              }} style=${{
                 padding: '9px 16px', borderRadius: 20,
                 border: `1.5px solid ${active ? 'var(--or)' : 'var(--bd)'}`,
                 background: active ? 'var(--or3)' : '#fff',
@@ -1404,7 +1408,7 @@ function RncEditor({ rnc, allItems, toast, genNum, onBack, onSave, onDelete }) {
               }}>${s}</button>`;
             })}
           </div>
-          ${(setor !== '' && setor !== 'CD' && setor !== 'CP') && html`<input class="inp" value=${setor.trim()} onInput=${e => setSetor(e.target.value || ' ')} placeholder="Digite o setor (ex: Recebimento, Salão, Câmara fria...)" style=${{ marginBottom: 4 }}/>`}
+          ${setorCustom && html`<input class="inp" value=${setor} onInput=${e => setSetor(e.target.value)} placeholder="Digite o setor (ex: Recebimento, Salão, Câmara fria...)" style=${{ marginBottom: 4 }}/>`}
 
           <div style=${{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 12 }}>
             <div>${labelObrig('Data da ocorrência')}<input type="date" class="inp" value=${data} onInput=${e => setData(e.target.value)}/></div>
@@ -1503,10 +1507,10 @@ function RncEditor({ rnc, allItems, toast, genNum, onBack, onSave, onDelete }) {
       </div>`}
 
       ${step === 3 && html`<div>
-        ${stepHeader(3, 'Ação corretiva solicitada')}
+        ${stepHeader(3, 'Providência e acompanhamento')}
 
         <div class="card" style=${{ padding: 16, marginBottom: 12 }}>
-          ${labelObrig('Selecione a ação')}
+          ${labelObrig('Providência solicitada ao fornecedor')}
           <div style=${{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 12 }}>
             ${ACOES.map(a => html`<button key=${a.v} onClick=${() => setAcao(a.v)} style=${{
               padding: '12px 14px', borderRadius: 10,
@@ -1520,13 +1524,18 @@ function RncEditor({ rnc, allItems, toast, genNum, onBack, onSave, onDelete }) {
             </button>`)}
           </div>
 
-          ${labelOpt('Observações sobre a ação')}
-          <textarea class="inp" value=${obsAcao} onInput=${e => setObsAcao(e.target.value)} rows="3" placeholder="Detalhes adicionais, combinados com o fornecedor, prazos, etc." style=${{marginBottom:12}}/>
-          ${labelOpt('Causa raiz')}<textarea class="inp" value=${causaRaiz} onInput=${e=>setCausaRaiz(e.target.value)} rows="2" placeholder="Por que o problema ocorreu?" style=${{marginBottom:12}}/>
-          ${status === 'resolvida' ? labelObrig('Plano de ação executado') : labelOpt('Plano de ação')}<textarea class="inp" value=${planoAcao} onInput=${e=>setPlanoAcao(e.target.value)} rows="3" placeholder="O que será ou foi feito para corrigir e evitar recorrência?" style=${{marginBottom:12}}/>
-          <div style=${{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,marginBottom:12}}><div>${labelOpt('Responsável pela ação')}<input class="inp" value=${responsavelAcao} onInput=${e=>setResponsavelAcao(e.target.value)}/></div><div>${labelOpt('Prazo')}<input type="date" class="inp" value=${prazoAcao} onInput=${e=>setPrazoAcao(e.target.value)}/></div></div>
-          ${labelOpt('Resposta do CD/CP')}<textarea class="inp" value=${respostaFornecedor} onInput=${e=>setRespostaFornecedor(e.target.value)} rows="2" placeholder="Retorno, aceite, reposição ou crédito informado" style=${{marginBottom:12}}/>
-          ${status === 'resolvida' ? labelObrig('Verificação de eficácia') : labelOpt('Verificação de eficácia')}<textarea class="inp" value=${verificacaoEficacia} onInput=${e=>setVerificacaoEficacia(e.target.value)} rows="2" placeholder="Como foi confirmado que a ação resolveu o problema?"/>
+          ${labelOpt('Detalhes da solicitação')}
+          <textarea class="inp" value=${obsAcao} onInput=${e => setObsAcao(e.target.value)} rows="3" placeholder="Ex.: substituir até determinada data, retirar o produto, lançar crédito ou apenas registrar a ocorrência."/>
+        </div>
+
+        <div class="card" style=${{ padding: 16, marginBottom: 12 }}>
+          <div style=${{fontWeight:800,fontSize:14,marginBottom:4}}>Acompanhamento interno do Ilha</div>
+          <div style=${{fontSize:11,color:'var(--s2)',marginBottom:14}}>Registre apenas o retorno recebido pelo WhatsApp e o que foi efetivamente cumprido. O plano de ação interno do fornecedor não faz parte do NEXUS.</div>
+          ${labelOpt('Retorno do fornecedor')}
+          <textarea class="inp" value=${respostaFornecedor} onInput=${e=>setRespostaFornecedor(e.target.value)} rows="3" placeholder="Ex.: A troca será efetuada; o valor será abonado porque não há estoque; ainda não houve retorno." style=${{marginBottom:12}}/>
+          ${status === 'resolvida' ? labelObrig('Medida efetivamente realizada') : labelOpt('Medida efetivamente realizada')}
+          <textarea class="inp" value=${medidaRealizada} onInput=${e=>setMedidaRealizada(e.target.value)} rows="3" placeholder="Preencha quando a providência for concluída. Ex.: 200 unidades substituídas; crédito lançado na NF; produto recolhido."/>
+          ${status !== 'resolvida' && html`<div style=${{fontSize:11,color:'var(--s2)',marginTop:6}}>Enquanto a troca, o crédito ou a correção não forem efetivados, mantenha a RNC aberta ou em acompanhamento.</div>`}
         </div>
       </div>`}
 
@@ -1576,7 +1585,7 @@ function RncEditor({ rnc, allItems, toast, genNum, onBack, onSave, onDelete }) {
             ['Gravidade', gravidade],
             ['NF / Lote', [notaFiscal,lote].filter(Boolean).join(' / ') || '—'],
             ['Tipo', tipoFinal || '—'],
-            ['Ação solicitada', acao || '—'],
+            ['Providência solicitada', acao || '—'],
             ['Evidências', `${fotos.length} foto(s)${assinatura ? ' · assinado' : ''}`],
           ].map(([k, v]) => html`<div key=${k} class="row" style=${{ padding: '6px 0', borderBottom: '1px dashed rgba(201, 120, 0, .25)', fontSize: 12 }}>
             <span style=${{ fontWeight: 700, color: 'var(--s2)', minWidth: 110 }}>${k}</span>
@@ -1682,7 +1691,7 @@ function pdfOrcamento(o) {
 let _rncLogoCache = undefined;
 function loadRncLogo() {
   if (_rncLogoCache !== undefined) return Promise.resolve(_rncLogoCache);
-  const sources = ['logo-rnc-white.png', 'logo-ilha.png'];
+  const sources = ['logo-rnc-white.png', 'logo-ilha-clean.png', 'logo-ilha.png'];
   const tryLoad = (idx) => new Promise(resolve => {
     if (idx >= sources.length) { _rncLogoCache = null; return resolve(null); }
     const img = new Image();
@@ -1706,262 +1715,330 @@ async function pdfRnc(r) {
   const logo = await loadRncLogo();
   const Doc = getJsPDF();
   const doc = new Doc({ orientation: 'p', unit: 'mm', format: 'a4' });
-  const pageW = 210, pageH = 297, M = 16;
-  const CW = pageW - M * 2; // largura útil
+  const pageW = 210, pageH = 297, M = 14, CW = pageW - M * 2;
+  const footerLineY = pageH - 15;
+  const contentBottom = footerLineY - 12;
 
-  // ---- Paleta ----
-  const OR   = [245, 149, 0];
-  const OR2  = [201, 120, 0];
-  const INK  = [24, 24, 27];
-  const S1   = [63, 63, 70];
-  const S2   = [113, 113, 122];
-  const S3   = [161, 161, 170];
-  const BD   = [228, 228, 231];
-  const BG   = [250, 250, 250];
-  const RD   = [220, 38, 38];
-  const RD_BG= [254, 242, 242];
-  const GR   = [22, 163, 74];
-  const AM   = [217, 119, 6];
-  const OR_BG= [255, 248, 236];
+  const OR = [245, 149, 0];
+  const OR_D = [190, 111, 0];
+  const OR_SOFT = [255, 248, 236];
+  const INK = [24, 24, 27];
+  const S1 = [82, 82, 91];
+  const S2 = [113, 113, 122];
+  const S3 = [161, 161, 170];
+  const BD = [228, 228, 231];
+  const BG = [250, 250, 251];
+  const RD = [220, 38, 38];
+  const RD_BG = [254, 242, 242];
+  const AM = [217, 119, 6];
+  const AM_BG = [255, 251, 235];
+  const GR = [22, 163, 74];
+  const GR_BG = [240, 253, 244];
+  const BL_BG = [248, 250, 252];
 
-  const stColor = { aberta: RD, analise: AM, resolvida: GR, cancelada: S2 }[r.status] || S2;
-  const stLabel = ({ aberta: 'ABERTA', analise: 'EM ANÁLISE', resolvida: 'RESOLVIDA', cancelada: 'CANCELADA' })[r.status] || (r.status || '').toUpperCase();
+  const statusMeta = {
+    aberta: { label: 'ABERTA', detail: 'Aguardando retorno do fornecedor', color: RD, fill: RD_BG },
+    analise: { label: 'EM ACOMPANHAMENTO', detail: 'Providência pendente de conclusão', color: AM, fill: AM_BG },
+    resolvida: { label: 'CONCLUÍDA', detail: 'Providência efetivada', color: GR, fill: GR_BG },
+    cancelada: { label: 'CANCELADA', detail: 'Registro encerrado sem prosseguimento', color: S2, fill: BG },
+  }[r.status] || { label: String(r.status || 'SEM STATUS').toUpperCase(), detail: '', color: S2, fill: BG };
+
   const numStr = r.numero || '—';
-  const origemLabel = r.origem === 'CD' ? 'CD · Centro de Distribuição' : r.origem === 'CP' ? 'CP · Cozinha de Produção' : (r.origem || '—');
+  const origemLabel = r.origem === 'CD'
+    ? 'CD · Centro de Distribuição'
+    : r.origem === 'CP'
+      ? 'CP · Cozinha de Produção'
+      : (r.origem || '—');
 
-  // ═══════════════════════════════════════════════════════════
-  //  CABEÇALHO
-  // ═══════════════════════════════════════════════════════════
-  const HH = 34; // altura do cabeçalho
-  doc.setFillColor(...OR);
-  doc.rect(0, 0, pageW, HH, 'F');
-  doc.setFillColor(...OR2);
-  doc.rect(0, HH, pageW, 1.2, 'F');
-
-  // Logo (quadrado laranja com marca branca) à esquerda
-  let textX = M;
-  if (logo && logo.data) {
-    const logoH = 20, logoW = logo.w && logo.h ? logoH * (logo.w / logo.h) : 20;
-    try {
-      doc.addImage(logo.data, 'PNG', M, (HH - logoH) / 2, logoW, logoH);
-      textX = M + logoW + 5;
-    } catch (e) { textX = M; }
-  }
-
-  // Marca textual "NEXUS - RNC"
-  doc.setTextColor(255, 255, 255);
-  doc.setFont(undefined, 'bold');
-  doc.setFontSize(19);
-  doc.text('NEXUS - RNC', textX, 15);
-  doc.setFont(undefined, 'normal');
-  doc.setFontSize(8.5);
-  doc.setTextColor(255, 244, 224);
-  doc.text('Registro de Não Conformidade · Grupo Ilha', textX, 22);
-  doc.setFontSize(7.5);
-  doc.text('Gestão Operacional NEXUS', textX, 27.5);
-
-  // Cartão do número no canto direito
-  const nbW = 52, nbH = 24, nbX = pageW - M - nbW, nbY = (HH - nbH) / 2;
-  doc.setFillColor(255, 255, 255);
-  doc.roundedRect(nbX, nbY, nbW, nbH, 2.5, 2.5, 'F');
-  doc.setTextColor(...S2);
-  doc.setFont(undefined, 'bold');
-  doc.setFontSize(6.5);
-  doc.text('DOCUMENTO Nº', nbX + nbW / 2, nbY + 5, { align: 'center' });
-  doc.setTextColor(...OR2);
-  doc.setFontSize(12);
-  doc.text(String(numStr), nbX + nbW / 2, nbY + 11.5, { align: 'center' });
-  // pílula de status
-  doc.setFillColor(...stColor);
-  const pillW = nbW - 12;
-  doc.roundedRect(nbX + 6, nbY + 15, pillW, 5, 2.5, 2.5, 'F');
-  doc.setTextColor(255, 255, 255);
-  doc.setFontSize(7);
-  doc.text(stLabel, nbX + nbW / 2, nbY + 18.5, { align: 'center' });
-
-  let y = HH + 12;
-
-  // ---- Helper: título de seção ----
-  const sectionTitle = (n, titulo) => {
-    // chip do número (laranja, cantos arredondados)
-    const chipW = 8, chipH = 8;
-    doc.setFillColor(...OR);
-    doc.roundedRect(M, y - 5.2, chipW, chipH, 1.8, 1.8, 'F');
-    doc.setTextColor(255, 255, 255);
-    doc.setFont(undefined, 'bold');
-    doc.setFontSize(8.5);
-    doc.text(String(n).padStart(2, '0'), M + chipW / 2, y + 0.1, { align: 'center' });
-    // título
-    doc.setTextColor(...INK);
-    doc.setFontSize(11);
-    doc.text(String(titulo), M + chipW + 4, y);
-    // régua fina abaixo
-    const tW = doc.getTextWidth(String(titulo));
-    doc.setDrawColor(...BD);
-    doc.setLineWidth(0.4);
-    doc.line(M + chipW + 4 + tW + 4, y - 1, pageW - M, y - 1);
-    y += 8;
+  const pageTitle = 'REGISTRO DE NÃO CONFORMIDADE';
+  let y = 39;
+  const normalize = value => value == null || value === '' ? '—' : String(value);
+  const newContentPage = (context = 'Continuação do registro') => {
+    doc.addPage();
+    drawHeader(context);
+    y = 39;
+  };
+  const ensureSpace = (height, context = 'Continuação do registro') => {
+    if (y + height > contentBottom) newContentPage(context);
   };
 
-  // ---- Helper: campo rótulo/valor dentro de caixa ----
-  const field = (label, value, x, w, yPos, opts = {}) => {
-    const vColor = opts.valueColor || INK;
+  function drawHeader(context = 'Documento de ocorrência e acompanhamento') {
+    doc.setFillColor(255,255,255);
+    doc.rect(0,0,pageW,35,'F');
+    doc.setFillColor(...OR);
+    doc.rect(0,0,pageW,3,'F');
+
+    const brandX = M, brandY = 8, brandW = 34, brandH = 17;
+    doc.setFillColor(...OR);
+    doc.roundedRect(brandX, brandY, brandW, brandH, 2.6, 2.6, 'F');
+    if (logo && logo.data) {
+      const innerPad = 2.2;
+      const maxW = brandW - innerPad * 2;
+      const maxH = brandH - innerPad * 2;
+      const ratio = logo.w && logo.h ? (logo.w / logo.h) : 1.7;
+      let w = maxW, h = w / ratio;
+      if (h > maxH) { h = maxH; w = h * ratio; }
+      const lx = brandX + (brandW - w) / 2;
+      const ly = brandY + (brandH - h) / 2;
+      try { doc.addImage(logo.data, 'PNG', lx, ly, w, h); } catch (e) {}
+    }
+
+    const tx = brandX + brandW + 7;
+    const titleMax = 84;
+    const titleLines = doc.splitTextToSize(pageTitle, titleMax).slice(0, 2);
+    doc.setTextColor(...INK);
+    doc.setFont(undefined, 'bold');
+    doc.setFontSize(14.2);
+    doc.text(titleLines, tx, 13.8);
+    doc.setFont(undefined, 'normal');
+    doc.setFontSize(8);
+    doc.setTextColor(...S2);
+    doc.text(context, tx, 20.5);
+    doc.text('Grupo Ilha · Gestão Operacional NEXUS', tx, 25.2);
+
+    const boxW = 54, boxH = 19, boxX = pageW - M - boxW, boxY = 7.3;
+    doc.setFillColor(255,255,255);
+    doc.setDrawColor(...BD);
+    doc.setLineWidth(0.3);
+    doc.roundedRect(boxX, boxY, boxW, boxH, 2.3, 2.3, 'FD');
     doc.setTextColor(...S2);
     doc.setFont(undefined, 'bold');
-    doc.setFontSize(6.5);
-    doc.text(String(label).toUpperCase(), x, yPos);
-    doc.setTextColor(...vColor);
-    doc.setFont(undefined, opts.bold ? 'bold' : 'normal');
-    doc.setFontSize(opts.size || 10);
-    const txt = String(value == null || value === '' ? '—' : value);
-    const lines = doc.splitTextToSize(txt, w);
-    doc.text(lines.slice(0, opts.maxLines || 2), x, yPos + 4.6);
-    return (Math.min(lines.length, opts.maxLines || 2)) * 4.6 + 4.6;
-  };
+    doc.setFontSize(6.1);
+    doc.text('DOCUMENTO', boxX + 4, boxY + 4.8);
+    doc.setTextColor(...INK);
+    doc.setFontSize(9.5);
+    doc.text(String(numStr), boxX + 4, boxY + 10.7);
+    doc.setFillColor(...statusMeta.fill);
+    doc.setDrawColor(...statusMeta.color);
+    doc.roundedRect(boxX + 4, boxY + 12.4, boxW - 8, 5.1, 2.5, 2.5, 'FD');
+    doc.setTextColor(...statusMeta.color);
+    doc.setFontSize(statusMeta.label.length > 16 ? 5.4 : 6.7);
+    doc.text(statusMeta.label, boxX + boxW / 2, boxY + 15.9, { align: 'center' });
 
-  // ═══════════════════════════════════════════════════════════
-  //  1 · IDENTIFICAÇÃO
-  // ═══════════════════════════════════════════════════════════
-  sectionTitle(1, 'Identificação do registro');
-  const setorTxt = (r.setor && r.setor.trim()) ? r.setor.trim() : '—';
-  const idH = 42;
-  doc.setFillColor(...BG); doc.setDrawColor(...BD); doc.setLineWidth(0.2);
-  doc.roundedRect(M, y, CW, idH, 2, 2, 'FD');
-  const colW = (CW - 12) / 2;
-  const cx1 = M + 4, cx2 = M + 4 + colW + 4;
-  field('Origem do produto', origemLabel, cx1, colW, y + 6, { bold: true });
-  field('Setor de origem', setorTxt, cx2, colW, y + 6, { bold: true });
-  field('Data da ocorrência', fDate(r.data) || '—', cx1, colW, y + 18, { bold: true });
-  field('Responsável pelo registro', r.responsavel || '—', cx2, colW, y + 18, { bold: true });
-  field('Documento emitido em', new Date(r.criadoEm || Date.now()).toLocaleString('pt-BR'), cx1, colW, y + 30, { valueColor: S1, size: 9 });
-  field('Status', stLabel, cx2, colW, y + 30, { bold: true, valueColor: stColor, size: 9 });
-  y += idH + 9;
+    doc.setDrawColor(...BD);
+    doc.line(M, 31.8, pageW - M, 31.8);
+  }
 
-  // ═══════════════════════════════════════════════════════════
-  //  2 · PRODUTO / ITEM AFETADO
-  // ═══════════════════════════════════════════════════════════
-  sectionTitle(2, 'Produto / item afetado');
-  const prH = 30;
-  doc.setFillColor(...BG); doc.setDrawColor(...BD);
-  doc.roundedRect(M, y, CW, prH, 2, 2, 'FD');
-  field('Produto', r.produto || '—', cx1, CW - 8, y + 6, { bold: true, size: 11 });
-  field('Quantidade', r.quantidade ? `${r.quantidade} ${r.unidade || ''}` : '—', cx1, colW, y + 18, { bold: true });
-  field('Fornecedor', r.fornecedor || '—', cx2, colW, y + 18, { bold: true });
-  y += prH + 9;
+  function sectionTitle(title) {
+    ensureSpace(11, 'Continuação do registro');
+    doc.setFillColor(...OR);
+    doc.roundedRect(M, y - 3.6, 2, 7.2, 0.9, 0.9, 'F');
+    doc.setTextColor(...INK);
+    doc.setFont(undefined, 'bold');
+    doc.setFontSize(10.8);
+    doc.text(String(title), M + 5, y + 0.5);
+    const lineStart = M + 38;
+    doc.setDrawColor(...BD);
+    doc.setLineWidth(0.25);
+    doc.line(Math.min(lineStart, pageW - M - 6), y + 0.2, pageW - M, y + 0.2);
+    y += 6.4;
+  }
 
-  // ═══════════════════════════════════════════════════════════
-  //  3 · NÃO CONFORMIDADE
-  // ═══════════════════════════════════════════════════════════
-  sectionTitle(3, 'Não conformidade identificada');
-  // Badge do tipo
-  const tipoTxt = (r.tipoCustom && r.tipo === 'Outro (descrever)') ? r.tipoCustom : (r.tipo || '—');
-  doc.setFont(undefined, 'bold'); doc.setFontSize(8.5);
-  const tW = Math.min(doc.getTextWidth(tipoTxt) + 10, CW);
-  doc.setFillColor(...RD_BG); doc.setDrawColor(...RD); doc.setLineWidth(0.3);
-  doc.roundedRect(M, y, tW, 7.5, 3.5, 3.5, 'FD');
+  function drawInfoPanel(fields, cols = 2, options = {}) {
+    const colW = CW / cols;
+    const labelSize = 6.1;
+    const valueSize = options.valueSize || 8.8;
+    const minRowH = options.rowH || 13.5;
+    const rows = [];
+    for (let i = 0; i < fields.length; i += cols) rows.push(fields.slice(i, i + cols));
+    const rowMeta = rows.map(row => row.map(item => {
+      const text = normalize(item[1]);
+      const lines = doc.splitTextToSize(text, colW - 11).slice(0, options.maxLines || 3);
+      return { item, lines };
+    }));
+    const rowHeights = rowMeta.map(row => Math.max(minRowH, ...row.map(cell => 7.8 + cell.lines.length * 3.9)));
+    const totalH = 4 + rowHeights.reduce((a, b) => a + b, 0);
+    ensureSpace(totalH + 5, 'Continuação do registro');
+    doc.setFillColor(...(options.fill || [255,255,255]));
+    doc.setDrawColor(...BD);
+    doc.setLineWidth(0.25);
+    doc.roundedRect(M, y, CW, totalH, 2.4, 2.4, 'FD');
+    let yy = y + 4.8;
+    rowMeta.forEach((row, rIdx) => {
+      const rowH = rowHeights[rIdx];
+      row.forEach((cell, cIdx) => {
+        const x = M + cIdx * colW + 5;
+        doc.setTextColor(...S2);
+        doc.setFont(undefined, 'bold');
+        doc.setFontSize(labelSize);
+        doc.text(String(cell.item[0]).toUpperCase(), x, yy);
+        doc.setTextColor(...(cell.item[2] || INK));
+        doc.setFont(undefined, cell.item[3] ? 'bold' : 'normal');
+        doc.setFontSize(cell.item[4] || valueSize);
+        doc.text(cell.lines, x, yy + 4.1);
+      });
+      yy += rowH;
+      if (rIdx < rowMeta.length - 1) {
+        doc.setDrawColor(...BD);
+        doc.line(M + 3.5, yy - 2.8, M + CW - 3.5, yy - 2.8);
+      }
+    });
+    y += totalH + 4.5;
+  }
+
+  function drawFullField(label, value, options = {}) {
+    const text = normalize(value);
+    const lines = doc.splitTextToSize(text, CW - 14);
+    const h = Math.max(options.minH || 15, 9.5 + lines.length * (options.lineH || 4.1));
+    ensureSpace(h + 4.5, 'Continuação do registro');
+    doc.setFillColor(...(options.fill || [255,255,255]));
+    doc.setDrawColor(...(options.border || BD));
+    doc.setLineWidth(options.lineWidth || 0.25);
+    doc.roundedRect(M, y, CW, h, 2.4, 2.4, 'FD');
+    if (options.accent) {
+      doc.setFillColor(...options.accent);
+      doc.roundedRect(M, y, 2, h, 0.9, 0.9, 'F');
+    }
+    doc.setTextColor(...(options.labelColor || S2));
+    doc.setFont(undefined, 'bold');
+    doc.setFontSize(6.2);
+    doc.text(String(label).toUpperCase(), M + 6, y + 5.2);
+    doc.setTextColor(...(options.textColor || INK));
+    doc.setFont(undefined, options.bold ? 'bold' : 'normal');
+    doc.setFontSize(options.size || 9.1);
+    doc.text(lines, M + 6, y + 9.8);
+    y += h + 4.5;
+  }
+
+  function drawStatusNote(text, options = {}) {
+    const lines = doc.splitTextToSize(String(text), CW - 16);
+    const h = Math.max(13, 8 + lines.length * 3.9);
+    ensureSpace(h + 4.5, options.context || 'Continuação do acompanhamento');
+    doc.setFillColor(...(options.fill || BL_BG));
+    doc.setDrawColor(...(options.border || BD));
+    doc.setLineWidth(0.25);
+    doc.roundedRect(M, y, CW, h, 2.4, 2.4, 'FD');
+    if (options.accent) {
+      doc.setFillColor(...options.accent);
+      doc.roundedRect(M, y, 2, h, 0.9, 0.9, 'F');
+    }
+    doc.setTextColor(...(options.color || S1));
+    doc.setFont(undefined, options.bold ? 'bold' : 'normal');
+    doc.setFontSize(8.8);
+    doc.text(lines, M + 7, y + 7.2);
+    y += h + 4.5;
+  }
+
+  function drawActionBox(action, details) {
+    const detailsText = String(details || '').trim();
+    drawFullField('Solicitação', action || '—', {
+      fill: OR_SOFT,
+      border: OR,
+      accent: OR,
+      textColor: OR_D,
+      bold: true,
+      size: 10,
+      minH: 15
+    });
+    if (detailsText) {
+      drawFullField('Detalhes da solicitação', detailsText, { minH: 15 });
+    }
+  }
+
+  drawHeader();
+
+  sectionTitle('Identificação');
+  drawInfoPanel([
+    ['Origem do produto', origemLabel, INK, true],
+    ['Setor de origem', (r.setor || '').trim() || '—', INK, true],
+    ['Data da ocorrência', fDate(r.data) || '—'],
+    ['Responsável pelo registro', r.responsavel || '—'],
+  ], 2, { rowH: 14 });
+
+  sectionTitle('Produto e rastreabilidade');
+  drawFullField('Produto / item afetado', r.produto || '—', { minH: 14, bold: true, size: 10.1 });
+  const qtdResumo = r.quantidade ? `${r.quantidade} ${r.unidade || ''}` : '—';
+  const fabVal = [r.fabricacao ? fDate(r.fabricacao) : '', r.validade ? fDate(r.validade) : ''].filter(Boolean).join(' / ') || '—';
+  const nfLote = [r.notaFiscal ? `NF ${r.notaFiscal}` : '', r.lote ? `Lote ${r.lote}` : ''].filter(Boolean).join(' · ') || '—';
+  const temp = r.temperatura == null || r.temperatura === '' ? '—' : `${r.temperatura} °C`;
+  const qtds = `Pedida: ${r.qtdPedida ?? 0} · Recebida: ${r.qtdRecebida ?? 0} · Recusada: ${r.qtdRecusada ?? 0} ${r.unidade || ''}`;
+  const impacto = `${r.gravidade || '—'} · ${fMoeda(r.impactoFinanceiro || 0)}`;
+  drawInfoPanel([
+    ['Quantidade afetada', qtdResumo],
+    ['Fornecedor', r.fornecedor || '—'],
+    ['Nota fiscal / lote', nfLote],
+    ['Fabricação / validade', fabVal],
+    ['Temperatura', temp],
+    ['Gravidade / impacto', impacto],
+  ], 2, { rowH: 14, maxLines: 3 });
+  if (Number(r.qtdPedida || 0) || Number(r.qtdRecebida || 0) || Number(r.qtdRecusada || 0)) {
+    drawStatusNote(qtds, { bold: true, fill: BG });
+  }
+
+  sectionTitle('Não conformidade identificada');
+  const tipoTxt = (r.tipoCustom && r.tipo === 'Outro (descrever)') ? r.tipoCustom : (r.tipo || 'Não informado');
+  const badgeW = Math.min(CW, doc.getTextWidth(tipoTxt) + 18);
+  doc.setFillColor(...RD_BG);
+  doc.setDrawColor(...RD);
+  doc.setLineWidth(0.25);
+  doc.roundedRect(M, y, badgeW, 7.4, 3.7, 3.7, 'FD');
   doc.setTextColor(...RD);
-  doc.text(tipoTxt, M + 5, y + 5);
-  y += 12;
-  // Caixa da descrição
-  const descTxt = String(r.descricao || 'Sem descrição registrada.').trim();
-  const descLines = doc.splitTextToSize(descTxt, CW - 10);
-  const descH = Math.max(24, descLines.length * 4.8 + 12);
-  doc.setFillColor(255, 255, 255); doc.setDrawColor(...BD); doc.setLineWidth(0.3);
-  doc.roundedRect(M, y, CW, descH, 2, 2, 'FD');
-  doc.setFillColor(...RD); doc.rect(M, y, 1.4, descH, 'F');
-  doc.setTextColor(...S2); doc.setFont(undefined, 'bold'); doc.setFontSize(6.5);
-  doc.text('DESCRIÇÃO', M + 5, y + 6);
-  doc.setTextColor(...INK); doc.setFont(undefined, 'normal'); doc.setFontSize(9.5);
-  doc.text(descLines, M + 5, y + 11.5);
-  y += descH + 9;
+  doc.setFont(undefined, 'bold');
+  doc.setFontSize(7.7);
+  doc.text(tipoTxt, M + 5.6, y + 4.8);
+  y += 10.8;
+  drawFullField('Descrição da ocorrência', r.descricao || 'Sem descrição registrada.', { accent: RD, minH: 16 });
 
-  // ═══════════════════════════════════════════════════════════
-  //  4 · AÇÃO CORRETIVA
-  // ═══════════════════════════════════════════════════════════
-  if (y > pageH - 78) { doc.addPage(); y = 20; }
-  sectionTitle(4, 'Ação corretiva solicitada');
-  const obsTxt = String(r.obsAcao || '').trim();
-  const obsLines = obsTxt ? doc.splitTextToSize(obsTxt, CW - 10) : [];
-  const acH = obsTxt ? Math.max(24, obsLines.length * 4.5 + 18) : 16;
-  doc.setFillColor(...OR_BG); doc.setDrawColor(...OR); doc.setLineWidth(0.4);
-  doc.roundedRect(M, y, CW, acH, 2, 2, 'FD');
-  doc.setTextColor(...OR2); doc.setFont(undefined, 'bold'); doc.setFontSize(10.5);
-  doc.text(String(r.acao || '—'), M + 6, y + 8);
-  if (obsTxt) {
-    doc.setTextColor(...S2); doc.setFont(undefined, 'bold'); doc.setFontSize(6.5);
-    doc.text('OBSERVAÇÕES', M + 6, y + 14);
-    doc.setTextColor(...INK); doc.setFont(undefined, 'normal'); doc.setFontSize(9);
-    doc.text(obsLines, M + 6, y + 18.5);
-  }
-  y += acH + 9;
+  sectionTitle('Providência solicitada ao fornecedor');
+  drawActionBox(r.acao || '—', r.obsAcao || '');
 
-  // ═══════════════════════════════════════════════════════════
-  //  5 · RASTREABILIDADE E TRATAMENTO
-  // ═══════════════════════════════════════════════════════════
-  if (y > pageH - 88) { doc.addPage(); y = 20; }
-  sectionTitle(5, 'Rastreabilidade e tratamento');
-  const detalheRows = [
-    ['Pedido / orçamento', [r.pedidoId ? `Pedido ${r.pedidoId}` : '', r.orcamentoId ? `Orçamento ${r.orcamentoId}` : ''].filter(Boolean).join(' · ') || '—'],
-    ['Nota fiscal / lote', [r.notaFiscal, r.lote].filter(Boolean).join(' · ') || '—'],
-    ['Fabricação / validade', [r.fabricacao ? fDate(r.fabricacao) : '', r.validade ? fDate(r.validade) : ''].filter(Boolean).join(' · ') || '—'],
-    ['Temperatura', r.temperatura == null || r.temperatura === '' ? '—' : `${r.temperatura} °C`],
-    ['Quantidades', `Pedida: ${r.qtdPedida ?? 0} · Recebida: ${r.qtdRecebida ?? 0} · Recusada: ${r.qtdRecusada ?? 0} ${r.unidade || ''}`],
-    ['Gravidade / impacto', `${r.gravidade || '—'} · ${fMoeda(r.impactoFinanceiro || 0)}`],
-    ['Causa raiz', r.causaRaiz || '—'],
-    ['Plano de ação', r.planoAcao || '—'],
-    ['Responsável / prazo', [r.responsavelAcao, r.prazoAcao ? fDate(r.prazoAcao) : ''].filter(Boolean).join(' · ') || '—'],
-    ['Resposta do CD/CP', r.respostaFornecedor || '—'],
-    ['Verificação de eficácia', r.verificacaoEficacia || '—'],
-    ['Encerramento', r.encerradoEm ? fDateTime(r.encerradoEm) : '—'],
-    ['Histórico de status', Array.isArray(r.historicoStatus) && r.historicoStatus.length ? r.historicoStatus.map(h=>`${fDateTime(h.em)}: ${h.de ? (ST_RNC[h.de]?.l || h.de) : 'Criação'} → ${ST_RNC[h.para]?.l || h.para} (${h.usuario || 'Usuário local'})`).join(' | ') : '—'],
-  ];
-  if (doc.autoTable) {
-    doc.autoTable({ startY:y, body:detalheRows, theme:'grid', styles:{fontSize:7.6,cellPadding:2.2,overflow:'linebreak'}, columnStyles:{0:{cellWidth:42,fontStyle:'bold',textColor:S2},1:{cellWidth:CW-42,textColor:INK}}, margin:{left:M,right:M}, alternateRowStyles:{fillColor:BG}, didParseCell:data=>{ if(data.section==='body' && data.column.index===0) data.cell.styles.fillColor=OR_BG; } });
-    y = doc.lastAutoTable.finalY + 9;
+  sectionTitle('Acompanhamento');
+  if (String(r.respostaFornecedor || '').trim()) {
+    drawFullField('Retorno do fornecedor', r.respostaFornecedor, { minH: 15 });
   } else {
-    doc.setFontSize(8); detalheRows.forEach(row=>{ if(y>pageH-24){doc.addPage();y=20;} doc.setFont(undefined,'bold');doc.text(row[0],M,y);doc.setFont(undefined,'normal');doc.text(doc.splitTextToSize(String(row[1]),CW-46),M+44,y);y+=8; }); y+=3;
+    drawStatusNote('Aguardando resposta do fornecedor.', { bold: true, accent: OR, fill: BG });
+  }
+  if (String(r.medidaRealizada || '').trim()) {
+    const medidaPdf = r.status === 'resolvida' && r.encerradoEm
+      ? `${r.medidaRealizada}
+Concluída em ${fDateTime(r.encerradoEm)}.`
+      : r.medidaRealizada;
+    drawFullField('Medida efetivamente realizada', medidaPdf, { accent: GR, fill: GR_BG, border: GR, textColor: [21, 128, 61], minH: 16 });
+  } else if (r.status === 'analise') {
+    drawStatusNote('Resposta recebida. Reposição, crédito ou correção ainda em acompanhamento.', { color: AM, bold: true, fill: AM_BG, border: [253, 230, 138], accent: AM });
+  }
+  if (r.status === 'cancelada' && (r.motivoCancelamento || r.obsAcao)) {
+    drawStatusNote(`Motivo do cancelamento: ${r.motivoCancelamento || r.obsAcao}`, { color: S1, bold: true });
   }
 
-  // ═══════════════════════════════════════════════════════════
-  //  6 · VALIDAÇÃO / ASSINATURAS
-  // ═══════════════════════════════════════════════════════════
-  if (y > pageH - 52) { doc.addPage(); y = 20; }
-  sectionTitle(6, 'Validação do registro');
-  const sigH = 34;
-  const sigColW = (CW - 6) / 2;
-  // Coluna 1 — responsável
-  doc.setFillColor(255, 255, 255); doc.setDrawColor(...BD); doc.setLineWidth(0.3);
-  doc.roundedRect(M, y, sigColW, sigH, 2, 2, 'FD');
+  sectionTitle('Validação do registro');
+  const sigH = 20.5, sigGap = 6, sigW = (CW - sigGap) / 2;
+  ensureSpace(sigH + 5, 'Validação do registro');
+  doc.setFillColor(255,255,255);
+  doc.setDrawColor(...BD);
+  doc.setLineWidth(0.25);
+  doc.roundedRect(M, y, sigW, sigH, 2.4, 2.4, 'FD');
   if (r.assinatura) {
-    try { doc.addImage(r.assinatura, 'PNG', M + 4, y + 3, sigColW - 8, 18); } catch (e) {}
+    try { doc.addImage(r.assinatura, 'PNG', M + 5, y + 2, sigW - 10, 10.6); } catch (e) {}
   } else {
-    doc.setLineDashPattern([1, 1], 0);
-    doc.line(M + 6, y + 20, M + sigColW - 6, y + 20);
+    doc.setLineDashPattern([1.2, 1.2], 0);
+    doc.line(M + 7, y + 11.1, M + sigW - 7, y + 11.1);
     doc.setLineDashPattern([], 0);
   }
-  doc.setTextColor(...S2); doc.setFont(undefined, 'bold'); doc.setFontSize(6.5);
-  doc.text('RESPONSÁVEL PELO REGISTRO', M + 4, y + 26);
-  doc.setTextColor(...INK); doc.setFont(undefined, 'normal'); doc.setFontSize(9);
-  doc.text(String(r.responsavel || '—'), M + 4, y + 31);
-  // Coluna 2 — ciência da gestão
-  const c2x = M + sigColW + 6;
-  doc.setFillColor(255, 255, 255); doc.setDrawColor(...BD);
-  doc.roundedRect(c2x, y, sigColW, sigH, 2, 2, 'FD');
-  doc.setLineDashPattern([1, 1], 0);
-  doc.line(c2x + 6, y + 20, c2x + sigColW - 6, y + 20);
-  doc.setLineDashPattern([], 0);
-  doc.setTextColor(...S2); doc.setFont(undefined, 'bold'); doc.setFontSize(6.5);
-  doc.text('CIÊNCIA DA GESTÃO', c2x + 4, y + 26);
-  doc.setTextColor(...S3); doc.setFont(undefined, 'normal'); doc.setFontSize(9);
-  doc.text('Nome / Data', c2x + 4, y + 31);
-  y += sigH + 6;
+  doc.setTextColor(...S2);
+  doc.setFont(undefined, 'bold');
+  doc.setFontSize(6.2);
+  doc.text('RESPONSÁVEL PELO REGISTRO', M + 5, y + 15.3);
+  doc.setTextColor(...INK);
+  doc.setFont(undefined, 'normal');
+  doc.setFontSize(8.5);
+  doc.text(doc.splitTextToSize(String(r.responsavel || '—'), sigW - 10).slice(0, 1), M + 5, y + 18.6);
 
-  // ═══════════════════════════════════════════════════════════
-  //  EVIDÊNCIAS FOTOGRÁFICAS — 1 IMAGEM POR PÁGINA
-  // ═══════════════════════════════════════════════════════════
+  const sx = M + sigW + sigGap;
+  doc.setFillColor(255,255,255);
+  doc.setDrawColor(...BD);
+  doc.roundedRect(sx, y, sigW, sigH, 2.4, 2.4, 'FD');
+  doc.setLineDashPattern([1.2, 1.2], 0);
+  doc.line(sx + 7, y + 11.1, sx + sigW - 7, y + 11.1);
+  doc.setLineDashPattern([], 0);
+  doc.setTextColor(...S2);
+  doc.setFont(undefined, 'bold');
+  doc.setFontSize(6.2);
+  doc.text('CIÊNCIA DA GESTÃO', sx + 5, y + 16.1);
+  y += sigH + 4.5;
+
   const fotos = Array.isArray(r.fotos) ? r.fotos : [];
-  // Pré-mede as dimensões reais de cada foto via Image() (confiável em qualquer navegador)
-  const medirImg = (src) => new Promise(resolve => {
+  const medirImg = src => new Promise(resolve => {
     try {
       const im = new Image();
       im.onload = () => resolve({ w: im.naturalWidth || 1, h: im.naturalHeight || 1 });
@@ -1970,78 +2047,62 @@ async function pdfRnc(r) {
     } catch (e) { resolve(null); }
   });
   const dims = [];
-  for (let k = 0; k < fotos.length; k++) { dims[k] = await medirImg(fotos[k]); }
+  for (let i = 0; i < fotos.length; i++) dims[i] = await medirImg(fotos[i]);
 
   for (let i = 0; i < fotos.length; i++) {
-    const foto = fotos[i];
     doc.addPage();
-    // faixa de cabeçalho da página de evidência
-    doc.setFillColor(...OR); doc.rect(0, 0, pageW, HH, 'F');
-    doc.setFillColor(...OR2); doc.rect(0, HH, pageW, 1.2, 'F');
-    const evLogoW = logo && logo.data && logo.w && logo.h ? 20 * (logo.w / logo.h) : 0;
-    if (logo && logo.data) {
-      try { doc.addImage(logo.data, 'PNG', M, (HH - 20) / 2, evLogoW, 20); } catch (e) {}
-    }
-    const evTextX = M + (evLogoW ? evLogoW + 5 : 0);
-    doc.setTextColor(255, 255, 255); doc.setFont(undefined, 'bold'); doc.setFontSize(17);
-    doc.text('NEXUS - RNC', evTextX, 16);
-    doc.setFont(undefined, 'normal'); doc.setFontSize(8.5);
-    doc.setTextColor(255, 244, 224);
-    doc.text(`Evidência ${i + 1} de ${fotos.length} · Documento ${numStr}`, evTextX, 23);
-
-    // reinicia o cursor vertical no topo da área de conteúdo desta página
-    y = HH + 14;
-    sectionTitle(7, `Evidência fotográfica ${i + 1}`);
-    // Área da imagem
-    const areaX = M, areaY = y, areaW = CW, areaH = pageH - y - 22;
-    doc.setFillColor(255, 255, 255); doc.setDrawColor(...BD); doc.setLineWidth(0.3);
-    doc.roundedRect(areaX, areaY, areaW, areaH, 2, 2, 'FD');
-    // dimensiona preservando proporção (usa dimensões pré-medidas)
-    const capH = 9;
-    const pad = 6;
-    const maxW = areaW - pad * 2, maxH = areaH - pad * 2 - capH;
+    drawHeader(`Evidência fotográfica ${i + 1} de ${fotos.length}`);
+    y = 39;
+    sectionTitle(`Evidência fotográfica ${i + 1}`);
+    const areaX = M, areaY = y, areaW = CW, areaH = pageH - y - 26;
+    doc.setFillColor(255,255,255);
+    doc.setDrawColor(...BD);
+    doc.roundedRect(areaX, areaY, areaW, areaH, 2.4, 2.4, 'FD');
+    const pad = 7.5, labelH = 10;
+    const maxW = areaW - pad * 2, maxH = areaH - pad * 2 - labelH;
     const d = dims[i];
     let drawW = maxW, drawH = maxH;
     if (d && d.w && d.h) {
       const ratio = d.w / d.h;
-      drawW = maxW; drawH = drawW / ratio;
+      drawH = drawW / ratio;
       if (drawH > maxH) { drawH = maxH; drawW = drawH * ratio; }
     }
     const imgX = areaX + (areaW - drawW) / 2;
     const imgY = areaY + pad + (maxH - drawH) / 2;
-    let imgOk = false;
-    for (const f of ['JPEG', 'PNG', 'WEBP']) {
-      try { doc.addImage(foto, f, imgX, imgY, drawW, drawH); imgOk = true; break; } catch (e) {}
+    let ok = false;
+    for (const format of ['JPEG', 'PNG', 'WEBP']) {
+      try { doc.addImage(fotos[i], format, imgX, imgY, drawW, drawH); ok = true; break; } catch (e) {}
     }
-    if (!imgOk) {
-      try { doc.addImage(foto, imgX, imgY, drawW, drawH); imgOk = true; } catch (e) {}
+    if (!ok) {
+      try { doc.addImage(fotos[i], imgX, imgY, drawW, drawH); ok = true; } catch (e) {}
     }
-    if (!imgOk) {
-      doc.setTextColor(...S3); doc.setFont(undefined, 'normal'); doc.setFontSize(9);
+    if (!ok) {
+      doc.setTextColor(...S3);
+      doc.setFont(undefined, 'normal');
+      doc.setFontSize(9);
       doc.text('Imagem indisponível', areaX + areaW / 2, areaY + areaH / 2, { align: 'center' });
     }
-    // legenda discreta (chip laranja, alinhado ao estilo do documento)
-    doc.setFillColor(...OR);
-    doc.roundedRect(areaX + pad, areaY + areaH - capH - 1, 30, capH - 2, 1.5, 1.5, 'F');
-    doc.setTextColor(255, 255, 255); doc.setFont(undefined, 'bold'); doc.setFontSize(7.5);
-    doc.text(`EVIDÊNCIA ${i + 1}`, areaX + pad + 15, areaY + areaH - capH + 3.5, { align: 'center' });
+    doc.setTextColor(...S2);
+    doc.setFont(undefined, 'bold');
+    doc.setFontSize(7);
+    doc.text(`EVIDÊNCIA ${i + 1}`, areaX + pad, areaY + areaH - 5.5);
   }
 
-  // ═══════════════════════════════════════════════════════════
-  //  RODAPÉ EM TODAS AS PÁGINAS
-  // ═══════════════════════════════════════════════════════════
   const totalPages = doc.internal.getNumberOfPages();
   for (let p = 1; p <= totalPages; p++) {
     doc.setPage(p);
-    doc.setDrawColor(...BD); doc.setLineWidth(0.2);
-    doc.line(M, pageH - 14, pageW - M, pageH - 14);
-    doc.setTextColor(...S3); doc.setFont(undefined, 'normal'); doc.setFontSize(7);
-    doc.text(`NEXUS - RNC · Grupo Ilha · Documento ${numStr}`, M, pageH - 9);
+    doc.setDrawColor(...BD);
+    doc.setLineWidth(0.2);
+    doc.line(M, footerLineY, pageW - M, footerLineY);
+    doc.setTextColor(...S3);
+    doc.setFont(undefined, 'normal');
+    doc.setFontSize(6.8);
+    doc.text(`NEXUS · Grupo Ilha · ${numStr}`, M, pageH - 9.6);
     doc.text(`Emitido em ${new Date().toLocaleString('pt-BR')}`, M, pageH - 5.2);
-    doc.text(`Página ${p} de ${totalPages}`, pageW - M, pageH - 9, { align: 'right' });
+    doc.text(`Página ${p} de ${totalPages}`, pageW - M, pageH - 9.6, { align: 'right' });
   }
 
-  doc.save(`NEXUS_RNC_${(numStr || r.id || '').replace(/[\\/:*?"<>|]+/g, '_')}.pdf`);
+  doc.save(`NEXUS_RNC_${(numStr || r.id || '').replace(/[\/:*?"<>|]+/g, '_')}.pdf`);
 }
 
 /* ══════════════════════════════════════
@@ -2301,7 +2362,7 @@ function AnaliseTab() {
       ${insumoCritico && insumoCritico.qtd > 1 ? html`<div class="card" style=${{ padding: 16, marginBottom: 16, background: 'var(--rd3)', border: '1px solid rgba(220,38,38,.2)' }}><div class="row" style=${{ gap: 10 }}><${Ic} n="rnc" s=${20} style=${{ color: 'var(--rd)' }}/><div><div style=${{ fontWeight: 800, fontSize: 15, color: 'var(--rd)' }}>Insumo mais recorrente: ${insumoCritico.nome}</div><div style=${{ fontSize: 13, color: 'var(--s1)', marginTop: 2 }}>${insumoCritico.qtd} ocorrências no período · problema mais comum: ${insumoCritico.tipoTop}${insumoCritico.fornecedores.length ? ' · fornecedor(es): ' + insumoCritico.fornecedores.join(', ') : ''}</div></div></div></div>` : null}
       <div style=${{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(160px, 1fr))', gap: 12, marginBottom: 16 }}>
         <${Kpi} label="Total de RNCs" value=${totalRnc} sub="no período/filtros"/>
-        <${Kpi} label="Em aberto" value=${rncAbertas} color=${rncAbertas > 0 ? 'var(--rd)' : 'var(--gr)'} sub="aberta ou em análise"/>
+        <${Kpi} label="Em aberto" value=${rncAbertas} color=${rncAbertas > 0 ? 'var(--rd)' : 'var(--gr)'} sub="aberta ou em acompanhamento"/>
         <${Kpi} label="Insumos distintos" value=${rncPorItem.length} sub="com ocorrência"/>
         <${Kpi} label="Fornecedores" value=${rncPorFornecedor.filter(f => f.label !== 'Não informado').length} sub="citados nas RNCs"/>
       </div>
@@ -2313,7 +2374,7 @@ function AnaliseTab() {
         <div class="card" style=${{ padding: 16 }}><div style=${{ fontWeight: 800, fontSize: 15, marginBottom: 12 }}>Por fornecedor</div>${rncPorFornecedor.length ? html`<${BarList} rows=${rncPorFornecedor} valueKey="qtd" maxRows=${10} color="#2563EB"/>` : html`<p style=${{ fontSize: 13, color: 'var(--s2)' }}>Sem dados.</p>`}</div>
         <div class="card" style=${{ padding: 16 }}><div style=${{ fontWeight: 800, fontSize: 15, marginBottom: 12 }}>Evolução por semana</div>${rncPorSemana.length ? html`<${MonoChart} rows=${rncPorSemana} k="qtd" color="var(--rd)"/>` : html`<p style=${{ fontSize: 13, color: 'var(--s2)' }}>Sem dados.</p>`}</div>
       </div>
-      <div class="card" style=${{ padding: 16 }}><div style=${{ fontWeight: 800, fontSize: 15, marginBottom: 12 }}>Detalhamento por insumo</div><div style=${{ overflowX: 'auto' }}><table style=${{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}><thead><tr style=${{ borderBottom: '2px solid var(--bd)' }}>${['Insumo', 'Ocorrências', 'Problema mais comum', 'Fornecedor(es)', 'Origem', 'Abertas', 'Resolvidas'].map((h, i) => html`<th key=${h} style=${{ textAlign: i === 0 ? 'left' : i === 1 || i > 4 ? 'right' : 'left', padding: '8px 6px', fontSize: 10, textTransform: 'uppercase', color: 'var(--s3)' }}>${h}</th>`)}</tr></thead><tbody>${rncPorItem.map((r, i) => html`<tr key=${r.nome} style=${{ borderBottom: '1px solid var(--bd)', background: i % 2 ? '#FAFAFA' : '#fff' }}><td style=${{ padding: '9px 6px', fontWeight: 700 }}>${r.nome}</td><td style=${{ padding: '9px 6px', textAlign: 'right', fontWeight: 800, color: r.qtd > 2 ? 'var(--rd)' : 'var(--ink)' }}>${r.qtd}</td><td style=${{ padding: '9px 6px' }}>${r.tipoTop}</td><td style=${{ padding: '9px 6px' }}>${r.fornecedores.join(', ') || '—'}</td><td style=${{ padding: '9px 6px' }}>${r.origens.join(', ') || '—'}</td><td style=${{ padding: '9px 6px', textAlign: 'right', color: r.abertas > 0 ? 'var(--rd)' : 'var(--s2)' }}>${r.abertas}</td><td style=${{ padding: '9px 6px', textAlign: 'right', color: 'var(--gr)' }}>${r.resolvidas}</td></tr>`)}</tbody></table></div></div>
+      <div class="card" style=${{ padding: 16 }}><div style=${{ fontWeight: 800, fontSize: 15, marginBottom: 12 }}>Detalhamento por insumo</div><div style=${{ overflowX: 'auto' }}><table style=${{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}><thead><tr style=${{ borderBottom: '2px solid var(--bd)' }}>${['Insumo', 'Ocorrências', 'Problema mais comum', 'Fornecedor(es)', 'Origem', 'Abertas', 'Concluídas'].map((h, i) => html`<th key=${h} style=${{ textAlign: i === 0 ? 'left' : i === 1 || i > 4 ? 'right' : 'left', padding: '8px 6px', fontSize: 10, textTransform: 'uppercase', color: 'var(--s3)' }}>${h}</th>`)}</tr></thead><tbody>${rncPorItem.map((r, i) => html`<tr key=${r.nome} style=${{ borderBottom: '1px solid var(--bd)', background: i % 2 ? '#FAFAFA' : '#fff' }}><td style=${{ padding: '9px 6px', fontWeight: 700 }}>${r.nome}</td><td style=${{ padding: '9px 6px', textAlign: 'right', fontWeight: 800, color: r.qtd > 2 ? 'var(--rd)' : 'var(--ink)' }}>${r.qtd}</td><td style=${{ padding: '9px 6px' }}>${r.tipoTop}</td><td style=${{ padding: '9px 6px' }}>${r.fornecedores.join(', ') || '—'}</td><td style=${{ padding: '9px 6px' }}>${r.origens.join(', ') || '—'}</td><td style=${{ padding: '9px 6px', textAlign: 'right', color: r.abertas > 0 ? 'var(--rd)' : 'var(--s2)' }}>${r.abertas}</td><td style=${{ padding: '9px 6px', textAlign: 'right', color: 'var(--gr)' }}>${r.resolvidas}</td></tr>`)}</tbody></table></div></div>
     </div>` : null}
 
     ${view === 'item' ? html`<div style=${{ display: 'grid', gridTemplateColumns: '360px 1fr', gap: 12 }}>
@@ -2429,7 +2490,7 @@ function ConfigTab({ toast }) {
     <div style=${{ marginTop: 32, marginBottom: 24, textAlign: 'center', padding: '20px 0', borderTop: '1px solid var(--bd)' }}>
       <div style=${{ fontSize: 10, fontWeight: 700, letterSpacing: '.12em', color: 'var(--s3)', textTransform: 'uppercase', marginBottom: 6 }}>Desenvolvido por</div>
       <div style=${{ fontSize: 15, fontWeight: 800, color: 'var(--ink)', marginBottom: 2, fontFamily: "'Plus Jakarta Sans',sans-serif" }}>Vinicius Candido dos Santos</div>
-      <div style=${{ fontSize: 12, color: 'var(--s2)' }}>NEXUS v2.6.0 · Grupo Ilha · ${new Date().getFullYear()}</div>
+      <div style=${{ fontSize: 12, color: 'var(--s2)' }}>NEXUS v2.6.2 · Grupo Ilha · ${new Date().getFullYear()}</div>
     </div>
 
     ${addingItem && html`<${AddItemModal} orig=${addingItem.orig} cat=${addingItem.cat} defUnit=${addingItem.unit} onClose=${() => setAddingItem(null)} onConfirm=${addItem}/>`}
@@ -2560,7 +2621,7 @@ function AdminLocal({ toast }) {
       <div class="card" style=${{ padding:16 }}>
         <div style=${{ fontWeight:800, fontSize:16, marginBottom:10 }}>Painel de saúde operacional</div>
         <div style=${{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
-          ${[['Pedidos pendentes',pedidos.filter(p=>p.status==='pendente').length],['Recebimentos parciais',pedidos.filter(p=>p.status==='parcial').length],['Recebimentos OK',pedidos.filter(p=>p.status==='recebido').length],['RNCs abertas',rncs.filter(r=>r.status==='aberta'||r.status==='analise').length],['RNCs resolvidas',rncs.filter(r=>r.status==='resolvida').length],['Orçam. a autorizar',orcamentos.filter(o=>o.status==='pendente').length]].map(([l,v])=>html`<div style=${{ padding:12, border:'1px solid var(--bd)', borderRadius:12, background:'#fff' }}><div style=${{ fontSize:10,color:'var(--s3)',fontWeight:800,textTransform:'uppercase',letterSpacing:'.06em' }}>${l}</div><div style=${{ fontSize:24,fontWeight:800,fontFamily:"'Plus Jakarta Sans',sans-serif" }}>${v}</div></div>`)}
+          ${[['Pedidos pendentes',pedidos.filter(p=>p.status==='pendente').length],['Recebimentos parciais',pedidos.filter(p=>p.status==='parcial').length],['Recebimentos OK',pedidos.filter(p=>p.status==='recebido').length],['RNCs abertas',rncs.filter(r=>r.status==='aberta'||r.status==='analise').length],['RNCs concluídas',rncs.filter(r=>r.status==='resolvida').length],['Orçam. a autorizar',orcamentos.filter(o=>o.status==='pendente').length]].map(([l,v])=>html`<div style=${{ padding:12, border:'1px solid var(--bd)', borderRadius:12, background:'#fff' }}><div style=${{ fontSize:10,color:'var(--s3)',fontWeight:800,textTransform:'uppercase',letterSpacing:'.06em' }}>${l}</div><div style=${{ fontSize:24,fontWeight:800,fontFamily:"'Plus Jakarta Sans',sans-serif" }}>${v}</div></div>`)}
         </div>
       </div>
     </div>
@@ -2670,7 +2731,7 @@ function WeekControl({ toast }) {
    DATA MIGRATION
 ══════════════════════════════════════ */
 function migrateLocalData() {
-  const target='2.6.0';
+  const target='2.6.2';
   if (LS.get('schemaVersion') === target) return true;
   const now=new Date().toISOString();
   let pedidos=LS.get('pedidos') || [];
@@ -2694,7 +2755,7 @@ function migrateLocalData() {
   const rebuilt=[]; const usedNumbers=new Set();
   rncs.forEach(r=>{
     const data=r.data||todayISO(); const origem=r.origem||'CD'; const status=r.status||'aberta';
-    const base={...r,id:r.id||uid(),data,semana:r.semana||dateToWeek(data),origem,status,gravidade:r.gravidade||'Média',quantidade:nonNeg(r.quantidade),qtdPedida:nonNeg(r.qtdPedida),qtdRecebida:nonNeg(r.qtdRecebida),qtdRecusada:nonNeg(r.qtdRecusada),impactoFinanceiro:nonNeg(r.impactoFinanceiro),criadoEm:r.criadoEm||now,historicoStatus:(r.historicoStatus||[]).length?r.historicoStatus:[{de:null,para:status,em:r.criadoEm||now,usuario:r.responsavel||(LS.get('config')||{}).responsavel||'Usuário local'}]};
+    const base={...r,id:r.id||uid(),data,semana:r.semana||dateToWeek(data),origem,status,gravidade:r.gravidade||'Média',quantidade:nonNeg(r.quantidade),qtdPedida:nonNeg(r.qtdPedida),qtdRecebida:nonNeg(r.qtdRecebida),qtdRecusada:nonNeg(r.qtdRecusada),impactoFinanceiro:nonNeg(r.impactoFinanceiro),medidaRealizada:r.medidaRealizada||(status==='resolvida'?(r.verificacaoEficacia||r.planoAcao||''):''),criadoEm:r.criadoEm||now,historicoStatus:(r.historicoStatus||[]).length?r.historicoStatus:[{de:null,para:status,em:r.criadoEm||now,usuario:r.responsavel||(LS.get('config')||{}).responsavel||'Usuário local'}]};
     if(!base.numero || usedNumbers.has(base.numero)) base.numero=nextRncNumber(origem,[...rebuilt,...rncs],data);
     usedNumbers.add(base.numero); rebuilt.push(base);
   });

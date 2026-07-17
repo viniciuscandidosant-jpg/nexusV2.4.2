@@ -1,4 +1,4 @@
-const CACHE = 'nexus-v2.7.0';
+const CACHE = 'nexus-v2.8.1';
 const LOCAL_ASSETS = [
   './', './index.html', './app.js', './styles.css', './manifest.json', './logo-ilha-clean.png', './logo-ilha.png', './logo-rnc-white.png', './icon-192.png', './icon-512.png'
 ];

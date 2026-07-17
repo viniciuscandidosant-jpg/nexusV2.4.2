@@ -75,6 +75,33 @@ function genSems() {
   return [...new Set(out)].sort();
 }
 function fDateTime(s) { if (!s) return ''; try { return new Date(s).toLocaleString('pt-BR'); } catch { return ''; } }
+function fHora(s) { if (!s) return ''; try { return new Date(s).toLocaleTimeString('pt-BR', { hour:'2-digit', minute:'2-digit', second:'2-digit' }); } catch { return ''; } }
+function duracaoEntre(inicio, fim) {
+  if (!inicio || !fim) return '';
+  const ms = new Date(fim) - new Date(inicio);
+  if (!Number.isFinite(ms) || ms < 0) return '';
+  const min = Math.floor(ms / 60000), h = Math.floor(min / 60), m = min % 60;
+  return h > 0 ? `${h}h ${String(m).padStart(2,'0')}min` : `${m} min`;
+}
+function precoItemRecebimento(item, recItem) {
+  return nonNeg(recItem?.precoUnit ?? item?.precoUnit ?? ultimoPrecoGlobal(item?.nome));
+}
+function totaisRecebimento(pedido, itensRec) {
+  const mapa = new Map((itensRec || []).map(i => [i.nome, i]));
+  let valorPedido = 0, valorRecebido = 0;
+  const itens = (pedido?.itens || []).map(item => {
+    const recItem = mapa.get(item.nome) || {};
+    const precoUnit = precoItemRecebimento(item, recItem);
+    const qtdPedida = Number(item.qtd || 0);
+    const qtdRecebida = Number(recItem.qtdRecebida ?? item.qtd ?? 0);
+    const subtotalPedido = qtdPedida * precoUnit;
+    const subtotalRecebido = qtdRecebida * precoUnit;
+    valorPedido += subtotalPedido;
+    valorRecebido += subtotalRecebido;
+    return { ...item, ...recItem, qtd:qtdPedida, qtdRecebida, precoUnit, subtotalPedido, subtotalRecebido };
+  });
+  return { itens, valorPedido, valorRecebido };
+}
 function recordWeek(rec) { return rec?.semana || dateToWeek(rec?.data || rec?.recebimento?.finalizadoEm || todayISO()); }
 
 /* ══════════════════════════════════════
@@ -188,7 +215,7 @@ function downloadJson(filename, data) {
   const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = filename; a.click(); setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 function exportBackup() {
-  const data = { app:'NEXUS', version:'2.7.0', exportedAt:new Date().toISOString(), stores:{} };
+  const data = { app:'NEXUS', version:'2.8.1', exportedAt:new Date().toISOString(), stores:{} };
   for (let i=0;i<localStorage.length;i++) { const k=localStorage.key(i); if (k?.startsWith('nx:')) { try { data.stores[k.slice(3)] = JSON.parse(localStorage.getItem(k)); } catch (error) { console.warn('Backup ignorou uma chave inválida:', k, error); } } }
   downloadJson(`NEXUS_backup_${todayISO()}.json`, data);
   auditLog('Backup exportado', `${Object.keys(data.stores).length} conjuntos de dados`);
@@ -402,7 +429,7 @@ function BottomNav({ tab, setTab }) {
 /* ══════════════════════════════════════
    STATUS MAPS
 ══════════════════════════════════════ */
-const ST_PED = { pendente: { l: 'Aguardando', c: 'bgy' }, recebido: { l: 'Recebido', c: 'bgr2' }, parcial: { l: 'Parcial', c: 'bam' }, cancelado: { l: 'Cancelado', c: 'brd2' } };
+const ST_PED = { pendente: { l: 'Aguardando', c: 'bgy' }, recebido: { l: 'Recebido', c: 'bgr2' }, parcial: { l: 'Com divergência', c: 'bam' }, cancelado: { l: 'Cancelado', c: 'brd2' } };
 const ST_RNC = { aberta: { l: 'Aberta', c: 'brd2' }, analise: { l: 'Em acompanhamento', c: 'bam' }, resolvida: { l: 'Concluída', c: 'bgr2' }, cancelada: { l: 'Cancelada', c: 'bgy' } };
 
 function RecordsFilter({ busca, setBusca, origem, setOrigem, status, setStatus, statusOpts=[], unidade, setUnidade, unidades=[] }) {
@@ -442,7 +469,7 @@ function InicioTab({ setTab }) {
     <div style=${{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 16 }}>
       ${[[`Pedidos pendentes`, pend, pend > 0 ? 'var(--or)' : 'var(--ink)', 'recebimento'],
         [`RNCs abertas`, rncA, rncA > 0 ? 'var(--rd)' : 'var(--ink)', 'rnc'],
-        [`Recebimentos parciais`, parcial, parcial > 0 ? 'var(--am)' : 'var(--ink)', 'recebimento'],
+        [`Recebimentos com divergência`, parcial, parcial > 0 ? 'var(--am)' : 'var(--ink)', 'recebimento'],
         [`Orçamentos a autorizar`, orcPend, orcPend > 0 ? 'var(--bl)' : 'var(--ink)', 'orcamento'],
       ].map(([l, v, c, t]) => html`
         <button class="stcard" key=${l} onClick=${() => setTab(t)}>
@@ -773,7 +800,7 @@ function PedidosTab({ toast }) {
       <div><h2 style=${{ fontSize: 20, fontWeight: 800, fontFamily: "'Plus Jakarta Sans',sans-serif", margin: 0 }}>Pedidos</h2><p style=${{ fontSize: 13, color: 'var(--s2)', margin: '2px 0 0' }}>${pedidos.length} pedido${pedidos.length !== 1 ? 's' : ''}</p></div>
       <button class="btn bp bsm" onClick=${() => { const d=LS.get('draft_pedido'); if(d && confirm('Continuar rascunho automático do pedido?')) setEditing(hydratePedidoDraft(d)); else setEditing(null); setView('editor'); }}><${Ic} n="plus" s=${14}/>Novo</button>
     </div>
-    ${pedidos.length>0 && html`<${RecordsFilter} busca=${fBusca} setBusca=${resetLimit(setFBusca)} origem=${fOrig} setOrigem=${resetLimit(setFOrig)} status=${fStatus} setStatus=${resetLimit(setFStatus)} statusOpts=${[{v:'pendente',l:'Aguardando'},{v:'recebido',l:'Recebido'},{v:'parcial',l:'Parcial'},{v:'cancelado',l:'Cancelado'}]}/>`}
+    ${pedidos.length>0 && html`<${RecordsFilter} busca=${fBusca} setBusca=${resetLimit(setFBusca)} origem=${fOrig} setOrigem=${resetLimit(setFOrig)} status=${fStatus} setStatus=${resetLimit(setFStatus)} statusOpts=${[{v:'pendente',l:'Aguardando'},{v:'recebido',l:'Recebido'},{v:'parcial',l:'Com divergência'},{v:'cancelado',l:'Cancelado'}]}/>`}
     ${pedidos.length === 0 && html`<div class="empty"><${Ic} n="orders" s=${40} style=${{ color: 'var(--s3)' }}/><p>Nenhum pedido ainda.</p></div>`}
     ${pedidos.length>0 && filtrados.length===0 && html`<div class="empty"><p>Nenhum pedido corresponde aos filtros.</p></div>`}
     ${pendAll.length > 0 && html`<span class="slbl">Aguardando recebimento (${pendAll.length})</span><div style=${{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 16 }}>${pend.map(p => html`<${PCard} key=${p.id} p=${p} onClick=${() => { setEditing(p); setView('editor'); }} toast=${toast}/>`)}<${MoreResults} total=${pendAll.length} shown=${pend.length} onMore=${()=>setLimit(v=>v+30)}/></div>`}
@@ -872,51 +899,115 @@ function PedidoEditor({ pedido, cat, allItems, toast, onBack, onSave, onDelete }
    RECEBIMENTO
 ══════════════════════════════════════ */
 function receiptDivergences(pedido, receiptItems) {
-  return (receiptItems || []).map(i => ({ ...i, diferenca:Number(i.qtdRecebida || 0) - Number(i.qtd || 0) })).filter(i => Math.abs(i.diferenca) > 0.000001);
+  const totalizados = totaisRecebimento(pedido, receiptItems).itens;
+  return totalizados
+    .map(i => ({ ...i, diferenca:Number(i.qtdRecebida || 0) - Number(i.qtd || 0), valorDivergencia:Math.abs(Number(i.qtdRecebida || 0) - Number(i.qtd || 0)) * Number(i.precoUnit || 0) }))
+    .filter(i => Math.abs(i.diferenca) > 0.000001);
 }
 function syncAutoRncsForReceipt(pedido, recebimento, allowCreate) {
   let rncs = [...(LS.get('rncs') || [])];
-  const divergencias = receiptDivergences(pedido, recebimento.itens);
+  const totais = totaisRecebimento(pedido, recebimento.itens);
+  const divergencias = receiptDivergences(pedido, totais.itens);
   const activeKeys = new Set(divergencias.map(d => `${pedido.id}::${d.nome}`));
   const now = new Date().toISOString();
   const usuario = recebimento.responsavel || pedido.responsavel || (LS.get('config') || {}).responsavel || 'Usuário local';
+  const unidadePadrao = (LS.get('config')||{}).unidadePadrao || getUnidades()[0]?.nome || '';
   for (const d of divergencias) {
     const autoKey = `${pedido.id}::${d.nome}`;
     const idx = rncs.findIndex(r => r.autoGerada && (r.autoKey === autoKey || (r.pedidoId === pedido.id && r.produto === d.nome)));
     if (idx < 0 && !allowCreate) continue;
     const existente = idx >= 0 ? rncs[idx] : null;
-    const changed = existente && (Number(existente.qtdPedida || 0) !== Number(d.qtd || 0) || Number(existente.qtdRecebida || 0) !== Number(d.qtdRecebida || 0));
     const natureza = d.diferenca < 0 ? 'Falta no recebimento' : 'Excesso no recebimento';
     const quantidade = Math.abs(d.diferenca);
+    const changed = existente && (
+      Number(existente.qtdPedida || 0) !== Number(d.qtd || 0) ||
+      Number(existente.qtdRecebida || 0) !== Number(d.qtdRecebida || 0) ||
+      Number(existente.precoUnit || 0) !== Number(d.precoUnit || 0)
+    );
     const canceladaPeloSistema = existente?.status === 'cancelada' && (existente.canceladaAutomaticamente || ['Recebimento de origem removido','Divergência removida após correção do recebimento.'].includes(existente.motivoCancelamento));
     const novoStatus = (!existente || canceladaPeloSistema || (changed && ['resolvida','cancelada'].includes(existente.status))) ? 'aberta' : (existente.status || 'aberta');
     const historicoStatus = [...(existente?.historicoStatus || [])];
     if (!existente || existente.status !== novoStatus) historicoStatus.push({ de:existente?.status || null, para:novoStatus, em:now, usuario });
+    const descricao = `${natureza}. Quantidade pedida: ${d.qtd} ${d.unit || ''}. Quantidade recebida: ${d.qtdRecebida} ${d.unit || ''}. Diferença: ${d.diferenca > 0 ? '+' : ''}${d.diferenca} ${d.unit || ''}. Preço unitário: ${fMoeda(d.precoUnit || 0)}. Valor da divergência: ${fMoeda(d.valorDivergencia || 0)}.`;
+    const impacto = d.diferenca < 0
+      ? `O recebimento foi concluído com falta de ${quantidade} ${d.unit || ''} do produto. Valor estimado da falta: ${fMoeda(d.valorDivergencia || 0)}.`
+      : `O recebimento foi concluído com excesso de ${quantidade} ${d.unit || ''} do produto. Valor estimado do excesso: ${fMoeda(d.valorDivergencia || 0)}.`;
+    const providencia = d.diferenca < 0
+      ? 'Solicitamos a entrega da quantidade faltante ou o crédito correspondente.'
+      : 'Solicitamos orientação para devolução, regularização ou ajuste da quantidade excedente.';
     const base = {
-      ...(existente || {}), id:existente?.id || uid(), numero:existente?.numero || nextRncNumber(pedido.origem, rncs, recebimento.data || todayISO()),
-      data:recebimento.data || todayISO(), dataIdentificacao:recebimento.data || todayISO(), dataRecebimento:recebimento.data || todayISO(), semana:pedido.semana, origem:pedido.origem,
-      unidadeOrigem:(LS.get('config')||{}).unidadePadrao || getUnidades()[0]?.nome || '', setor:'Recebimento', setorIdentificacao:'Recebimento', responsavel:usuario,
-      momentoIdentificacao:'No recebimento', etapaIdentificacao:'Recebimento', condicaoRecebimento:'Problema já identificado no recebimento',
-      produto:d.nome, fornecedor:pedido.origem === 'CD' ? 'Centro de Distribuição (CD)' : 'Cozinha de Produção (CP)', unidade:d.unit || 'UND', quantidade,
-      qtdAfetadaInicial:quantidade, qtdAfetadaConfirmada:quantidade, qtdPedida:Number(d.qtd || 0), qtdRecebida:Number(d.qtdRecebida || 0), qtdRecusada:d.diferenca > 0 ? quantidade : 0,
-      qtdUtilizadaAntes:0, qtdSegregada:0, qtdSobObservacao:0, qtdDescartadaDevolvida:d.diferenca > 0 ? quantidade : 0,
-      tipo:'Quantidade incorreta', naturezaDivergencia:natureza, abrangencia:'Uma unidade isolada', contencoes:['Registro realizado no recebimento'], riscos:['Perda financeira'],
-      descricao:`RNC automática por ${natureza.toLowerCase()}. Pedido ${wLbl(pedido.semana)}: solicitado ${d.qtd} ${d.unit || ''}, recebido ${d.qtdRecebida} ${d.unit || ''}, diferença ${d.diferenca > 0 ? '+' : ''}${d.diferenca}.`,
-      acao:existente?.acao || 'Apenas registrar ocorrência', obsAcao:existente?.obsAcao || recebimento.observacoes || '',
-      status:novoStatus, historicoStatus,
+      ...(existente || {}),
+      id:existente?.id || uid(),
+      numero:existente?.numero || nextRncNumber(pedido.origem, rncs, recebimento.data || todayISO()),
+      data:recebimento.data || todayISO(),
+      dataIdentificacao:recebimento.data || todayISO(),
+      semana:pedido.semana,
+      unidadeOrigem:existente?.unidadeOrigem || unidadePadrao,
+      origem:pedido.origem,
+      setor:'Recebimento',
+      setorIdentificacao:'Recebimento',
+      etapaIdentificacao:'Recebimento',
+      responsavel:usuario,
+      produto:d.nome,
+      lote:existente?.lote || '',
+      dataManipulacaoFabricacao:existente?.dataManipulacaoFabricacao || '',
+      validade:existente?.validade || '',
+      unidade:d.unit || 'UND',
+      quantidade,
+      qtdAfetadaConfirmada:quantidade,
+      qtdAfetadaInicial:quantidade,
+      qtdDescartada:existente?.qtdDescartada || 0,
+      qtdEmObservacao:existente?.qtdEmObservacao || 0,
+      gravidade:existente?.gravidade || 'Média',
+      tipo:'Quantidade incorreta',
+      tipoCustom:'',
+      naturezaDivergencia:natureza,
+      descricao,
+      abrangencia:existente?.abrangencia || 'Abrangência ainda não determinada',
+      riscos:Array.isArray(existente?.riscos) && existente.riscos.length ? existente.riscos : ['Perda financeira','Interrupção operacional'],
+      contencoes:Array.isArray(existente?.contencoes) && existente.contencoes.length ? existente.contencoes : ['Nenhuma contenção necessária'],
+      impactoOperacional:existente?.impactoOperacional || impacto,
+      providenciaSolicitada:existente?.providenciaSolicitada || providencia,
+      situacaoAtual:existente?.situacaoAtual || 'RNC aberta automaticamente ao finalizar o recebimento. Aguardando retorno do fornecedor.',
+      status:novoStatus,
+      historicoStatus,
       encerradoEm:novoStatus === 'resolvida' ? existente?.encerradoEm || null : null,
-      motivoCancelamento:novoStatus === 'cancelada' ? existente?.motivoCancelamento || '' : '', canceladaEm:novoStatus === 'cancelada' ? existente?.canceladaEm || null : null,
-      fotos:existente?.fotos || [], assinatura:existente?.assinatura || null,
-      autoGerada:true, autoKey, pedidoId:pedido.id, recebimentoId:recebimento.id, orcamentoId:pedido.orcamentoId || null,
-      criadoEm:existente?.criadoEm || now, atualizadoEm:now, canceladaAutomaticamente:false,
+      motivoCancelamento:novoStatus === 'cancelada' ? existente?.motivoCancelamento || '' : '',
+      canceladaEm:novoStatus === 'cancelada' ? existente?.canceladaEm || null : null,
+      fotos:existente?.fotos || [],
+      autoGerada:true,
+      autoKey,
+      pedidoId:pedido.id,
+      recebimentoId:recebimento.id,
+      orcamentoId:pedido.orcamentoId || null,
+      qtdPedida:Number(d.qtd || 0),
+      qtdRecebida:Number(d.qtdRecebida || 0),
+      diferencaRecebimento:Number(d.diferenca || 0),
+      precoUnit:Number(d.precoUnit || 0),
+      valorDivergencia:Number(d.valorDivergencia || 0),
+      valorTotalPedido:Number(recebimento.valorTotalPedido ?? totais.valorPedido),
+      valorTotalRecebido:Number(recebimento.valorTotalRecebido ?? totais.valorRecebido),
+      responsavelRecebimento:recebimento.responsavel || '',
+      recebimentoIniciadoEm:recebimento.iniciadoEm || null,
+      recebimentoFinalizadoEm:recebimento.finalizadoEm || null,
+      criadoEm:existente?.criadoEm || now,
+      atualizadoEm:now,
+      canceladaAutomaticamente:false,
     };
     if (idx >= 0) rncs[idx] = base; else rncs.unshift(base);
   }
   rncs = rncs.map(r => {
     if (!r.autoGerada || r.pedidoId !== pedido.id || activeKeys.has(r.autoKey || `${pedido.id}::${r.produto}`)) return r;
     if (!['aberta','analise'].includes(r.status)) return r;
-    return { ...r, status:'cancelada', canceladaAutomaticamente:true, motivoCancelamento:'Divergência removida após correção do recebimento.', canceladaEm:now, atualizadoEm:now,
-      historicoStatus:[...(r.historicoStatus || []), { de:r.status, para:'cancelada', em:now, usuario }] };
+    return {
+      ...r,
+      status:'cancelada',
+      canceladaAutomaticamente:true,
+      motivoCancelamento:'Divergência removida após correção do recebimento.',
+      canceladaEm:now,
+      atualizadoEm:now,
+      historicoStatus:[...(r.historicoStatus || []), { de:r.status, para:'cancelada', em:now, usuario }]
+    };
   });
   return rncs;
 }
@@ -925,7 +1016,16 @@ function RecebimentoTab({ toast }) {
   const [pedidos, setPedidos] = useState(() => LS.get('pedidos') || []);
   const [editing, setEditing] = useState(null);
   const [fBusca, setFBusca] = useState(''); const [fOrig, setFOrig] = useState('TODOS'); const [fStatus, setFStatus] = useState('TODOS'); const [limit, setLimit] = useState(30);
-  useEffect(() => { const openTarget=()=>{ const t=LS.get('openTarget'); if(t?.tab==='recebimento'){ const rec=(LS.get('pedidos')||[]).find(x=>x.id===t.id); if(rec){ setEditing(rec); setView('editor'); } LS.del('openTarget'); } }; openTarget(); window.addEventListener('nx-open-target',openTarget); return()=>window.removeEventListener('nx-open-target',openTarget); }, []);
+  const abrirRecebimento = pedido => {
+    let atual = pedido;
+    if (pedido && !pedido.recebimento && !pedido.recebimentoInicioEm && !isWeekClosed(pedido.semana)) {
+      atual = { ...pedido, recebimentoInicioEm:new Date().toISOString(), atualizadoEm:new Date().toISOString() };
+      const upd = (LS.get('pedidos') || []).map(p => p.id === atual.id ? atual : p);
+      if (LS.set('pedidos', upd)) setPedidos(upd);
+    }
+    if (atual) { setEditing(atual); setView('editor'); }
+  };
+  useEffect(() => { const openTarget=()=>{ const t=LS.get('openTarget'); if(t?.tab==='recebimento'){ const rec=(LS.get('pedidos')||[]).find(x=>x.id===t.id); if(rec) abrirRecebimento(rec); LS.del('openTarget'); } }; openTarget(); window.addEventListener('nx-open-target',openTarget); return()=>window.removeEventListener('nx-open-target',openTarget); }, []);
   const savePed = (p, rncsUpd=null) => {
     const upd = pedidos.map(x => x.id === p.id ? p : x);
     const changes = { pedidos:upd }; if (rncsUpd) changes.rncs = rncsUpd;
@@ -938,7 +1038,7 @@ function RecebimentoTab({ toast }) {
     const usuario = pedido.recebimento?.responsavel || pedido.responsavel || (LS.get('config')||{}).responsavel || 'Usuário local';
     const backup = { pedidoId:pedido.id, recebimento:pedido.recebimento, statusAnterior:pedido.status, semana:pedido.semana, origem:pedido.origem };
     const entry = { id:uid(), type:'recebimento', record:backup, motivo:'Recebimento removido do pedido', apagadoEm:agora };
-    const pedidosUpd = pedidos.map(p => p.id === pedido.id ? { ...p, status:'pendente', recebimento:null, atualizadoEm:agora } : p);
+    const pedidosUpd = pedidos.map(p => p.id === pedido.id ? { ...p, status:'pendente', recebimentoInicioEm:null, recebimento:null, atualizadoEm:agora } : p);
     const rncsUpd = (LS.get('rncs')||[]).map(r => r.autoGerada && r.pedidoId===pedido.id && r.status!=='cancelada' ? {
       ...r, status:'cancelada', canceladaEm:agora, atualizadoEm:agora, canceladaAutomaticamente:true, motivoCancelamento:'Recebimento de origem removido',
       historicoStatus:[...(r.historicoStatus||[]),{de:r.status,para:'cancelada',em:agora,usuario}]
@@ -959,94 +1059,176 @@ function RecebimentoTab({ toast }) {
   const resetLimit=fn=>v=>{fn(v);setLimit(30)};
   return html`<div class="page">
     <div style=${{ marginBottom: 16 }}><h2 style=${{ fontSize: 20, fontWeight: 800, fontFamily: "'Plus Jakarta Sans',sans-serif", margin: 0 }}>Recebimento</h2><p style=${{ fontSize: 13, color: 'var(--s2)', margin: '2px 0 0' }}>Confirme os itens recebidos</p></div>
-    ${pedidos.length>0 && html`<${RecordsFilter} busca=${fBusca} setBusca=${resetLimit(setFBusca)} origem=${fOrig} setOrigem=${resetLimit(setFOrig)} status=${fStatus} setStatus=${resetLimit(setFStatus)} statusOpts=${[{v:'pendente',l:'Aguardando'},{v:'recebido',l:'Recebido'},{v:'parcial',l:'Parcial'}]}/>`}
+    ${pedidos.length>0 && html`<${RecordsFilter} busca=${fBusca} setBusca=${resetLimit(setFBusca)} origem=${fOrig} setOrigem=${resetLimit(setFOrig)} status=${fStatus} setStatus=${resetLimit(setFStatus)} statusOpts=${[{v:'pendente',l:'Aguardando'},{v:'recebido',l:'Recebido'},{v:'parcial',l:'Com divergência'}]}/>`}
     ${pedidos.length===0 && html`<div class="empty"><${Ic} n="recv" s=${40} style=${{ color:'var(--s3)' }}/><p>Nenhum pedido disponível para recebimento.</p></div>`}
     ${pedidos.length>0 && filtrados.length===0 && html`<div class="empty"><p>Nenhum recebimento corresponde aos filtros.</p></div>`}
-    ${pendAll.length > 0 && html`<span class="slbl">Aguardando (${pendAll.length})</span><div style=${{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 16 }}>${pend.map(p => html`<${RCard} key=${p.id} p=${p} onClick=${() => { setEditing(p); setView('editor'); }}/>`)}<${MoreResults} total=${pendAll.length} shown=${pend.length} onMore=${()=>setLimit(v=>v+30)}/></div>`}
-    ${recAll.length > 0 && html`<span class="slbl">Finalizados (${recAll.length})</span><div style=${{ display: 'flex', flexDirection: 'column', gap: 8 }}>${rec.map(p => html`<${RCard} key=${p.id} p=${p} onClick=${() => { setEditing(p); setView('editor'); }}/>`)}<${MoreResults} total=${recAll.length} shown=${rec.length} onMore=${()=>setLimit(v=>v+30)}/></div>`}
+    ${pendAll.length > 0 && html`<span class="slbl">Aguardando (${pendAll.length})</span><div style=${{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 16 }}>${pend.map(p => html`<${RCard} key=${p.id} p=${p} onClick=${() => abrirRecebimento(p)}/>`)}<${MoreResults} total=${pendAll.length} shown=${pend.length} onMore=${()=>setLimit(v=>v+30)}/></div>`}
+    ${recAll.length > 0 && html`<span class="slbl">Finalizados (${recAll.length})</span><div style=${{ display: 'flex', flexDirection: 'column', gap: 8 }}>${rec.map(p => html`<${RCard} key=${p.id} p=${p} onClick=${() => abrirRecebimento(p)}/>`)}<${MoreResults} total=${recAll.length} shown=${rec.length} onMore=${()=>setLimit(v=>v+30)}/></div>`}
   </div>`;
 }
 
 function RCard({ p, onClick }) {
-  const st = ST_PED[p.status] || { l: p.status, c: 'bgy' };
-  return html`<button class="card" style=${{ padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 12, border: 'none', textAlign: 'left', width: '100%', cursor: 'pointer' }} onClick=${onClick}>
-    <div style=${{ flex: 1, minWidth: 0 }}><div class="row" style=${{ gap: 6, marginBottom: 4 }}><span class=${`badge ${st.c}`}>${st.l}</span><span class="badge bor">${p.origem}</span></div><div style=${{ fontWeight: 700, fontSize: 14 }}>${wLbl(p.semana)}</div><div style=${{ fontSize: 12, color: 'var(--s2)', marginTop: 2 }}>${(p.itens || []).length} itens · ${fDate(p.criadoEm)}</div></div>
-    <${Ic} n="cr" s=${16} style=${{ color: 'var(--s3)' }}/>
+  const st = ST_PED[p.status] || { l:p.status, c:'bgy' };
+  const rec = p.recebimento || {};
+  const total = rec.valorTotalPedido ?? totaisRecebimento(p, rec.itens || []).valorPedido;
+  const timing = rec.iniciadoEm && rec.finalizadoEm ? `${fHora(rec.iniciadoEm)}–${fHora(rec.finalizadoEm)} · ${duracaoEntre(rec.iniciadoEm,rec.finalizadoEm)}` : '';
+  return html`<button class="card" style=${{padding:'14px 16px',display:'flex',alignItems:'center',gap:12,border:'none',textAlign:'left',width:'100%',cursor:'pointer'}} onClick=${onClick}>
+    <div style=${{flex:1,minWidth:0}}><div class="row" style=${{gap:6,marginBottom:4}}><span class=${`badge ${st.c}`}>${st.l}</span><span class="badge bor">${p.origem}</span></div><div style=${{fontWeight:700,fontSize:14}}>${wLbl(p.semana)} · ${fMoeda(total)}</div><div style=${{fontSize:12,color:'var(--s2)',marginTop:2}}>${(p.itens||[]).length} produtos${rec.responsavel?` · ${rec.responsavel}`:''}</div>${timing&&html`<div style=${{fontSize:10,color:'var(--s3)',marginTop:3}}>${timing}</div>`}</div>
+    <${Ic} n="cr" s=${16} style=${{color:'var(--s3)'}}/>
   </button>`;
 }
+
 
 function RecEditor({ pedido, toast, onBack, onSave, onDeleteReceipt }) {
   const finalizado = ['recebido', 'parcial'].includes(pedido.status);
   const rec = pedido.recebimento || {};
   const [resp, setResp] = useState(rec.responsavel || (LS.get('config') || {}).responsavel || '');
   const [obs, setObs] = useState(rec.observacoes || '');
-  const [qtdsR, setQtdsR] = useState(() => { const m = {}; (pedido.itens || []).forEach(i => { const ri = (rec.itens || []).find(r => r.nome === i.nome); m[i.nome] = ri ? String(ri.qtdRecebida) : ''; }); return m; });
+  const [iniciadoEm] = useState(rec.iniciadoEm || pedido.recebimentoInicioEm || new Date().toISOString());
+  const [qtdsR, setQtdsR] = useState(() => {
+    const m = {};
+    (pedido.itens || []).forEach(i => {
+      const ri = (rec.itens || []).find(r => r.nome === i.nome);
+      m[i.nome] = ri && ri.qtdRecebida != null ? String(ri.qtdRecebida) : '';
+    });
+    return m;
+  });
+  const [precosR, setPrecosR] = useState(() => {
+    const m = {};
+    (pedido.itens || []).forEach(i => {
+      const ri = (rec.itens || []).find(r => r.nome === i.nome);
+      const preco = precoItemRecebimento(i, ri);
+      m[i.nome] = preco > 0 ? String(preco) : '';
+    });
+    return m;
+  });
   const [abrirRncAuto, setAbrirRncAuto] = useState((LS.get('config') || {}).abrirRncDivergencia || 'perguntar');
   const itens = pedido.itens || [];
   const locked = isWeekClosed(pedido.semana);
-  const previewItems = itens.map(i => ({ ...i, qtdRecebida:nonNeg(qtdsR[i.nome]) }));
-  const divergencias = receiptDivergences(pedido, previewItems);
+  const previewItems = itens.map(i => ({ ...i, qtdRecebida:nonNeg(qtdsR[i.nome]), precoUnit:nonNeg(precosR[i.nome]) }));
+  const totais = totaisRecebimento(pedido, previewItems);
+  const divergencias = receiptDivergences(pedido, totais.itens);
   const corretos = Math.max(0, itens.length - divergencias.length);
-  const totaisUnidade = previewItems.reduce((m,i) => { const u=i.unit || 'UND'; if(!m[u]) m[u]={pedido:0,recebido:0}; m[u].pedido+=Number(i.qtd||0); m[u].recebido+=Number(i.qtdRecebida||0); return m; },{});
-  const snapshot = JSON.stringify({ resp, obs, qtdsR, abrirRncAuto });
+  const finalizacaoPreview = rec.finalizadoEm || null;
+  const snapshot = JSON.stringify({ resp, obs, qtdsR, precosR, abrirRncAuto });
   const guard = useDirtyGuard(snapshot);
+
   const finalizar = () => {
     if (!ensureWeekOpen(pedido.semana, toast, 'registrar o recebimento')) return;
     if (!resp.trim()) { toast.show('Informe o responsável pelo recebimento.'); return; }
-    const iL = itens.map(i => ({ ...i, qtdRecebida:nonNeg(qtdsR[i.nome]) }));
+    const semQtd = itens.filter(i => String(qtdsR[i.nome] ?? '').trim() === '');
+    if (semQtd.length) {
+      toast.show(`Informe a quantidade recebida de todos os produtos. Pendentes: ${semQtd.slice(0,2).map(i=>i.nome).join(', ')}${semQtd.length>2?'…':''}`);
+      return;
+    }
+    const semPreco = itens.filter(i => nonNeg(precosR[i.nome]) <= 0);
+    if (semPreco.length) {
+      toast.show(`Informe o preço unitário de todos os produtos. Pendentes: ${semPreco.slice(0,2).map(i=>i.nome).join(', ')}${semPreco.length>2?'…':''}`);
+      return;
+    }
+
+    const finalizadoEm = rec.finalizadoEm || new Date().toISOString();
+    const iL = totais.itens.map(i => ({
+      ...i,
+      qtd:Number(i.qtd || 0),
+      qtdRecebida:Number(i.qtdRecebida || 0),
+      precoUnit:Number(i.precoUnit || 0),
+      subtotalPedido:Number(i.subtotalPedido || 0),
+      subtotalRecebido:Number(i.subtotalRecebido || 0),
+    }));
     const divs = receiptDivergences(pedido, iL);
     const hasDiv = divs.length > 0;
     const receiptId = rec.id || uid();
-    const recebimento = { ...rec, id:receiptId, data:rec.data || todayISO(), responsavel:resp.trim(), observacoes:obs.trim(), itens:iL,
-      finalizadoEm:rec.finalizadoEm || new Date().toISOString(), atualizadoEm:new Date().toISOString(), status:hasDiv ? 'parcial' : 'completo' };
-    const ped = { ...pedido, status:hasDiv ? 'parcial' : 'recebido', recebimento };
+    const recebimento = {
+      ...rec,
+      id:receiptId,
+      data:rec.data || todayISO(finalizadoEm),
+      responsavel:resp.trim(),
+      observacoes:obs.trim(),
+      itens:iL,
+      iniciadoEm:rec.iniciadoEm || iniciadoEm,
+      finalizadoEm,
+      duracaoMinutos:Math.max(0, Math.round((new Date(finalizadoEm) - new Date(rec.iniciadoEm || iniciadoEm)) / 60000)),
+      valorTotalPedido:Number(totais.valorPedido || 0),
+      valorTotalRecebido:Number(totais.valorRecebido || 0),
+      atualizadoEm:new Date().toISOString(),
+      status:hasDiv ? 'divergente' : 'completo'
+    };
+    const ped = { ...pedido, status:hasDiv ? 'parcial' : 'recebido', recebimentoInicioEm:recebimento.iniciadoEm, recebimento, atualizadoEm:new Date().toISOString() };
     const atuais = LS.get('rncs') || [];
     const hasExistingAuto = atuais.some(r => r.autoGerada && r.pedidoId === pedido.id);
     let allowCreate = false;
     if (hasDiv) {
       if (hasExistingAuto || abrirRncAuto === 'sempre') allowCreate = true;
-      else if (abrirRncAuto === 'perguntar') allowCreate = confirm(`Foram encontradas ${divs.length} divergência(s), incluindo faltas ou excessos. Deseja gerar uma RNC individual para cada produto?`);
+      else if (abrirRncAuto === 'perguntar') {
+        const resumo = divs.map(d => `${d.nome}: ${d.diferenca < 0 ? 'falta' : 'excesso'} de ${Math.abs(d.diferenca)} ${d.unit || ''}`).join('\n');
+        allowCreate = confirm(`O recebimento possui ${divs.length} produto(s) com divergência:
+
+${resumo}
+
+Deseja abrir uma RNC individual para cada produto divergente?`);
+      }
     }
     const rncsUpd = syncAutoRncsForReceipt(pedido, recebimento, allowCreate);
     guard.clean();
-    onSave(ped, rncsUpd, hasDiv ? 'Recebimento salvo com divergências.' : 'Recebimento finalizado sem divergências.');
+    const msg = hasDiv
+      ? (allowCreate ? `Recebimento finalizado com ${divs.length} divergência(s) e RNC(s) geradas.` : `Recebimento finalizado com ${divs.length} divergência(s).`)
+      : 'Recebimento finalizado sem divergências.';
+    onSave(ped, rncsUpd, msg);
   };
-  return html`<div style=${{ maxWidth: 'none', margin: '0 auto' }}>
-    <div class="stk" style=${{ padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 12 }}>
+
+  return html`<div style=${{ maxWidth:'none', margin:'0 auto' }}>
+    <div class="stk" style=${{ padding:'12px 16px', display:'flex', alignItems:'center', gap:12 }}>
       <button class="btn bg0 bic" onClick=${() => guard.leave(onBack)}><${Ic} n="left" s=${20}/></button>
-      <div style=${{ flex: 1 }}><div style=${{ fontWeight: 800, fontSize: 15, fontFamily: "'Plus Jakarta Sans',sans-serif" }}>Recebimento · ${pedido.origem}</div><div style=${{ fontSize: 12, color: 'var(--s2)' }}>${wLbl(pedido.semana)}</div></div>
-      ${finalizado && !locked && html`<button class="btn brd bsm" onClick=${() => { if (strongConfirm('Excluir recebimento') && onDeleteReceipt(pedido)) guard.clean(); }}>Excluir recebimento</button>`}
+      <div style=${{flex:1,minWidth:0}}><div style=${{fontWeight:800,fontSize:15,fontFamily:"'Plus Jakarta Sans',sans-serif"}}>Recebimento · ${pedido.origem}</div><div style=${{fontSize:12,color:'var(--s2)'}}>${wLbl(pedido.semana)} · ${itens.length} produto(s)</div></div>
+      ${finalizado && !locked && html`<button class="btn brd bsm" onClick=${()=>{if(strongConfirm('Excluir recebimento')&&onDeleteReceipt(pedido))guard.clean();}}>Excluir recebimento</button>`}
     </div>
     ${locked && html`<div class="nx-lock-note">Esta semana está fechada. O recebimento está em modo somente leitura.</div>`}
-    <div class="page" style=${{ paddingBottom: 110 }}>
-      <div class="card" style=${{ padding: 16, marginBottom: 12 }}>
-        <label style=${{ fontSize: 11, fontWeight: 700, color: 'var(--s2)', textTransform: 'uppercase', letterSpacing: '.06em', display: 'block', marginBottom: 6 }}>Responsável</label>
-        <input class="inp" value=${resp} onInput=${e => setResp(e.target.value)} placeholder="Seu nome" disabled=${locked}/>
+    <div class="page" style=${{paddingBottom:110}}>
+      <div class="card" style=${{padding:16,marginBottom:12}}>
+        <div class="rec-summary-grid">
+          <div class="rec-summary-field"><label>Responsável pelo recebimento</label><input class="inp" value=${resp} onInput=${e=>setResp(e.target.value)} placeholder="Nome do responsável" disabled=${locked}/></div>
+          <div class="rec-summary-field"><label>Início do recebimento</label><div class="rec-readonly">${fDate(iniciadoEm)} · ${fHora(iniciadoEm)}</div></div>
+          <div class="rec-summary-field"><label>Finalização</label><div class="rec-readonly">${rec.finalizadoEm ? `${fDate(rec.finalizadoEm)} · ${fHora(rec.finalizadoEm)}` : 'Será registrada ao finalizar'}</div></div>
+          <div class="rec-summary-field"><label>Duração</label><div class="rec-readonly">${rec.finalizadoEm ? duracaoEntre(rec.iniciadoEm || iniciadoEm,rec.finalizadoEm) : 'Em andamento'}</div></div>
+        </div>
       </div>
-      <div style=${{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: 12 }}>
-        ${[['Itens', itens.length, 'var(--ink)'], ['Conformes', corretos, 'var(--gr)'], ['Divergentes', divergencias.length, divergencias.length ? 'var(--rd)' : 'var(--gr)']].map(([l,v,c]) => html`<div key=${l} class="card" style=${{ padding:'12px', textAlign:'center' }}><div style=${{ fontSize:10,fontWeight:700,color:'var(--s3)',textTransform:'uppercase',letterSpacing:'.05em',marginBottom:4 }}>${l}</div><div style=${{ fontSize:22,fontWeight:800,color:c,fontFamily:"'Plus Jakarta Sans',sans-serif" }}>${v}</div></div>`)}
+
+      <div class="rec-kpi-grid">
+        <div class="card rec-kpi"><span>Valor do pedido</span><strong>${fMoeda(totais.valorPedido)}</strong></div>
+        <div class="card rec-kpi"><span>Valor recebido</span><strong>${fMoeda(totais.valorRecebido)}</strong></div>
+        <div class="card rec-kpi"><span>Produtos conformes</span><strong style=${{color:'var(--gr)'}}>${corretos}</strong></div>
+        <div class="card rec-kpi"><span>Com divergência</span><strong style=${{color:divergencias.length?'var(--rd)':'var(--gr)'}}>${divergencias.length}</strong></div>
       </div>
-      <div class="card" style=${{ padding:12, marginBottom:12 }}><div style=${{fontSize:11,fontWeight:800,color:'var(--s2)',textTransform:'uppercase',marginBottom:8}}>Totais por unidade</div><div style=${{display:'flex',flexWrap:'wrap',gap:6}}>${Object.entries(totaisUnidade).map(([u,v])=>html`<span class=${`badge ${Math.abs(v.recebido-v.pedido)<.0001?'bgr2':'bam'}`}>${u}: ${Number(v.pedido.toFixed(2))} → ${Number(v.recebido.toFixed(2))}</span>`)}</div></div>
-      <div class="card" style=${{ overflow: 'hidden', marginBottom: 12 }}>
-        <div class="ghdr" style=${{ gridTemplateColumns: '1fr 64px 150px' }}><span>Produto</span><span style=${{ textAlign: 'center' }}>Ped.</span><span style=${{ textAlign: 'center' }}>Recebido</span></div>
-        ${itens.map((item, idx) => { const qR = nonNeg(qtdsR[item.nome]), diff = qR - item.qtd; return html`
-          <div key=${item.nome} class="irow" style=${{ gridTemplateColumns: '1fr 64px 150px', borderTop: idx > 0 ? '1px solid var(--bd)' : 'none', background: diff < 0 ? 'var(--rd3)' : diff > 0 ? 'var(--am3)' : '#fff' }}>
-            <div><div style=${{ fontSize: 13, fontWeight: 500 }}>${item.nome}</div><div style=${{ fontSize: 11, color: 'var(--s3)' }}>${item.unit}${diff !== 0 ? html` · <span style=${{ fontWeight: 700, color: diff < 0 ? 'var(--rd)' : 'var(--am)' }}>${diff > 0 ? '+' : ''}${diff}</span>` : ''}</div></div>
-            <div style=${{ textAlign: 'center', fontWeight: 600, color: 'var(--s2)' }}>${item.qtd}</div>
-            <div style=${{ display: 'flex', justifyContent: 'center', gap:6, alignItems:'center' }}><button class="btn bs bsm" disabled=${locked} style=${{ padding:'7px 9px' }} onClick=${()=>setQtdsR(p=>({ ...p, [item.nome]: String(item.qtd) }))}>Tudo</button><input type="number" min="0" class="inp-n" value=${qtdsR[item.nome] ?? ''} disabled=${locked} onInput=${e => setQtdsR(p => ({ ...p, [item.nome]: e.target.value }))} style=${{ borderColor: diff !== 0 ? (diff < 0 ? 'var(--rd)' : 'var(--am)') : undefined }}/></div>
-          </div>`; })}
+
+      <div style=${{display:'flex',flexDirection:'column',gap:8,marginBottom:12}}>
+        ${totais.itens.map((item,idx)=>{
+          const diff=Number(item.qtdRecebida||0)-Number(item.qtd||0);
+          const meta=diff<0?{l:`Falta ${Math.abs(diff)} ${item.unit||''}`,c:'brd2'}:diff>0?{l:`Excesso ${diff} ${item.unit||''}`,c:'bam'}:{l:'Conforme',c:'bgr2'};
+          return html`<div key=${item.nome} class="card rec-product-card" style=${{borderColor:diff<0?'rgba(220,38,38,.28)':diff>0?'rgba(217,119,6,.28)':'var(--bd)'}}>
+            <div class="rec-product-head"><div><strong>${item.nome}</strong><small>${item.cat||''}${item.unit?` · ${item.unit}`:''}</small></div><span class=${`badge ${meta.c}`}>${meta.l}</span></div>
+            <div class="rec-product-grid">
+              <div><label>Qtd. pedida</label><div class="rec-metric">${item.qtd} ${item.unit||''}</div></div>
+              <div><label>Qtd. recebida</label><div class="rec-input-wrap"><button class="btn bs bsm" disabled=${locked} onClick=${()=>setQtdsR(p=>({...p,[item.nome]:String(item.qtd)}))}>Tudo</button><input type="number" min="0" step="any" class="inp" value=${qtdsR[item.nome]??''} disabled=${locked} onInput=${e=>setQtdsR(p=>({...p,[item.nome]:e.target.value}))}/></div></div>
+              <div><label>Preço unitário</label><input type="number" min="0" step="0.01" class="inp" value=${precosR[item.nome]??''} disabled=${locked} onInput=${e=>setPrecosR(p=>({...p,[item.nome]:e.target.value}))}/></div>
+              <div><label>Total pedido</label><div class="rec-metric">${fMoeda(item.subtotalPedido)}</div></div>
+              <div><label>Total recebido</label><div class="rec-metric">${fMoeda(item.subtotalRecebido)}</div></div>
+            </div>
+          </div>`;
+        })}
       </div>
-      <div class="card" style=${{ padding: 16, marginBottom: 12 }}>
-        <label style=${{ fontSize: 11, fontWeight: 700, color: 'var(--s2)', textTransform: 'uppercase', letterSpacing: '.06em', display: 'block', marginBottom: 6 }}>RNC em caso de divergência</label>
-        <select class="inp" value=${abrirRncAuto} disabled=${locked} onChange=${e => { setAbrirRncAuto(e.target.value); const c = LS.get('config') || {}; LS.set('config', { ...c, abrirRncDivergencia: e.target.value }); }} style=${{ marginBottom: 10 }}>
+
+      <div class="card" style=${{padding:16,marginBottom:12}}>
+        <label style=${{fontSize:11,fontWeight:700,color:'var(--s2)',textTransform:'uppercase',letterSpacing:'.06em',display:'block',marginBottom:6}}>RNC quando houver falta ou excesso</label>
+        <select class="inp" value=${abrirRncAuto} disabled=${locked} onChange=${e=>{setAbrirRncAuto(e.target.value);const c=LS.get('config')||{};LS.set('config',{...c,abrirRncDivergencia:e.target.value});}} style=${{marginBottom:10}}>
           <option value="perguntar">Perguntar ao finalizar</option><option value="sempre">Abrir automaticamente</option><option value="nunca">Não abrir automaticamente</option>
         </select>
-        <div style=${{fontSize:11,color:'var(--s2)',margin:'-4px 0 12px'}}>Cada produto divergente gera uma RNC própria. Ao editar, a RNC existente é atualizada em vez de duplicada.</div>
-        <label style=${{ fontSize: 11, fontWeight: 700, color: 'var(--s2)', textTransform: 'uppercase', letterSpacing: '.06em', display: 'block', marginBottom: 6 }}>Observações</label>
-        <textarea class="inp" value=${obs} disabled=${locked} onInput=${e => setObs(e.target.value)} rows="3" placeholder="Divergências, ocorrências, observações importantes..."/>
+        <div style=${{fontSize:11,color:'var(--s2)',margin:'-4px 0 12px'}}>Ao finalizar, o NEXUS identifica faltas e excessos. Cada produto divergente pode gerar uma RNC própria, sem duplicar registros já existentes.</div>
+        <label style=${{fontSize:11,fontWeight:700,color:'var(--s2)',textTransform:'uppercase',letterSpacing:'.06em',display:'block',marginBottom:6}}>Observações do recebimento</label>
+        <textarea class="inp" value=${obs} disabled=${locked} onInput=${e=>setObs(e.target.value)} rows="4" placeholder="Condições da entrega, avarias, recusas ou outras observações importantes..."/>
       </div>
     </div>
-    ${!locked && html`<div style=${{ position: 'sticky', bottom: 72, background: '#fff', borderTop: '1px solid var(--bd)', padding: '12px 16px' }}><button class="btn bgr" style=${{ width: '100%', padding: 14, borderRadius: 12, fontSize: 15 }} onClick=${finalizar}><${Ic} n="chk" s=${16}/>${finalizado ? 'Salvar alterações do recebimento' : 'Finalizar recebimento'}</button></div>`}
+    ${!locked&&html`<div style=${{position:'sticky',bottom:72,background:'#fff',borderTop:'1px solid var(--bd)',padding:'12px 16px'}}><button class="btn bgr" style=${{width:'100%',padding:14,borderRadius:12,fontSize:15}} onClick=${finalizar}><${Ic} n="chk" s=${16}/>${finalizado?'Salvar alterações do recebimento':'Finalizar recebimento'}</button></div>`}
   </div>`;
 }
 
@@ -1058,7 +1240,7 @@ function RncTab({ toast }) {
   const [view, setView] = useState('lista');
   const [rncs, setRncs] = useState(() => LS.get('rncs') || []);
   const [editing, setEditing] = useState(null);
-  const [fBusca, setFBusca] = useState(''); const [fOrig, setFOrig] = useState('TODOS'); const [fStatus, setFStatus] = useState('TODOS'); const [limit, setLimit] = useState(30);
+  const [fBusca, setFBusca] = useState(''); const [fOrig, setFOrig] = useState('TODOS'); const [fStatus, setFStatus] = useState('TODOS'); const [fUnidade, setFUnidade] = useState('TODAS'); const [limit, setLimit] = useState(30);
   useEffect(() => { const openTarget=()=>{ const t=LS.get('openTarget'); if(t?.tab==='rnc'){ const rec=(LS.get('rncs')||[]).find(x=>x.id===t.id); if(rec){ setEditing(rec); setView('editor'); } LS.del('openTarget'); } }; openTarget(); window.addEventListener('nx-open-target',openTarget); return()=>window.removeEventListener('nx-open-target',openTarget); }, []);
   const cat = useMemo(getCatalog, []);
   const allItems = useMemo(() => flatCatalog(cat), [cat]);
@@ -1109,188 +1291,70 @@ function RncCard({ rnc, onClick }) {
   </button>`;
 }
 
-/* SignaturePad — canvas de assinatura digital reutilizável.
-   Retorna dataURL via onChange (PNG transparente, traço escuro). */
-function SignaturePad({ value, onChange, label='Assinatura' }) {
-  const canvasRef = useRef(null);
-  const wrapRef = useRef(null);
-  const drawingRef = useRef(false);
-  const lastRef = useRef({ x: 0, y: 0 });
-  const dirtyRef = useRef(false);
-
-  // Inicializa o canvas com a resolução visual correta (DPR)
-  useEffect(() => {
-    const cv = canvasRef.current;
-    const wrap = wrapRef.current;
-    if (!cv || !wrap) return;
-    const dpr = window.devicePixelRatio || 1;
-    const w = wrap.clientWidth;
-    const h = 140;
-    cv.width = w * dpr;
-    cv.height = h * dpr;
-    cv.style.width = w + 'px';
-    cv.style.height = h + 'px';
-    const ctx = cv.getContext('2d');
-    ctx.scale(dpr, dpr);
-    ctx.lineCap = 'round';
-    ctx.lineJoin = 'round';
-    ctx.lineWidth = 2;
-    ctx.strokeStyle = '#111827';
-    // se já tinha assinatura salva, redesenha
-    if (value) {
-      const img = new Image();
-      img.onload = () => { ctx.drawImage(img, 0, 0, w, h); dirtyRef.current = true; };
-      img.src = value;
-    }
-  }, []); // só uma vez na montagem; tamanho fixo no editor
-
-  const pos = (e) => {
-    const cv = canvasRef.current;
-    const rect = cv.getBoundingClientRect();
-    const touch = e.touches?.[0];
-    const x = (touch ? touch.clientX : e.clientX) - rect.left;
-    const y = (touch ? touch.clientY : e.clientY) - rect.top;
-    return { x, y };
-  };
-  const start = (e) => {
-    e.preventDefault();
-    drawingRef.current = true;
-    lastRef.current = pos(e);
-  };
-  const move = (e) => {
-    if (!drawingRef.current) return;
-    e.preventDefault();
-    const p = pos(e);
-    const ctx = canvasRef.current.getContext('2d');
-    ctx.beginPath();
-    ctx.moveTo(lastRef.current.x, lastRef.current.y);
-    ctx.lineTo(p.x, p.y);
-    ctx.stroke();
-    lastRef.current = p;
-    dirtyRef.current = true;
-  };
-  const end = () => {
-    if (!drawingRef.current) return;
-    drawingRef.current = false;
-    if (dirtyRef.current) {
-      const data = canvasRef.current.toDataURL('image/png');
-      onChange?.(data);
-    }
-  };
-  const clear = () => {
-    const cv = canvasRef.current;
-    const ctx = cv.getContext('2d');
-    ctx.clearRect(0, 0, cv.width, cv.height);
-    dirtyRef.current = false;
-    onChange?.(null);
-  };
-
-  return html`<div ref=${wrapRef} style=${{ width: '100%' }}>
-    <div class="row" style=${{ justifyContent: 'space-between', marginBottom: 8 }}>
-      <span style=${{ fontSize: 11, fontWeight: 700, color: 'var(--s2)', textTransform: 'uppercase', letterSpacing: '.06em' }}>${label}</span>
-      <button class="btn bg0 bsm" onClick=${clear} style=${{ color: 'var(--s2)' }}><${Ic} n="x" s=${12}/>Limpar</button>
-    </div>
-    <div style=${{ position: 'relative', border: '1.5px dashed var(--bd)', borderRadius: 10, background: '#FAFAFA', overflow: 'hidden' }}>
-      <canvas
-        ref=${canvasRef}
-        onMouseDown=${start}
-        onMouseMove=${move}
-        onMouseUp=${end}
-        onMouseLeave=${end}
-        onTouchStart=${start}
-        onTouchMove=${move}
-        onTouchEnd=${end}
-        style=${{ display: 'block', touchAction: 'none', cursor: 'crosshair' }}
-      />
-      ${!value && !dirtyRef.current && html`<div style=${{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', color: 'var(--s3)', fontSize: 12, pointerEvents: 'none', fontStyle: 'italic' }}>Assine aqui</div>`}
-    </div>
-  </div>`;
-}
-
 function RncEditor({ rnc, allItems, toast, genNum, onBack, onSave, onDelete }) {
   const isEdit = !!rnc?.id;
-  const [step, setStep] = useState(1);
   const config = LS.get('config') || {};
   const unidades = getUnidades();
-  const recebimentosDisponiveis = useMemo(() => (LS.get('pedidos') || []).filter(p => p.recebimento).sort((a,b)=>new Date(b.recebimento?.finalizadoEm||0)-new Date(a.recebimento?.finalizadoEm||0)), []);
-
   const unidadeInicial = rnc?.unidadeOrigem || config.unidadePadrao || unidades[0]?.nome || '';
-  const [orig, setOrig] = useState(rnc?.origem || 'CD');
+
   const [unidadeOrigem, setUnidadeOrigem] = useState(unidadeInicial);
+  const [orig, setOrig] = useState(rnc?.origem || 'CD');
   const [setor, setSetor] = useState(rnc?.setorIdentificacao || rnc?.setor || '');
-  const [momentoIdentificacao, setMomentoIdentificacao] = useState(rnc?.momentoIdentificacao || (rnc?.recebimentoId ? 'No recebimento' : 'Após o recebimento'));
-  const [etapaIdentificacao, setEtapaIdentificacao] = useState(rnc?.etapaIdentificacao || (rnc?.recebimentoId ? 'Recebimento' : 'Durante a produção'));
-  const [dataRecebimento, setDataRecebimento] = useState(rnc?.dataRecebimento || '');
+  const [etapaIdentificacao, setEtapaIdentificacao] = useState(rnc?.etapaIdentificacao || 'Durante a produção');
   const [data, setData] = useState(rnc?.dataIdentificacao || rnc?.data || todayISO());
-  const [condicaoRecebimento, setCondicaoRecebimento] = useState(rnc?.condicaoRecebimento || 'Sem anormalidade aparente');
-  const [status, setStatus] = useState(rnc?.status || 'aberta');
   const [resp, setResp] = useState(rnc?.responsavel || config.responsavel || '');
 
-  const [pedidoRelacionadoId, setPedidoRelacionadoId] = useState(rnc?.pedidoId || '');
-  const [recebimentoRelacionadoId, setRecebimentoRelacionadoId] = useState(rnc?.recebimentoId || '');
-  const [orcamentoRelacionadoId, setOrcamentoRelacionadoId] = useState(rnc?.orcamentoId || '');
-
   const [produto, setProduto] = useState(rnc?.produto || '');
-  const [fornecedor, setFornecedor] = useState(rnc?.fornecedor || '');
-  const [unit, setUnit] = useState(rnc?.unidade || 'UND');
-  const [qtdAfetadaInicial, setQtdAfetadaInicial] = useState(String(rnc?.qtdAfetadaInicial ?? rnc?.quantidade ?? ''));
-  const [qtdPedida, setQtdPedida] = useState(String(rnc?.qtdPedida ?? ''));
-  const [qtdRecebida, setQtdRecebida] = useState(String(rnc?.qtdRecebida ?? ''));
-  const [qtdUtilizada, setQtdUtilizada] = useState(String(rnc?.qtdUtilizadaAntes ?? ''));
-  const [qtdSegregada, setQtdSegregada] = useState(String(rnc?.qtdSegregada ?? ''));
-  const [qtdObservacao, setQtdObservacao] = useState(String(rnc?.qtdSobObservacao ?? ''));
-  const [qtdDescartadaDevolvida, setQtdDescartadaDevolvida] = useState(String(rnc?.qtdDescartadaDevolvida ?? rnc?.qtdRecusada ?? ''));
-
-  const [notaFiscal, setNotaFiscal] = useState(rnc?.notaFiscal || '');
   const [lote, setLote] = useState(rnc?.lote || '');
-  const [fabricacao, setFabricacao] = useState(rnc?.fabricacao || '');
+  const [fabricacao, setFabricacao] = useState(rnc?.dataManipulacaoFabricacao || rnc?.fabricacao || '');
   const [validade, setValidade] = useState(rnc?.validade || '');
-  const [temperatura, setTemperatura] = useState(rnc?.temperatura ?? '');
+  const [unit, setUnit] = useState(rnc?.unidade || 'UND');
+  const [qtdAfetada, setQtdAfetada] = useState(String(rnc?.qtdAfetadaConfirmada ?? rnc?.qtdAfetadaInicial ?? rnc?.quantidade ?? ''));
+  const [qtdDescartada, setQtdDescartada] = useState(String(rnc?.qtdDescartada ?? rnc?.qtdDescartadaDevolvida ?? rnc?.qtdRecusada ?? ''));
+  const [qtdObservacao, setQtdObservacao] = useState(String(rnc?.qtdEmObservacao ?? rnc?.qtdSobObservacao ?? ''));
+  const [gravidade, setGravidade] = useState(rnc?.gravidade || 'Média');
 
   const [tipo, setTipo] = useState(rnc?.tipo || '');
   const [tipoCustom, setTipoCustom] = useState(rnc?.tipoCustom || '');
   const [desc, setDesc] = useState(rnc?.descricao || '');
   const [abrangencia, setAbrangencia] = useState(rnc?.abrangencia || 'Abrangência ainda não determinada');
-  const [contencoes, setContencoes] = useState(Array.isArray(rnc?.contencoes) ? rnc.contencoes : (rnc?.contencao ? [rnc.contencao] : []));
   const [riscos, setRiscos] = useState(Array.isArray(rnc?.riscos) ? rnc.riscos : (rnc?.riscoOcorrencia ? [rnc.riscoOcorrencia] : []));
+  const [contencoes, setContencoes] = useState(Array.isArray(rnc?.contencoes) ? rnc.contencoes : (rnc?.contencao ? [rnc.contencao] : []));
   const [impactoOperacional, setImpactoOperacional] = useState(rnc?.impactoOperacional || '');
-  const [gravidade, setGravidade] = useState(rnc?.gravidade || 'Média');
-  const [impactoFinanceiro, setImpactoFinanceiro] = useState(String(rnc?.impactoFinanceiro ?? ''));
 
-  const [acao, setAcao] = useState(rnc?.acao || '');
-  const [obsAcao, setObsAcao] = useState(rnc?.obsAcao || '');
-  const [respostaFornecedor, setRespostaFornecedor] = useState(rnc?.respostaFornecedor || '');
-  const [medidaRealizada, setMedidaRealizada] = useState(rnc?.medidaRealizada || '');
+  const providenciaInicial = rnc?.providenciaSolicitada || rnc?.providenciaFornecedor || [rnc?.acao, rnc?.obsAcao].filter(Boolean).join(' — ');
+  const situacaoInicial = rnc?.situacaoAtual || rnc?.medidaRealizada || rnc?.respostaFornecedor || (rnc?.status === 'resolvida' ? 'RNC concluída.' : 'Aguardando resposta do fornecedor.');
+  const [providencia, setProvidencia] = useState(providenciaInicial || '');
+  const [status, setStatus] = useState(rnc?.status || 'aberta');
+  const [situacaoAtual, setSituacaoAtual] = useState(situacaoInicial);
 
-  const [fotos, setFotos] = useState(rnc?.fotos || []);
-  const [assinatura, setAssinatura] = useState(rnc?.assinatura || null);
-  const [constatacoes, setConstatacoes] = useState(Array.isArray(rnc?.constatacoes) ? rnc.constatacoes : []);
-  const [novaConstatacao, setNovaConstatacao] = useState({ data:todayISO(), quantidade:'', descricao:'', responsavel:resp || '', destino:'', foto:null });
+  const [fotos, setFotos] = useState(Array.isArray(rnc?.fotos) ? rnc.fotos : []);
   const fotoRef = useRef(null);
-  const constFotoRef = useRef(null);
 
   const TIPOS = [
-    'Produto fora do prazo','Produto com avaria','Quantidade incorreta','Produto fora do padrão de qualidade',
-    'Temperatura inadequada','Embalagem danificada','Alteração de odor, cor ou textura','Outro (descrever)'
+    'Produto fora do prazo', 'Produto com avaria', 'Quantidade incorreta', 'Produto fora do padrão de qualidade',
+    'Temperatura inadequada', 'Embalagem danificada', 'Alteração de odor, cor ou textura', 'Outro (descrever)'
   ];
-  const MOMENTOS = ['No recebimento','Após o recebimento'];
-  const ETAPAS = ['Recebimento','Armazenamento','Descongelamento','Pré-preparo','Durante a produção','Durante o serviço','Outro'];
-  const ABRANGENCIAS = ['Uma unidade isolada','Algumas unidades do mesmo lote','Lote parcialmente comprometido','Todo o lote','Abrangência ainda não determinada'];
-  const CONTENCOES = ['Uso interrompido','Produto segregado','Lote bloqueado','Produto descartado','Produto mantido para análise','Amostra preservada','Equipe orientada','Nenhuma contenção necessária'];
-  const RISCOS = ['Qualidade sensorial','Segurança alimentar','Perda financeira','Interrupção operacional','Reclamação de cliente','Risco ainda não avaliado'];
-  const ACOES = [
-    { v:'Devolução ao fornecedor', desc:'Material deve ser recolhido ou devolvido' },
-    { v:'Substituição imediata', desc:'Fornecedor deve repor o item afetado' },
-    { v:'Crédito em nota', desc:'Abatimento financeiro no faturamento' },
-    { v:'Avaliação e retorno do fornecedor', desc:'Solicitar análise e definição da providência' },
-    { v:'Apenas registrar ocorrência', desc:'Sem providência imediata, somente histórico' },
-  ];
+  const ETAPAS = ['Recebimento', 'Armazenamento', 'Descongelamento', 'Pré-preparo', 'Durante a produção', 'Durante o serviço', 'Outro'];
+  const ABRANGENCIAS = ['Uma unidade isolada', 'Algumas unidades do mesmo lote', 'Lote parcialmente comprometido', 'Todo o lote', 'Abrangência ainda não determinada'];
+  const RISCOS = ['Qualidade sensorial', 'Segurança alimentar', 'Perda financeira', 'Interrupção operacional', 'Reclamação de cliente', 'Risco ainda não avaliado'];
+  const CONTENCOES = ['Uso interrompido', 'Produto segregado', 'Lote bloqueado', 'Produto descartado', 'Produto mantido para análise', 'Amostra preservada', 'Equipe orientada', 'Nenhuma contenção necessária'];
   const STATUS_OPTS = [
-    { v:'aberta', l:'Aberta', desc:'PDF enviado ou aguardando resposta do fornecedor', c:'brd2' },
-    { v:'analise', l:'Em acompanhamento', desc:'Fornecedor respondeu; reposição, crédito ou correção ainda pendente', c:'bam' },
-    { v:'resolvida', l:'Concluída', desc:'A providência foi efetivamente realizada', c:'bgr2' },
+    { v:'aberta', l:'Aberta', desc:'Aguardando resposta ou providência do fornecedor', c:'brd2' },
+    { v:'analise', l:'Em acompanhamento', desc:'O fornecedor respondeu e a providência ainda está pendente', c:'bam' },
+    { v:'resolvida', l:'Concluída', desc:'A troca, o crédito ou a correção foi efetivamente realizada', c:'bgr2' },
     { v:'cancelada', l:'Cancelada', desc:'Registro encerrado sem prosseguimento', c:'bgy' },
   ];
+
+  const itemsOrig = allItems.filter(i => i.orig === orig);
+  const produtosDisponiveis = [...new Map(itemsOrig.map(i => [i.name, i])).values()];
+  const aplicarProduto = nome => {
+    setProduto(nome);
+    const item = allItems.find(i => i.name === nome);
+    if (item?.unit) setUnit(item.unit);
+  };
+
+  const toggleArray = (value, setter) => setter(list => list.includes(value) ? list.filter(x => x !== value) : [...list, value]);
 
   const compressImage = (file, cb) => {
     if (!file) return;
@@ -1300,14 +1364,14 @@ function RncEditor({ rnc, allItems, toast, genNum, onBack, onSave, onDelete }) {
       const img = new Image();
       img.onload = () => {
         const c = document.createElement('canvas');
-        const max = 900;
+        const max = 1000;
         let w = img.width, h = img.height;
         if (w > max) { h = Math.round(h * max / w); w = max; }
         if (h > max) { w = Math.round(w * max / h); h = max; }
         c.width = w; c.height = h;
-        c.getContext('2d').drawImage(img,0,0,w,h);
-        let data = c.toDataURL('image/webp',.66);
-        if (!data.startsWith('data:image/webp')) data = c.toDataURL('image/jpeg',.66);
+        c.getContext('2d').drawImage(img, 0, 0, w, h);
+        let data = c.toDataURL('image/webp', .7);
+        if (!data.startsWith('data:image/webp')) data = c.toDataURL('image/jpeg', .7);
         const projectedMb = storageUsage().mb + data.length * 2 / 1024 / 1024;
         if (projectedMb > 4.5) { toast.show('Armazenamento local quase cheio. Exporte um backup antes de adicionar mais fotos.'); return; }
         cb(data);
@@ -1319,157 +1383,169 @@ function RncEditor({ rnc, allItems, toast, genNum, onBack, onSave, onDelete }) {
     reader.readAsDataURL(file);
   };
   const addFoto = file => {
-    if (fotos.length >= 3) { toast.show('Limite de 3 fotos principais por RNC.'); return; }
-    compressImage(file, data => setFotos(p=>[...p,data].slice(0,3)));
+    if (fotos.length >= 3) { toast.show('Limite de 3 fotos por RNC.'); return; }
+    compressImage(file, data => setFotos(prev => [...prev, data].slice(0, 3)));
   };
 
-  const pedidoRelacionado = recebimentosDisponiveis.find(p=>p.id===pedidoRelacionadoId);
-  const itensRelacionados = pedidoRelacionado?.recebimento?.itens || [];
-  const itemsOrig = allItems.filter(i=>i.orig===orig);
-  const produtosDisponiveis = [...new Map([...itensRelacionados.map(i=>({name:i.nome,unit:i.unit||'UND',orig:pedidoRelacionado?.origem||orig,cat:i.cat||''})),...itemsOrig].map(i=>[i.name,i])).values()];
-
-  const aplicarProdutoRelacionado = nome => {
-    setProduto(nome);
-    const item = itensRelacionados.find(i=>i.nome===nome);
-    if (item) {
-      setUnit(item.unit || 'UND');
-      setQtdPedida(String(item.qtd ?? ''));
-      setQtdRecebida(String(item.qtdRecebida ?? item.qtd ?? ''));
-    } else {
-      const catItem=allItems.find(i=>i.name===nome);
-      if(catItem) setUnit(catItem.unit || 'UND');
-    }
-  };
-  const selecionarRecebimento = id => {
-    setPedidoRelacionadoId(id);
-    const p=recebimentosDisponiveis.find(x=>x.id===id);
-    if(!p){ setRecebimentoRelacionadoId(''); setOrcamentoRelacionadoId(''); return; }
-    setRecebimentoRelacionadoId(p.recebimento?.id || '');
-    setOrcamentoRelacionadoId(p.orcamentoId || '');
-    setOrig(p.origem || orig);
-    const dr=String(p.recebimento?.data || p.recebimento?.finalizadoEm || p.data || '').slice(0,10);
-    if(dr) setDataRecebimento(dr);
-    setFornecedor(p.origem==='CD'?'Centro de Distribuição (CD)':'Cozinha de Produção (CP)');
-    if((p.recebimento?.itens||[]).length===1) { const item=p.recebimento.itens[0]; setProduto(item.nome||''); setUnit(item.unit||'UND'); setQtdPedida(String(item.qtd??'')); setQtdRecebida(String(item.qtdRecebida??item.qtd??'')); }
-  };
-
-  const toggleArray = (value, setter) => setter(list=>list.includes(value)?list.filter(x=>x!==value):[...list,value]);
-  const adicionarConstatacao = () => {
-    if (!novaConstatacao.data || !novaConstatacao.descricao.trim() || nonNeg(novaConstatacao.quantidade)<=0) {
-      toast.show('Informe data, quantidade e descrição da nova constatação.'); return;
-    }
-    setConstatacoes(p=>[...p,{...novaConstatacao,id:uid(),quantidade:nonNeg(novaConstatacao.quantidade),responsavel:novaConstatacao.responsavel.trim()||resp.trim(),criadoEm:new Date().toISOString()}]);
-    setNovaConstatacao({data:todayISO(),quantidade:'',descricao:'',responsavel:resp||'',destino:'',foto:null});
-  };
-
-  const totalConstatacoes = constatacoes.reduce((s,c)=>s+nonNeg(c.quantidade),0);
-  const totalAfetado = nonNeg(qtdAfetadaInicial) + totalConstatacoes;
-  const v1 = !!(orig && unidadeOrigem && setor.trim() && data && resp.trim() && momentoIdentificacao && etapaIdentificacao);
-  const v2 = !!(produto.trim() && totalAfetado>0);
-  const v3 = !!(tipo && (tipo!=='Outro (descrever)' || tipoCustom.trim()) && desc.trim() && abrangencia && contencoes.length && riscos.length);
-  const conclusaoOk = status!=='resolvida' || !!medidaRealizada.trim();
-  const cancelamentoOk = status!=='cancelada' || !!obsAcao.trim();
-  const v4 = !!(acao && conclusaoOk && cancelamentoOk);
-  const podeRegistrar = v1 && v2 && v3 && v4;
-  const semanaRegistro = rnc?.pedidoId && rnc?.semana ? rnc.semana : dateToWeek(data);
+  const tipoFinal = tipo === 'Outro (descrever)' ? tipoCustom.trim() : tipo;
+  const semanaRegistro = rnc?.semana || dateToWeek(data);
   const locked = isWeekClosed(semanaRegistro);
-  const tipoFinal = tipo==='Outro (descrever)' && tipoCustom ? tipoCustom : tipo;
+  const camposObrigatoriosOk = !!(
+    unidadeOrigem && orig && setor.trim() && etapaIdentificacao && data && resp.trim() &&
+    produto.trim() && nonNeg(qtdAfetada) > 0 && gravidade && tipoFinal && desc.trim() &&
+    abrangencia && riscos.length && contencoes.length && impactoOperacional.trim() &&
+    providencia.trim() && situacaoAtual.trim()
+  );
 
-  const snapshot = JSON.stringify({orig,unidadeOrigem,setor,momentoIdentificacao,etapaIdentificacao,dataRecebimento,data,condicaoRecebimento,status,resp,pedidoRelacionadoId,produto,fornecedor,unit,qtdAfetadaInicial,qtdPedida,qtdRecebida,qtdUtilizada,qtdSegregada,qtdObservacao,qtdDescartadaDevolvida,notaFiscal,lote,fabricacao,validade,temperatura,tipo,tipoCustom,desc,abrangencia,contencoes,riscos,impactoOperacional,gravidade,impactoFinanceiro,acao,obsAcao,respostaFornecedor,medidaRealizada,fotos,assinatura,constatacoes});
+  const snapshot = JSON.stringify({ unidadeOrigem, orig, setor, etapaIdentificacao, data, resp, produto, lote, fabricacao, validade, unit, qtdAfetada, qtdDescartada, qtdObservacao, gravidade, tipo, tipoCustom, desc, abrangencia, riscos, contencoes, impactoOperacional, providencia, status, situacaoAtual, fotos });
   const guard = useDirtyGuard(snapshot);
 
   const salvar = () => {
-    if (!ensureWeekOpen(semanaRegistro,toast,'salvar a RNC')) return;
-    if (!podeRegistrar) {
-      toast.show(status==='resolvida'&&!conclusaoOk?'Informe a medida efetivamente realizada.':status==='cancelada'&&!cancelamentoOk?'Informe o motivo do cancelamento nos detalhes da solicitação.':'Preencha os campos obrigatórios.');
-      return;
-    }
-    const agora=new Date().toISOString();
-    const hist=Array.isArray(rnc?.historicoStatus)?rnc.historicoStatus:[];
-    const historicoStatus=(!rnc||rnc.status!==status)?[...hist,{de:rnc?.status||null,para:status,em:agora,usuario:resp.trim()||'Usuário local'}]:(hist.length?hist:[{de:null,para:status,em:rnc?.criadoEm||agora,usuario:resp.trim()||'Usuário local'}]);
+    if (!ensureWeekOpen(semanaRegistro, toast, 'salvar a RNC')) return;
+    if (!camposObrigatoriosOk) { toast.show('Preencha os campos obrigatórios da RNC.'); return; }
+    const agora = new Date().toISOString();
+    const hist = Array.isArray(rnc?.historicoStatus) ? rnc.historicoStatus : [];
+    const historicoStatus = (!rnc || rnc.status !== status)
+      ? [...hist, { de:rnc?.status || null, para:status, em:agora, usuario:resp.trim() || 'Usuário local' }]
+      : (hist.length ? hist : [{ de:null, para:status, em:rnc?.criadoEm || agora, usuario:resp.trim() || 'Usuário local' }]);
     guard.clean();
     onSave({
-      ...(rnc||{}), id:rnc?.id||uid(), numero:rnc?.numero||genNum(orig),
-      data, dataIdentificacao:data, dataRecebimento, semana:semanaRegistro, responsavel:resp.trim(), origem:orig,
-      unidadeOrigem, setor:setor.trim(), setorIdentificacao:setor.trim(), momentoIdentificacao, etapaIdentificacao, condicaoRecebimento,
-      pedidoId:pedidoRelacionadoId||null, recebimentoId:recebimentoRelacionadoId||null, orcamentoId:orcamentoRelacionadoId||null,
-      produto:produto.trim(), fornecedor:fornecedor.trim(), unidade:unit,
-      quantidade:totalAfetado, qtdAfetadaInicial:nonNeg(qtdAfetadaInicial), qtdAfetadaConfirmada:totalAfetado,
-      qtdPedida:nonNeg(qtdPedida), qtdRecebida:nonNeg(qtdRecebida), qtdUtilizadaAntes:nonNeg(qtdUtilizada),
-      qtdSegregada:nonNeg(qtdSegregada), qtdSobObservacao:nonNeg(qtdObservacao), qtdDescartadaDevolvida:nonNeg(qtdDescartadaDevolvida), qtdRecusada:nonNeg(qtdDescartadaDevolvida),
-      notaFiscal:notaFiscal.trim(), lote:lote.trim(), fabricacao, validade, temperatura:temperatura===''?null:parseFloat(temperatura),
-      tipo:tipoFinal, tipoCustom, descricao:desc.trim(), abrangencia, contencoes, riscos, impactoOperacional:impactoOperacional.trim(),
-      gravidade, impactoFinanceiro:nonNeg(impactoFinanceiro), acao, obsAcao:obsAcao.trim(),
-      respostaFornecedor:respostaFornecedor.trim(), medidaRealizada:medidaRealizada.trim(), constatacoes,
-      status, encerradoEm:status==='resolvida'?(rnc?.encerradoEm||agora):null, motivoCancelamento:status==='cancelada'?obsAcao.trim():'', historicoStatus,
-      fotos, assinatura, criadoEm:rnc?.criadoEm||agora, atualizadoEm:agora,
+      ...(rnc || {}),
+      id: rnc?.id || uid(),
+      numero: rnc?.numero || genNum(orig),
+      data,
+      dataIdentificacao: data,
+      semana: semanaRegistro,
+      unidadeOrigem,
+      origem: orig,
+      setor: setor.trim(),
+      setorIdentificacao: setor.trim(),
+      etapaIdentificacao,
+      responsavel: resp.trim(),
+      produto: produto.trim(),
+      lote: lote.trim(),
+      fabricacao,
+      dataManipulacaoFabricacao: fabricacao,
+      validade,
+      unidade: unit,
+      quantidade: nonNeg(qtdAfetada),
+      qtdAfetadaInicial: nonNeg(qtdAfetada),
+      qtdAfetadaConfirmada: nonNeg(qtdAfetada),
+      qtdDescartada: nonNeg(qtdDescartada),
+      qtdDescartadaDevolvida: nonNeg(qtdDescartada),
+      qtdRecusada: nonNeg(qtdDescartada),
+      qtdEmObservacao: nonNeg(qtdObservacao),
+      qtdSobObservacao: nonNeg(qtdObservacao),
+      gravidade,
+      tipo: tipoFinal,
+      tipoCustom,
+      descricao: desc.trim(),
+      abrangencia,
+      riscos,
+      contencoes,
+      impactoOperacional: impactoOperacional.trim(),
+      providenciaSolicitada: providencia.trim(),
+      providenciaFornecedor: providencia.trim(),
+      acao: providencia.trim(),
+      obsAcao: '',
+      situacaoAtual: situacaoAtual.trim(),
+      respostaFornecedor: situacaoAtual.trim(),
+      medidaRealizada: status === 'resolvida' ? situacaoAtual.trim() : '',
+      status,
+      encerradoEm: status === 'resolvida' ? (rnc?.encerradoEm || agora) : null,
+      historicoStatus,
+      fotos,
+      criadoEm: rnc?.criadoEm || agora,
+      atualizadoEm: agora,
     });
   };
 
-  const labelObrig=txt=>html`<label style=${{fontSize:11,fontWeight:700,color:'var(--s2)',textTransform:'uppercase',letterSpacing:'.06em',display:'block',marginBottom:6}}>${txt} <span style=${{color:'var(--rd)'}}>*</span></label>`;
-  const labelOpt=txt=>html`<label style=${{fontSize:11,fontWeight:700,color:'var(--s2)',textTransform:'uppercase',letterSpacing:'.06em',display:'block',marginBottom:6}}>${txt}</label>`;
-  const stepHeader=(n,label)=>html`<div class="row" style=${{gap:10,marginBottom:14}}><div style=${{width:30,height:30,borderRadius:'50%',background:'var(--or)',color:'#fff',display:'flex',alignItems:'center',justifyContent:'center',fontWeight:800,fontSize:13}}>${n}</div><div style=${{fontWeight:800,fontSize:16,fontFamily:"'Plus Jakarta Sans',sans-serif"}}>${label}</div></div>`;
-  const chip=(text,active,onClick)=>html`<button type="button" onClick=${onClick} style=${{padding:'8px 12px',borderRadius:20,border:`1.5px solid ${active?'var(--or)':'var(--bd)'}`,background:active?'var(--or3)':'#fff',fontWeight:700,fontSize:12,cursor:'pointer',color:active?'var(--or2)':'var(--ink)'}}>${text}</button>`;
-  const stStat=ST_RNC[status]||{l:status,c:'bgy'};
-  const stepData=[{n:1,l:'Contexto',ok:v1},{n:2,l:'Produto',ok:v2},{n:3,l:'Ocorrência',ok:v3},{n:4,l:'Ação',ok:v4},{n:5,l:'Evidências',ok:true}];
+  const labelObrig = txt => html`<label class="rnc-label">${txt}<span>*</span></label>`;
+  const labelOpt = txt => html`<label class="rnc-label">${txt}</label>`;
+  const chip = (text, active, onClick) => html`<button type="button" onClick=${onClick} class=${`rnc-simple-chip ${active ? 'on' : ''}`}>${text}</button>`;
+  const stStat = ST_RNC[status] || { l:status, c:'bgy' };
 
-  return html`<div style=${{maxWidth:'none',margin:'0 auto'}}>
-    <div class="stk" style=${{padding:'12px 16px',display:'flex',alignItems:'center',gap:12}}>
+  return html`<div class="rnc-simple-shell">
+    <div class="stk rnc-editor-header">
       <button class="btn bg0 bic" onClick=${()=>guard.leave(onBack)}><${Ic} n="left" s=${20}/></button>
-      <div style=${{flex:1,minWidth:0}}><div class="row" style=${{gap:6,marginBottom:2}}><span class=${`badge ${stStat.c}`}>${stStat.l}</span><span class="badge bor">${orig}</span>${unidadeOrigem&&html`<span class="badge bgy">${unidadeOrigem}</span>`}</div><div style=${{fontWeight:800,fontSize:15}}>${isEdit?rnc.numero:'Nova RNC'}</div><div style=${{fontSize:11,color:'var(--s2)'}}>Registro de Não Conformidade</div></div>
+      <div style=${{flex:1,minWidth:0}}>
+        <div class="row" style=${{gap:6,marginBottom:3,flexWrap:'wrap'}}><span class=${`badge ${stStat.c}`}>${stStat.l}</span><span class="badge bor">${orig}</span>${unidadeOrigem&&html`<span class="badge bgy">${unidadeOrigem}</span>`}</div>
+        <div style=${{fontWeight:800,fontSize:16}}>${isEdit ? rnc.numero : 'Nova RNC'}</div>
+        <div style=${{fontSize:11,color:'var(--s2)'}}>Registro de Não Conformidade</div>
+      </div>
       ${isEdit&&!locked&&html`<button class="btn bg0 bic" style=${{color:'var(--rd)'}} onClick=${()=>{if(strongConfirm('Excluir registro'))onDelete(rnc.id)}}><${Ic} n="trash" s=${18}/></button>`}
     </div>
+
     ${locked&&html`<div class="nx-lock-note">Esta semana está fechada. A RNC está em modo somente leitura.</div>`}
-    <div style=${{padding:'10px 12px 3px',background:'#fff',borderBottom:'1px solid var(--bd)',overflowX:'auto'}}><div class="row" style=${{gap:2,minWidth:520}}>${stepData.map(s=>html`<button key=${s.n} onClick=${()=>setStep(s.n)} style=${{flex:1,padding:'6px 3px',background:'none',border:'none',cursor:'pointer',borderBottom:`3px solid ${step===s.n?'var(--or)':'transparent'}`,opacity:step===s.n?1:.58}}><div style=${{width:18,height:18,borderRadius:'50%',background:s.ok?'var(--gr)':(step===s.n?'var(--or)':'var(--bd)'),color:'#fff',display:'flex',alignItems:'center',justifyContent:'center',fontSize:10,fontWeight:800,margin:'0 auto 2px'}}>${s.ok?'✓':s.n}</div><div style=${{fontSize:10,fontWeight:700}}>${s.l}</div></button>`)}</div></div>
 
-    <fieldset disabled=${locked} class="page" style=${{paddingBottom:140,border:'none',minWidth:0,pointerEvents:locked?'none':'auto',opacity:locked?.82:1}}>
-      ${step===1&&html`<div>${stepHeader(1,'Contexto da identificação')}
-        <div class="card" style=${{padding:16,marginBottom:12}}>
-          ${labelOpt('Vincular a um recebimento anterior')}
-          <select class="inp" value=${pedidoRelacionadoId} onChange=${e=>selecionarRecebimento(e.target.value)} style=${{marginBottom:12}}><option value="">Sem vínculo / abertura manual</option>${recebimentosDisponiveis.map(p=>html`<option key=${p.id} value=${p.id}>${fDate(p.recebimento?.finalizadoEm||p.recebimento?.data)} · ${p.origem} · ${wLbl(p.semana)} · ${(p.recebimento?.itens||[]).length} item(ns)</option>`)}</select>
-          <div style=${{fontSize:11,color:'var(--s2)',margin:'-6px 0 14px'}}>O vínculo é opcional e preenche automaticamente parte da rastreabilidade.</div>
-          ${labelObrig('Origem do produto')}<div style=${{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginBottom:14}}>${['CD','CP'].map(o=>html`<button type="button" key=${o} onClick=${()=>setOrig(o)} style=${{padding:12,borderRadius:10,border:`2px solid ${orig===o?'var(--or)':'var(--bd)'}`,background:orig===o?'var(--or3)':'#fff',fontWeight:800,cursor:'pointer',textAlign:'left'}}>${o}<div style=${{fontSize:10,fontWeight:500,color:'var(--s2)',marginTop:2}}>${o==='CD'?'Centro de Distribuição':'Cozinha de Produção'}</div></button>`)}</div>
-          <div style=${{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,marginBottom:12}}><div>${labelObrig('Unidade de origem')}<select class="inp" value=${unidadeOrigem} onChange=${e=>setUnidadeOrigem(e.target.value)}><option value="">Selecione</option>${unidades.map(u=>html`<option key=${u.id} value=${u.nome}>${u.nome}</option>`)}</select></div><div>${labelObrig('Setor que identificou')}<input class="inp" value=${setor} onInput=${e=>setSetor(e.target.value)} placeholder="Ex.: Cozinha, estoque, bar..."/></div></div>
-          <div style=${{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,marginBottom:12}}><div>${labelObrig('Momento da identificação')}<select class="inp" value=${momentoIdentificacao} onChange=${e=>setMomentoIdentificacao(e.target.value)}>${MOMENTOS.map(x=>html`<option>${x}</option>`)}</select></div><div>${labelObrig('Etapa da identificação')}<select class="inp" value=${etapaIdentificacao} onChange=${e=>setEtapaIdentificacao(e.target.value)}>${ETAPAS.map(x=>html`<option>${x}</option>`)}</select></div></div>
-          <div style=${{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,marginBottom:12}}><div>${labelOpt('Data do recebimento')}<input type="date" class="inp" value=${dataRecebimento} onInput=${e=>setDataRecebimento(e.target.value)}/></div><div>${labelObrig('Data da identificação')}<input type="date" class="inp" value=${data} onInput=${e=>setData(e.target.value)}/></div></div>
-          ${labelObrig('Condição aparente no recebimento')}<select class="inp" value=${condicaoRecebimento} onChange=${e=>setCondicaoRecebimento(e.target.value)} style=${{marginBottom:12}}>${['Sem anormalidade aparente','Problema já identificado no recebimento','Não foi possível avaliar no recebimento','Não se aplica'].map(x=>html`<option>${x}</option>`)}</select>
-          <div style=${{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}><div>${labelObrig('Responsável pelo registro')}<input class="inp" value=${resp} onInput=${e=>setResp(e.target.value)} placeholder="Nome completo"/></div><div>${labelObrig('Status')}<select class="inp" value=${status} onChange=${e=>setStatus(e.target.value)}>${STATUS_OPTS.map(s=>html`<option value=${s.v}>${s.l}</option>`)}</select></div></div><div style=${{fontSize:11,color:'var(--s2)',marginTop:6}}>${STATUS_OPTS.find(s=>s.v===status)?.desc} A data de abertura é registrada automaticamente pelo NEXUS.</div>
+    <fieldset disabled=${locked} class="page rnc-simple-page" style=${{pointerEvents:locked?'none':'auto',opacity:locked?.82:1}}>
+      <section class="card rnc-simple-section">
+        <div class="rnc-simple-title"><span>1</span><div><strong>Identificação da RNC</strong><small>Onde, quando e por quem a ocorrência foi identificada.</small></div></div>
+        <div class="rnc-grid rnc-grid-2">
+          <div>${labelObrig('Unidade de origem da RNC')}<select class="inp" value=${unidadeOrigem} onChange=${e=>setUnidadeOrigem(e.target.value)}><option value="">Selecione</option>${unidades.map(u=>html`<option key=${u.id} value=${u.nome}>${u.nome}</option>`)}</select></div>
+          <div>${labelObrig('Origem do produto')}<select class="inp" value=${orig} onChange=${e=>setOrig(e.target.value)}><option value="CD">CD · Centro de Distribuição</option><option value="CP">CP · Cozinha de Produção</option></select></div>
+          <div>${labelObrig('Setor que identificou')}<input class="inp" value=${setor} onInput=${e=>setSetor(e.target.value)} placeholder="Ex.: Cozinha, estoque, bar..."/></div>
+          <div>${labelObrig('Etapa da identificação')}<select class="inp" value=${etapaIdentificacao} onChange=${e=>setEtapaIdentificacao(e.target.value)}>${ETAPAS.map(x=>html`<option>${x}</option>`)}</select></div>
+          <div>${labelObrig('Data da identificação')}<input type="date" class="inp" value=${data} onInput=${e=>setData(e.target.value)}/></div>
+          <div>${labelObrig('Responsável pelo registro')}<input class="inp" value=${resp} onInput=${e=>setResp(e.target.value)} placeholder="Nome completo"/></div>
         </div>
-      </div>`}
+      </section>
 
-      ${step===2&&html`<div>${stepHeader(2,'Produto, lote e quantidades')}
-        <div class="card" style=${{padding:16,marginBottom:12}}>
-          ${labelObrig('Produto')}<input class="inp" list="rnc-produtos" value=${produto} onInput=${e=>aplicarProdutoRelacionado(e.target.value)} placeholder="Selecione ou digite o produto" style=${{marginBottom:12}}/><datalist id="rnc-produtos">${produtosDisponiveis.map(i=>html`<option value=${i.name}/>` )}</datalist>
-          ${labelOpt('Fornecedor')}<input class="inp" value=${fornecedor} onInput=${e=>setFornecedor(e.target.value)} placeholder="Centro de Distribuição, Cozinha de Produção ou outro" style=${{marginBottom:12}}/>
-          <div style=${{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:8,marginBottom:12}}><div>${labelObrig('Afetada inicialmente')}<input type="number" min="0" step="any" class="inp" value=${qtdAfetadaInicial} onInput=${e=>setQtdAfetadaInicial(e.target.value)}/></div><div>${labelObrig('Unidade')}<select class="inp" value=${unit} onChange=${e=>setUnit(e.target.value)}>${['UND','KG','G','L','ML','PCT','CX','PCS'].map(u=>html`<option>${u}</option>`)}</select></div><div><label style=${{fontSize:11,fontWeight:700,color:'var(--s2)',textTransform:'uppercase',display:'block',marginBottom:6}}>Total confirmado</label><div class="inp" style=${{background:'var(--or3)',fontWeight:800,color:'var(--or2)'}}>${totalAfetado} ${unit}</div></div></div>
-          <div style=${{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:8,marginBottom:12}}><div>${labelOpt('Recebida')}<input type="number" min="0" step="any" class="inp" value=${qtdRecebida} onInput=${e=>setQtdRecebida(e.target.value)}/></div><div>${labelOpt('Utilizada antes')}<input type="number" min="0" step="any" class="inp" value=${qtdUtilizada} onInput=${e=>setQtdUtilizada(e.target.value)}/></div><div>${labelOpt('Segregada')}<input type="number" min="0" step="any" class="inp" value=${qtdSegregada} onInput=${e=>setQtdSegregada(e.target.value)}/></div><div>${labelOpt('Sob observação')}<input type="number" min="0" step="any" class="inp" value=${qtdObservacao} onInput=${e=>setQtdObservacao(e.target.value)}/></div><div>${labelOpt('Descartada/devolvida')}<input type="number" min="0" step="any" class="inp" value=${qtdDescartadaDevolvida} onInput=${e=>setQtdDescartadaDevolvida(e.target.value)}/></div><div>${labelOpt('Pedida')}<input type="number" min="0" step="any" class="inp" value=${qtdPedida} onInput=${e=>setQtdPedida(e.target.value)}/></div></div>
+      <section class="card rnc-simple-section">
+        <div class="rnc-simple-title"><span>2</span><div><strong>Produto e quantidades</strong><small>Dados necessários para identificar e dimensionar a ocorrência.</small></div></div>
+        <div class="rnc-grid rnc-grid-2">
+          <div class="rnc-field-span-2">${labelObrig('Produto')}<input class="inp" list="rnc-produtos" value=${produto} onInput=${e=>aplicarProduto(e.target.value)} placeholder="Selecione ou digite o produto"/><datalist id="rnc-produtos">${produtosDisponiveis.map(i=>html`<option value=${i.name}/>` )}</datalist></div>
+          <div>${labelOpt('Lote')}<input class="inp" value=${lote} onInput=${e=>setLote(e.target.value)} placeholder="Código do lote"/></div>
+          <div>${labelOpt('Data de manipulação/fabricação')}<input type="date" class="inp" value=${fabricacao} onInput=${e=>setFabricacao(e.target.value)}/></div>
+          <div>${labelOpt('Validade')}<input type="date" class="inp" value=${validade} onInput=${e=>setValidade(e.target.value)}/></div>
+          <div>${labelObrig('Gravidade')}<select class="inp" value=${gravidade} onChange=${e=>setGravidade(e.target.value)}>${['Baixa','Média','Alta','Crítica'].map(g=>html`<option>${g}</option>`)}</select></div>
         </div>
-        <div class="card" style=${{padding:16,marginBottom:12}}><div style=${{fontWeight:800,fontSize:14,marginBottom:12}}>Rastreabilidade</div><div style=${{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,marginBottom:10}}><div>${labelOpt('Nota fiscal')}<input class="inp" value=${notaFiscal} onInput=${e=>setNotaFiscal(e.target.value)}/></div><div>${labelOpt('Lote')}<input class="inp" value=${lote} onInput=${e=>setLote(e.target.value)}/></div><div>${labelOpt('Fabricação')}<input type="date" class="inp" value=${fabricacao} onInput=${e=>setFabricacao(e.target.value)}/></div><div>${labelOpt('Validade')}<input type="date" class="inp" value=${validade} onInput=${e=>setValidade(e.target.value)}/></div></div>${labelOpt('Temperatura no recebimento (°C)')}<input type="number" step="0.1" class="inp" value=${temperatura} onInput=${e=>setTemperatura(e.target.value)}/></div>
-      </div>`}
-
-      ${step===3&&html`<div>${stepHeader(3,'Ocorrência, abrangência e contenção')}
-        <div class="card" style=${{padding:16,marginBottom:12}}>${labelObrig('Tipo de não conformidade')}<div style=${{display:'flex',flexWrap:'wrap',gap:7,marginBottom:12}}>${TIPOS.map(t=>chip(t,tipo===t,()=>setTipo(t)))}</div>${tipo==='Outro (descrever)'&&html`<input class="inp" value=${tipoCustom} onInput=${e=>setTipoCustom(e.target.value)} placeholder="Descreva o tipo" style=${{marginBottom:12}}/>`}${labelObrig('Descrição')}<textarea class="inp" rows="4" value=${desc} onInput=${e=>setDesc(e.target.value)} placeholder="Explique como o problema foi percebido e em quais condições."/></div>
-        <div class="card" style=${{padding:16,marginBottom:12}}>${labelObrig('Abrangência identificada')}<select class="inp" value=${abrangencia} onChange=${e=>setAbrangencia(e.target.value)} style=${{marginBottom:14}}>${ABRANGENCIAS.map(x=>html`<option>${x}</option>`)}</select>${labelObrig('Contenção realizada pelo Ilha')}<div style=${{display:'flex',flexWrap:'wrap',gap:7,marginBottom:14}}>${CONTENCOES.map(x=>chip(x,contencoes.includes(x),()=>toggleArray(x,setContencoes)))}</div>${labelObrig('Risco da ocorrência')}<div style=${{display:'flex',flexWrap:'wrap',gap:7,marginBottom:14}}>${RISCOS.map(x=>chip(x,riscos.includes(x),()=>toggleArray(x,setRiscos)))}</div>${labelOpt('Impacto operacional')}<textarea class="inp" rows="3" value=${impactoOperacional} onInput=${e=>setImpactoOperacional(e.target.value)} placeholder="Ex.: produção suspensa, item indisponível ou sem impacto no atendimento."/></div>
-        <div class="card" style=${{padding:16,marginBottom:12}}><div style=${{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}><div>${labelObrig('Gravidade')}<select class="inp" value=${gravidade} onChange=${e=>setGravidade(e.target.value)}>${['Baixa','Média','Alta','Crítica'].map(g=>html`<option>${g}</option>`)}</select></div><div>${labelOpt('Impacto financeiro (R$)')}<input type="number" min="0" step="0.01" class="inp" value=${impactoFinanceiro} onInput=${e=>setImpactoFinanceiro(e.target.value)}/></div></div></div>
-      </div>`}
-
-      ${step===4&&html`<div>${stepHeader(4,'Providência e acompanhamento')}
-        <div class="card" style=${{padding:16,marginBottom:12}}>${labelObrig('Providência solicitada ao fornecedor')}<div style=${{display:'flex',flexDirection:'column',gap:8,marginBottom:12}}>${ACOES.map(a=>html`<button type="button" onClick=${()=>setAcao(a.v)} style=${{padding:'11px 13px',borderRadius:10,border:`1.5px solid ${acao===a.v?'var(--or)':'var(--bd)'}`,background:acao===a.v?'var(--or3)':'#fff',textAlign:'left',cursor:'pointer'}}><strong>${a.v}</strong><div style=${{fontSize:11,color:'var(--s2)',marginTop:2}}>${a.desc}</div></button>`)}</div>${labelOpt('Detalhes da solicitação')}<textarea class="inp" rows="3" value=${obsAcao} onInput=${e=>setObsAcao(e.target.value)} placeholder="Prazo desejado, quantidade a substituir, crédito ou recolhimento."/></div>
-        <div class="card" style=${{padding:16,marginBottom:12}}><div style=${{fontWeight:800,fontSize:14,marginBottom:4}}>Acompanhamento interno do Ilha</div><div style=${{fontSize:11,color:'var(--s2)',marginBottom:14}}>Registre apenas o retorno recebido pelo WhatsApp e o que foi efetivamente cumprido.</div>${labelOpt('Retorno do fornecedor')}<textarea class="inp" rows="3" value=${respostaFornecedor} onInput=${e=>setRespostaFornecedor(e.target.value)} placeholder="Ex.: troca será efetuada; valor será abonado; ainda não houve retorno." style=${{marginBottom:12}}/>${status==='resolvida'?labelObrig('Medida efetivamente realizada'):labelOpt('Medida efetivamente realizada')}<textarea class="inp" rows="3" value=${medidaRealizada} onInput=${e=>setMedidaRealizada(e.target.value)} placeholder="Ex.: unidades substituídas, crédito lançado ou produto recolhido."/></div>
-      </div>`}
-
-      ${step===5&&html`<div>${stepHeader(5,'Novas constatações e evidências')}
-        <div class="card" style=${{padding:16,marginBottom:12}}><div class="row" style=${{justifyContent:'space-between',marginBottom:10}}><div><div style=${{fontWeight:800,fontSize:14}}>Evolução da ocorrência</div><div style=${{fontSize:11,color:'var(--s2)',marginTop:2}}>Adicione novas embalagens ou unidades afetadas sem abrir outra RNC.</div></div><span class="badge bor">${constatacoes.length} atualização(ões)</span></div>
-          ${constatacoes.map((c,i)=>html`<div key=${c.id} style=${{padding:'10px 0',borderTop:i?'1px solid var(--bd)':'none',display:'grid',gridTemplateColumns:'90px 1fr auto',gap:10,alignItems:'start'}}><div style=${{fontSize:11,color:'var(--s2)'}}>${fDate(c.data)}<br/><strong>${c.quantidade} ${unit}</strong></div><div style=${{fontSize:12}}><strong>${c.descricao}</strong>${c.destino&&html`<div style=${{color:'var(--s2)',marginTop:3}}>Destino: ${c.destino}</div>`}<div style=${{fontSize:10,color:'var(--s3)',marginTop:3}}>${c.responsavel||'—'}</div></div><button class="btn bg0 bic" style=${{color:'var(--rd)'}} onClick=${()=>setConstatacoes(p=>p.filter(x=>x.id!==c.id))}><${Ic} n="trash" s=${14}/></button></div>`)}
-          <div style=${{marginTop:12,padding:12,border:'1px dashed var(--bd)',borderRadius:10,background:'#FAFAFA'}}><div style=${{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginBottom:8}}><div>${labelObrig('Data')}<input type="date" class="inp" value=${novaConstatacao.data} onInput=${e=>setNovaConstatacao(p=>({...p,data:e.target.value}))}/></div><div>${labelObrig('Quantidade adicional')}<input type="number" min="0" step="any" class="inp" value=${novaConstatacao.quantidade} onInput=${e=>setNovaConstatacao(p=>({...p,quantidade:e.target.value}))}/></div></div>${labelObrig('Descrição')}<textarea class="inp" rows="2" value=${novaConstatacao.descricao} onInput=${e=>setNovaConstatacao(p=>({...p,descricao:e.target.value}))} placeholder="Ex.: mais 3 pacotes apresentaram alteração ao serem abertos." style=${{marginBottom:8}}/>${labelOpt('Destino dado')}<input class="inp" value=${novaConstatacao.destino} onInput=${e=>setNovaConstatacao(p=>({...p,destino:e.target.value}))} placeholder="Segregado, descartado, devolvido..." style=${{marginBottom:8}}/>${labelOpt('Responsável')}<input class="inp" value=${novaConstatacao.responsavel} onInput=${e=>setNovaConstatacao(p=>({...p,responsavel:e.target.value}))} style=${{marginBottom:8}}/><div class="row" style=${{gap:8,justifyContent:'space-between'}}><button class="btn bs bsm" onClick=${()=>constFotoRef.current?.click()}><${Ic} n="img" s=${14}/>${novaConstatacao.foto?'Trocar foto':'Anexar foto'}</button><input ref=${constFotoRef} type="file" accept="image/*" capture="environment" style=${{display:'none'}} onChange=${e=>{compressImage(e.target.files?.[0],foto=>setNovaConstatacao(p=>({...p,foto})));e.target.value=''}}/><button class="btn bp bsm" onClick=${adicionarConstatacao}><${Ic} n="plus" s=${14}/>Adicionar constatação</button></div></div>
+        <div class="rnc-quantity-grid">
+          <div>${labelObrig('Quantidade afetada confirmada')}<input type="number" min="0" step="any" class="inp" value=${qtdAfetada} onInput=${e=>setQtdAfetada(e.target.value)}/></div>
+          <div>${labelOpt('Quantidade descartada')}<input type="number" min="0" step="any" class="inp" value=${qtdDescartada} onInput=${e=>setQtdDescartada(e.target.value)}/></div>
+          <div>${labelOpt('Quantidade em observação')}<input type="number" min="0" step="any" class="inp" value=${qtdObservacao} onInput=${e=>setQtdObservacao(e.target.value)}/></div>
+          <div>${labelObrig('Unidade de medida')}<select class="inp" value=${unit} onChange=${e=>setUnit(e.target.value)}>${['UND','KG','G','L','ML','PCT','CX','PCS'].map(u=>html`<option>${u}</option>`)}</select></div>
         </div>
-        <div class="card" style=${{padding:16,marginBottom:12}}><div class="row" style=${{justifyContent:'space-between',marginBottom:12}}><div><div style=${{fontWeight:800,fontSize:14}}>Fotos principais da ocorrência</div><div style=${{fontSize:11,color:'var(--s2)'}}>${fotos.length}/3 anexadas</div></div><button class="btn bs bsm" disabled=${fotos.length>=3} onClick=${()=>fotoRef.current?.click()}><${Ic} n="img" s=${14}/>Adicionar</button></div><input ref=${fotoRef} type="file" accept="image/*" capture="environment" style=${{display:'none'}} onChange=${e=>{addFoto(e.target.files?.[0]);e.target.value=''}}/>${fotos.length?html`<div style=${{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:8}}>${fotos.map((f,i)=>html`<div style=${{position:'relative',aspectRatio:'1',borderRadius:10,overflow:'hidden',border:'1px solid var(--bd)'}}><img src=${f} style=${{width:'100%',height:'100%',objectFit:'cover'}}/><button onClick=${()=>setFotos(p=>p.filter((_,j)=>j!==i))} style=${{position:'absolute',top:4,right:4,width:24,height:24,borderRadius:'50%',border:'none',background:'rgba(0,0,0,.7)',color:'#fff'}}><${Ic} n="x" s=${12}/></button></div>`)}</div>`:html`<div style=${{padding:22,textAlign:'center',border:'1.5px dashed var(--bd)',borderRadius:10,color:'var(--s2)'}}>Nenhuma foto principal anexada.</div>`}</div>
-        <div class="card" style=${{padding:16,marginBottom:12}}><div style=${{fontWeight:800,fontSize:14,marginBottom:8}}>Assinatura do responsável</div><${SignaturePad} value=${assinatura} onChange=${setAssinatura}/></div>
-        ${isEdit&&Array.isArray(rnc?.historicoStatus)&&rnc.historicoStatus.length>0&&html`<div class="card" style=${{padding:16,marginBottom:12}}><div style=${{fontWeight:800,fontSize:14,marginBottom:10}}>Histórico de status</div>${[...rnc.historicoStatus].reverse().map((h,i)=>html`<div style=${{padding:'8px 0',borderTop:i?'1px solid var(--bd)':'none',fontSize:12}}><strong>${h.de?(ST_RNC[h.de]?.l||h.de):'Criação'}</strong> → <strong>${ST_RNC[h.para]?.l||h.para}</strong><div style=${{fontSize:10,color:'var(--s2)',marginTop:2}}>${fDateTime(h.em)} · ${h.usuario||'Usuário local'}</div></div>`)}</div>`}
-      </div>`}
+      </section>
+
+      <section class="card rnc-simple-section">
+        <div class="rnc-simple-title"><span>3</span><div><strong>Não conformidade</strong><small>Defina o problema e descreva objetivamente o que foi encontrado.</small></div></div>
+        ${labelObrig('Não conformidade identificada')}
+        <div class="rnc-chip-grid">${TIPOS.map(t=>chip(t,tipo===t,()=>setTipo(t)))}</div>
+        ${tipo==='Outro (descrever)'&&html`<input class="inp" value=${tipoCustom} onInput=${e=>setTipoCustom(e.target.value)} placeholder="Descreva o tipo de não conformidade" style=${{marginTop:10}}/>`}
+        <div style=${{marginTop:14}}>${labelObrig('Descrição da ocorrência')}<textarea class="inp rnc-large-text" rows="5" value=${desc} onInput=${e=>setDesc(e.target.value)} placeholder="Descreva como o problema foi percebido e quais características estavam fora do padrão."/></div>
+      </section>
+
+      <section class="card rnc-simple-section">
+        <div class="rnc-simple-title"><span>4</span><div><strong>Avaliação e contenção</strong><small>Registre a abrangência, o risco e as medidas imediatas tomadas pela unidade.</small></div></div>
+        <div>${labelObrig('Abrangência')}<select class="inp" value=${abrangencia} onChange=${e=>setAbrangencia(e.target.value)}>${ABRANGENCIAS.map(x=>html`<option>${x}</option>`)}</select></div>
+        <div class="rnc-subgroup">${labelObrig('Risco identificado')}<div class="rnc-chip-grid">${RISCOS.map(x=>chip(x,riscos.includes(x),()=>toggleArray(x,setRiscos)))}</div></div>
+        <div class="rnc-subgroup">${labelObrig('Contenção realizada pela unidade')}<div class="rnc-chip-grid">${CONTENCOES.map(x=>chip(x,contencoes.includes(x),()=>toggleArray(x,setContencoes)))}</div></div>
+      </section>
+
+      <section class="card rnc-simple-section">
+        <div class="rnc-simple-title"><span>5</span><div><strong>Impacto e providência</strong><small>Informe o efeito na operação e o que foi solicitado ao fornecedor.</small></div></div>
+        ${labelObrig('Impacto operacional')}<textarea class="inp rnc-large-text" rows="4" value=${impactoOperacional} onInput=${e=>setImpactoOperacional(e.target.value)} placeholder="Ex.: item indisponível, produção interrompida, risco ao serviço ou sem impacto no atendimento."/>
+        <div style=${{marginTop:14}}>${labelObrig('Providência solicitada ao fornecedor')}<textarea class="inp rnc-large-text" rows="4" value=${providencia} onInput=${e=>setProvidencia(e.target.value)} placeholder="Ex.: substituir as unidades afetadas, conceder crédito ou avaliar a ocorrência e retornar."/></div>
+      </section>
+
+      <section class="card rnc-simple-section">
+        <div class="rnc-simple-title"><span>6</span><div><strong>Situação atual</strong><small>Atualize este mesmo registro conforme o retorno e a providência do fornecedor.</small></div></div>
+        <div class="rnc-grid rnc-grid-2">
+          <div>${labelObrig('Status')}<select class="inp" value=${status} onChange=${e=>setStatus(e.target.value)}>${STATUS_OPTS.map(s=>html`<option value=${s.v}>${s.l}</option>`)}</select><div class="rnc-inline-help">${STATUS_OPTS.find(s=>s.v===status)?.desc}</div></div>
+          <div>${labelObrig('Situação atual da RNC')}<textarea class="inp" rows="4" value=${situacaoAtual} onInput=${e=>setSituacaoAtual(e.target.value)} placeholder="Ex.: aguardando retorno; troca agendada; crédito confirmado; unidades substituídas."/></div>
+        </div>
+      </section>
+
+      <section class="card rnc-simple-section">
+        <div class="rnc-simple-title"><span>7</span><div><strong>Imagens da ocorrência</strong><small>Adicione até três evidências. As imagens serão incluídas em páginas próprias no PDF.</small></div></div>
+        <div class="row" style=${{justifyContent:'space-between',marginBottom:12,flexWrap:'wrap'}}><span style=${{fontSize:12,color:'var(--s2)'}}>${fotos.length}/3 imagens anexadas</span><button type="button" class="btn bs bsm" disabled=${fotos.length>=3} onClick=${()=>fotoRef.current?.click()}><${Ic} n="img" s=${14}/>Adicionar imagem</button></div>
+        <input ref=${fotoRef} type="file" accept="image/*" capture="environment" style=${{display:'none'}} onChange=${e=>{addFoto(e.target.files?.[0]);e.target.value=''}}/>
+        ${fotos.length ? html`<div class="rnc-photo-grid">${fotos.map((f,i)=>html`<div class="rnc-photo-item"><img src=${f}/><button type="button" onClick=${()=>setFotos(p=>p.filter((_,j)=>j!==i))}><${Ic} n="x" s=${12}/></button></div>`)}</div>` : html`<div class="rnc-photo-empty">Nenhuma imagem anexada.</div>`}
+      </section>
     </fieldset>
 
-    ${!locked&&html`<div style=${{position:'sticky',bottom:72,background:'#fff',borderTop:'1px solid var(--bd)',padding:'12px 16px',display:'flex',gap:8}}>${step>1?html`<button class="btn bs" style=${{flex:1}} onClick=${()=>setStep(s=>s-1)}><${Ic} n="left" s=${14}/>Voltar</button>`:html`<button class="btn bs" style=${{flex:1}} onClick=${()=>guard.leave(onBack)}>Cancelar</button>`}${step<5?html`<button class="btn bp" style=${{flex:2,padding:14}} onClick=${()=>setStep(s=>s+1)}>Próxima etapa<${Ic} n="cr" s=${14}/></button>`:html`<button class="btn bp" style=${{flex:2,padding:14,opacity:podeRegistrar?1:.55}} onClick=${salvar}><${Ic} n="save" s=${16}/>${isEdit?'Salvar alterações':`Registrar como ${stStat.l}`}</button>`}</div>`}
+    ${!locked&&html`<div class="rnc-editor-actions"><button class="btn bs" onClick=${()=>guard.leave(onBack)}>Cancelar</button><button class="btn bp" style=${{flex:1,padding:14,opacity:camposObrigatoriosOk?1:.58}} onClick=${salvar}><${Ic} n="save" s=${16}/>${isEdit?'Salvar alterações':'Registrar RNC'}</button></div>`}
   </div>`;
 }
 
@@ -1506,38 +1582,86 @@ function pdfPedido(p) {
   savePdf(doc,`NEXUS_Pedido_${p.origem||''}_${p.semana||''}`);
 }
 function pdfRecebimento(p) {
-  const Doc=getJsPDF(); const doc=new Doc({ orientation:'p', unit:'mm', format:'a4' });
+  const Doc=getJsPDF();
+  const doc=new Doc({ orientation:'l', unit:'mm', format:'a4' });
   const rec=p.recebimento || {};
-  pdfHeader(doc,'Recebimento',`${p.origem || ''} · ${wLbl(p.semana)} · ${fDate(rec.finalizadoEm || rec.data || p.data || p.criadoEm)}`);
+  const pageW=297,pageH=210,M=12;
+  const totais=totaisRecebimento(p,rec.itens||[]);
+  const divergencias=receiptDivergences(p,totais.itens);
+  const iniciado=rec.iniciadoEm||'';
+  const finalizado=rec.finalizadoEm||'';
 
-  // A observação escrita na tela de recebimento fica salva em rec.observacoes.
-  // Antes, o PDF ignorava esse campo e mostrava uma coluna "Justificativa" vazia.
-  // Agora o PDF imprime sempre as observações gerais do recebimento abaixo da tabela.
-  const itensPdf = (rec.itens || p.itens || []).map(i => {
-    const sol = Number(i.qtd || 0);
-    const ent = Number((i.qtdRecebida ?? i.qtd) || 0);
-    return [i.nome || '', sol, ent, ent - sol];
+  const header=()=>{
+    doc.setFillColor(245,149,0);doc.rect(0,0,pageW,20,'F');
+    doc.setTextColor(255,255,255);doc.setFont(undefined,'bold');doc.setFontSize(14);doc.text('NEXUS · RECEBIMENTO',M,9);
+    doc.setFont(undefined,'normal');doc.setFontSize(8);doc.text(`Grupo Ilha · ${p.origem||'—'} · ${wLbl(p.semana)}`,M,15);
+    doc.setTextColor(17,24,39);doc.setFont(undefined,'bold');doc.setFontSize(13);doc.text('RELATÓRIO DE RECEBIMENTO',M,29);
+    const status=p.status==='parcial'?'COM DIVERGÊNCIA':'RECEBIDO';
+    doc.setFillColor(p.status==='parcial'?255:240,p.status==='parcial'?251:253,p.status==='parcial'?235:244);
+    doc.setDrawColor(p.status==='parcial'?217:22,p.status==='parcial'?119:163,p.status==='parcial'?6:74);
+    doc.roundedRect(pageW-M-48,23,48,8,4,4,'FD');
+    doc.setTextColor(p.status==='parcial'?217:22,p.status==='parcial'?119:163,p.status==='parcial'?6:74);doc.setFontSize(7);doc.text(status,pageW-M-24,28.2,{align:'center'});
+  };
+  header();
+
+  const summary=[
+    ['Responsável',rec.responsavel||'—'],
+    ['Início',iniciado?`${fDate(iniciado)} · ${fHora(iniciado)}`:'—'],
+    ['Finalização',finalizado?`${fDate(finalizado)} · ${fHora(finalizado)}`:'—'],
+    ['Duração',duracaoEntre(iniciado,finalizado)||'—'],
+    ['Valor do pedido',fMoeda(rec.valorTotalPedido??totais.valorPedido)],
+    ['Valor recebido',fMoeda(rec.valorTotalRecebido??totais.valorRecebido)],
+  ];
+  const sw=(pageW-M*2)/summary.length;
+  summary.forEach(([label,value],i)=>{
+    const x=M+i*sw;
+    doc.setFillColor(249,250,251);doc.setDrawColor(229,231,235);doc.roundedRect(x,35,sw-2,15,2,2,'FD');
+    doc.setTextColor(113,113,122);doc.setFont(undefined,'bold');doc.setFontSize(5.7);doc.text(label.toUpperCase(),x+3.5,40);
+    doc.setTextColor(24,24,27);doc.setFont(undefined,'normal');doc.setFontSize(7.6);doc.text(doc.splitTextToSize(String(value),sw-7).slice(0,2),x+3.5,45);
   });
 
-  pdfTable(doc, ['Item','Qtd. solicitada','Qtd. recebida','Diferença'], itensPdf, 48);
+  const body=totais.itens.map(i=>[
+    i.nome||'',i.unit||'',Number(i.qtd||0),Number(i.qtdRecebida||0),Number(i.qtdRecebida||0)-Number(i.qtd||0),fMoeda(i.precoUnit||0),fMoeda(i.subtotalPedido||0),fMoeda(i.subtotalRecebido||0)
+  ]);
+  if(doc.autoTable){
+    doc.autoTable({
+      startY:55,
+      head:[['Produto','Unid.','Qtd. pedida','Qtd. recebida','Diferença','Preço unit.','Total pedido','Total recebido']],
+      body,
+      styles:{fontSize:7.3,cellPadding:2.1,valign:'middle'},
+      headStyles:{fillColor:[245,149,0],textColor:255,fontStyle:'bold'},
+      alternateRowStyles:{fillColor:[249,250,251]},
+      columnStyles:{0:{cellWidth:72},1:{cellWidth:15,halign:'center'},2:{cellWidth:23,halign:'right'},3:{cellWidth:25,halign:'right'},4:{cellWidth:21,halign:'right'},5:{cellWidth:29,halign:'right'},6:{cellWidth:31,halign:'right'},7:{cellWidth:33,halign:'right'}},
+      margin:{left:M,right:M},
+      didParseCell:data=>{if(data.section==='body'&&data.column.index===4){const v=Number(data.cell.raw||0);if(v<0){data.cell.styles.textColor=[220,38,38];data.cell.styles.fontStyle='bold';}else if(v>0){data.cell.styles.textColor=[217,119,6];data.cell.styles.fontStyle='bold';}}}
+    });
+  }
+  let y=(doc.lastAutoTable?.finalY||60)+7;
+  const box=(title,text,x,w,color=[245,149,0])=>{
+    const lines=doc.splitTextToSize(String(text||'—'),w-8);
+    const h=Math.max(18,10+lines.length*4);
+    if(y+h>pageH-18){doc.addPage();header();y=35;}
+    doc.setFillColor(255,255,255);doc.setDrawColor(229,231,235);doc.roundedRect(x,y,w,h,2,2,'FD');
+    doc.setFillColor(...color);doc.roundedRect(x,y,2,h,.8,.8,'F');
+    doc.setTextColor(113,113,122);doc.setFont(undefined,'bold');doc.setFontSize(6);doc.text(title.toUpperCase(),x+5,y+5);
+    doc.setTextColor(24,24,27);doc.setFont(undefined,'normal');doc.setFontSize(8);doc.text(lines,x+5,y+10);
+    return h;
+  };
+  const obs=String(rec.observacoes||'').trim()||'Sem observações registradas.';
+  const divText=divergencias.length?divergencias.map(d=>`${d.nome}: ${d.diferenca<0?'falta':'excesso'} de ${Math.abs(d.diferenca)} ${d.unit||''} · ${fMoeda(d.valorDivergencia||0)}`).join('\n'):'Nenhuma divergência identificada.';
+  const leftW=(pageW-M*2-5)*.52,rightW=(pageW-M*2-5)-leftW;
+  const h1=box('Observações do recebimento',obs,M,leftW,[245,149,0]);
+  const h2=box('Resumo das divergências',divText,M+leftW+5,rightW,divergencias.length?[220,38,38]:[22,163,74]);
+  y+=Math.max(h1,h2)+4;
 
-  let y = (doc.lastAutoTable && doc.lastAutoTable.finalY ? doc.lastAutoTable.finalY : 48 + itensPdf.length * 6 + 10) + 10;
-  if (y > 250) { doc.addPage(); y = 20; }
-
-  const obsTxt = String(rec.observacoes || p.observacoes || '').trim() || 'Sem observações registradas.';
-  doc.setDrawColor(229,231,235);
-  doc.setFillColor(249,250,251);
-  doc.roundedRect(14, y - 5, 182, 32, 3, 3, 'FD');
-  doc.setFontSize(9);
-  doc.setFont(undefined, 'bold');
-  doc.setTextColor(17,24,39);
-  doc.text('Observações do recebimento', 18, y);
-  doc.setFont(undefined, 'normal');
-  doc.setTextColor(17,24,39);
-  const obsLines = doc.splitTextToSize(obsTxt, 172);
-  doc.text(obsLines, 18, y + 7);
-
-  savePdf(doc,`NEXUS_Recebimento_${p.origem||''}_${p.semana||''}`);
+  const pages=doc.internal.getNumberOfPages();
+  for(let i=1;i<=pages;i++){
+    doc.setPage(i);doc.setDrawColor(229,231,235);doc.line(M,pageH-11,pageW-M,pageH-11);
+    doc.setTextColor(156,163,175);doc.setFontSize(6.5);doc.setFont(undefined,'normal');
+    doc.text(`Pedido ${p.id||'—'} · ${p.origem||'—'} · ${wLbl(p.semana)}`,M,pageH-6.5);
+    doc.text(`Emitido em ${new Date().toLocaleString('pt-BR')} · Página ${i}/${pages}`,pageW-M,pageH-6.5,{align:'right'});
+  }
+  doc.save(`NEXUS_Recebimento_${p.origem||''}_${p.semana||''}`.replace(/[\/:*?"<>|]+/g,'_')+'.pdf');
 }
 function pdfOrcamento(o) {
   const Doc=getJsPDF(); const doc=new Doc({ orientation:'p', unit:'mm', format:'a4' });
@@ -1562,7 +1686,7 @@ function loadRncLogo() {
         const c = document.createElement('canvas');
         c.width = img.naturalWidth; c.height = img.naturalHeight;
         c.getContext('2d').drawImage(img, 0, 0);
-        _rncLogoCache = { data: c.toDataURL('image/png'), w: img.naturalWidth, h: img.naturalHeight };
+        _rncLogoCache = { data:c.toDataURL('image/png'), w:img.naturalWidth, h:img.naturalHeight };
         resolve(_rncLogoCache);
       } catch (e) { resolve(tryLoad(idx + 1)); }
     };
@@ -1575,422 +1699,186 @@ function loadRncLogo() {
 async function pdfRnc(r) {
   const logo = await loadRncLogo();
   const Doc = getJsPDF();
-  const doc = new Doc({ orientation: 'p', unit: 'mm', format: 'a4' });
+  const doc = new Doc({ orientation:'p', unit:'mm', format:'a4' });
   const pageW = 210, pageH = 297, M = 13, CW = pageW - M * 2;
   const footerY = pageH - 14;
-  const contentBottom = footerY - 7;
+  const contentBottom = footerY - 6;
 
-  const OR = [245, 149, 0];
-  const OR_D = [190, 111, 0];
-  const OR_BG = [255, 249, 240];
-  const INK = [24, 24, 27];
-  const S1 = [82, 82, 91];
-  const S2 = [113, 113, 122];
-  const S3 = [161, 161, 170];
-  const BD = [226, 226, 232];
-  const BG = [249, 250, 251];
-  const RD = [220, 38, 38];
-  const RD_BG = [254, 242, 242];
-  const AM = [217, 119, 6];
-  const AM_BG = [255, 251, 235];
-  const GR = [22, 163, 74];
-  const GR_BG = [240, 253, 244];
+  const OR=[245,149,0], OR_D=[190,111,0], OR_BG=[255,249,240];
+  const INK=[24,24,27], S1=[82,82,91], S2=[113,113,122], S3=[161,161,170];
+  const BD=[226,226,232], BG=[249,250,251], RD=[220,38,38], RD_BG=[254,242,242];
+  const AM=[217,119,6], AM_BG=[255,251,235], GR=[22,163,74], GR_BG=[240,253,244];
 
   const statusMeta = {
-    aberta: { label: 'ABERTA', detail: 'Aguardando retorno do fornecedor', color: RD, fill: RD_BG },
-    analise: { label: 'EM ACOMPANHAMENTO', detail: 'Reposição, crédito ou correção em andamento', color: AM, fill: AM_BG },
-    resolvida: { label: 'CONCLUÍDA', detail: 'Providência efetivada', color: GR, fill: GR_BG },
-    cancelada: { label: 'CANCELADA', detail: 'Registro encerrado sem prosseguimento', color: S2, fill: BG },
-  }[r.status] || { label: String(r.status || 'SEM STATUS').toUpperCase(), detail: '', color: S2, fill: BG };
+    aberta:{label:'ABERTA',color:RD,fill:RD_BG},
+    analise:{label:'EM ACOMPANHAMENTO',color:AM,fill:AM_BG},
+    resolvida:{label:'CONCLUÍDA',color:GR,fill:GR_BG},
+    cancelada:{label:'CANCELADA',color:S2,fill:BG},
+  }[r.status] || {label:String(r.status||'SEM STATUS').toUpperCase(),color:S2,fill:BG};
 
   const numStr = r.numero || '—';
-  const origemLabel = r.origem === 'CD'
-    ? 'CD · Centro de Distribuição'
-    : r.origem === 'CP'
-      ? 'CP · Cozinha de Produção'
-      : (r.origem || '—');
+  const normalize = (v, fallback='—') => v == null || String(v).trim()==='' ? fallback : String(v).trim();
+  const providencia = normalize(r.providenciaSolicitada || r.providenciaFornecedor || [r.acao,r.obsAcao].filter(Boolean).join(' — '));
+  const situacao = normalize(r.situacaoAtual || r.medidaRealizada || r.respostaFornecedor, 'Aguardando resposta do fornecedor.');
+  const qtdAfetada = Number(r.qtdAfetadaConfirmada ?? r.quantidade ?? 0);
+  const qtdDescartada = Number(r.qtdDescartada ?? r.qtdDescartadaDevolvida ?? r.qtdRecusada ?? 0);
+  const qtdObservacao = Number(r.qtdEmObservacao ?? r.qtdSobObservacao ?? 0);
+  const fabricacao = r.dataManipulacaoFabricacao || r.fabricacao;
 
-  const cleanValue = (value, fallback = '—') => {
-    if (value == null) return fallback;
-    const txt = String(value).trim();
-    if (!txt) return fallback;
-    if (/^(sem|não|nao)\b/i.test(txt)) return fallback;
-    return txt;
-  };
-  const normalize = (value, fallback = '—') => cleanValue(value, fallback);
-  const nfTxt = normalize(r.notaFiscal, 'Não informada');
-  const loteTxt = normalize(r.lote, 'Não informado');
-  const tempTxt = r.temperatura == null || String(r.temperatura).trim() === '' ? '—' : `${r.temperatura} °C`;
-  const qtdAfetada = (r.qtdAfetadaConfirmada ?? r.quantidade) ? `${r.qtdAfetadaConfirmada ?? r.quantidade} ${r.unidade || ''}` : '—';
-  const fabricacaoTxt = r.fabricacao ? fDate(r.fabricacao) : '—';
-  const validadeTxt = r.validade ? fDate(r.validade) : '—';
-  const impactoTxt = `${r.gravidade || '—'} · ${fMoeda(r.impactoFinanceiro || 0)}`;
-  const tipoTxt = (r.tipoCustom && r.tipo === 'Outro (descrever)') ? r.tipoCustom : (r.tipo || 'Não informado');
-  const contencaoTxt = Array.isArray(r.contencoes) && r.contencoes.length ? r.contencoes.join(' · ') : cleanValue(r.contencao,'—');
-  const riscosTxt = Array.isArray(r.riscos) && r.riscos.length ? r.riscos.join(' · ') : cleanValue(r.riscoOcorrencia,'—');
-  const constatacoesPdf = Array.isArray(r.constatacoes) ? r.constatacoes : [];
+  let y = 32;
+  const newPage = context => { doc.addPage(); drawHeader(context || 'Continuação do registro'); y = 32; };
+  const ensure = (h, context) => { if (y + h > contentBottom) newPage(context); };
 
-  let y = 33;
-
-  const newPage = (context = 'Continuação do registro') => {
-    doc.addPage();
-    drawHeader(context);
-    y = 33;
-  };
-  const ensureSpace = (h, context = 'Continuação do registro') => {
-    if (y + h > contentBottom) newPage(context);
-  };
-
-  function drawHeader(context = 'Documento de ocorrência e acompanhamento') {
-    doc.setFillColor(255,255,255);
-    doc.rect(0, 0, pageW, 28, 'F');
-    doc.setFillColor(...OR);
-    doc.rect(0, 0, pageW, 3, 'F');
-
-    const logoBox = { x: M, y: 7.5, w: 24, h: 14 };
-    doc.setFillColor(...OR);
-    doc.roundedRect(logoBox.x, logoBox.y, logoBox.w, logoBox.h, 2.3, 2.3, 'F');
-    if (logo && logo.data) {
-      const pad = 1.8;
-      const maxW = logoBox.w - pad * 2;
-      const maxH = logoBox.h - pad * 2;
-      const ratio = logo.w && logo.h ? logo.w / logo.h : 1.7;
-      let w = maxW, h = w / ratio;
-      if (h > maxH) { h = maxH; w = h * ratio; }
-      const lx = logoBox.x + (logoBox.w - w) / 2;
-      const ly = logoBox.y + (logoBox.h - h) / 2;
-      try { doc.addImage(logo.data, 'PNG', lx, ly, w, h); } catch (e) {}
+  function drawHeader(context='Documento de ocorrência e acompanhamento') {
+    doc.setFillColor(255,255,255); doc.rect(0,0,pageW,28,'F');
+    doc.setFillColor(...OR); doc.rect(0,0,pageW,3,'F');
+    const lx=M, ly=7, lw=24, lh=14;
+    doc.setFillColor(...OR); doc.roundedRect(lx,ly,lw,lh,2.2,2.2,'F');
+    if (logo?.data) {
+      const ratio=logo.w&&logo.h?logo.w/logo.h:1.7; let w=20.5,h=w/ratio;
+      if(h>10.5){h=10.5;w=h*ratio;}
+      try{doc.addImage(logo.data,'PNG',lx+(lw-w)/2,ly+(lh-h)/2,w,h);}catch(e){}
     }
-
-    const titleX = M + 29;
-    const titleMaxW = 96;
-    let titleSize = 12.6;
-    doc.setFont(undefined, 'bold');
-    doc.setFontSize(titleSize);
-    while (doc.getTextWidth('REGISTRO DE NÃO CONFORMIDADE') > titleMaxW && titleSize > 10.5) {
-      titleSize -= 0.3;
-      doc.setFontSize(titleSize);
-    }
-    doc.setTextColor(...INK);
-    doc.text('REGISTRO DE NÃO CONFORMIDADE', titleX, 13);
-    doc.setFont(undefined, 'normal');
-    doc.setFontSize(7.2);
-    doc.setTextColor(...S2);
-    doc.text(context, titleX, 17.8);
-    doc.text('Grupo Ilha · Gestão Operacional NEXUS', titleX, 21.9);
-
-    const boxW = 50, boxH = 15, boxX = pageW - M - boxW, boxY = 7;
-    doc.setFillColor(255,255,255);
-    doc.setDrawColor(...BD);
-    doc.setLineWidth(0.25);
-    doc.roundedRect(boxX, boxY, boxW, boxH, 2.2, 2.2, 'FD');
-    doc.setTextColor(...S2);
-    doc.setFont(undefined, 'bold');
-    doc.setFontSize(5.8);
-    doc.text('DOCUMENTO', boxX + 4, boxY + 4.2);
-    doc.setTextColor(...INK);
-    doc.setFontSize(9.1);
-    doc.text(String(numStr), boxX + 4, boxY + 8.9);
-    doc.setFillColor(...statusMeta.fill);
-    doc.setDrawColor(...statusMeta.color);
-    doc.roundedRect(boxX + 4, boxY + 10, boxW - 8, 3.7, 1.8, 1.8, 'FD');
-    doc.setTextColor(...statusMeta.color);
-    doc.setFontSize(statusMeta.label.length > 16 ? 5.2 : 6.2);
-    doc.text(statusMeta.label, boxX + boxW / 2, boxY + 12.7, { align: 'center' });
-
-    doc.setDrawColor(...BD);
-    doc.line(M, 26, pageW - M, 26);
+    const tx=M+29;
+    doc.setTextColor(...INK); doc.setFont(undefined,'bold'); doc.setFontSize(11.5);
+    doc.text('REGISTRO DE NÃO CONFORMIDADE',tx,12.7);
+    doc.setFont(undefined,'normal'); doc.setFontSize(7); doc.setTextColor(...S2);
+    doc.text(context,tx,17.3); doc.text('Grupo Ilha · Gestão Operacional NEXUS',tx,21.2);
+    const bw=49,bx=pageW-M-bw,by=7;
+    doc.setFillColor(255,255,255); doc.setDrawColor(...BD); doc.roundedRect(bx,by,bw,15,2,2,'FD');
+    doc.setTextColor(...S2); doc.setFont(undefined,'bold'); doc.setFontSize(5.6); doc.text('DOCUMENTO',bx+4,by+4);
+    doc.setTextColor(...INK); doc.setFontSize(8.7); doc.text(String(numStr),bx+4,by+8.5);
+    doc.setFillColor(...statusMeta.fill); doc.setDrawColor(...statusMeta.color); doc.roundedRect(bx+4,by+9.6,bw-8,3.8,1.9,1.9,'FD');
+    doc.setTextColor(...statusMeta.color); doc.setFontSize(statusMeta.label.length>16?5:6); doc.text(statusMeta.label,bx+bw/2,by+12.3,{align:'center'});
+    doc.setDrawColor(...BD); doc.line(M,26,pageW-M,26);
   }
 
-  function sectionTitle(title) {
-    ensureSpace(7);
-    doc.setFillColor(...OR);
-    doc.roundedRect(M, y - 3.2, 1.8, 6, 0.8, 0.8, 'F');
-    doc.setTextColor(...INK);
-    doc.setFont(undefined, 'bold');
-    doc.setFontSize(9.8);
-    doc.text(String(title), M + 4.5, y + 0.1);
-    doc.setDrawColor(...BD);
-    doc.setLineWidth(0.2);
-    const lineStart = Math.min(pageW - M - 5, M + 4.5 + doc.getTextWidth(String(title)) + 4);
-    doc.line(lineStart, y - 0.2, pageW - M, y - 0.2);
-    y += 4.2;
+  function section(title) {
+    ensure(7);
+    doc.setFillColor(...OR); doc.roundedRect(M,y-3,1.8,5.8,.8,.8,'F');
+    doc.setTextColor(...INK); doc.setFont(undefined,'bold'); doc.setFontSize(9.4); doc.text(title,M+4.5,y+.1);
+    const lineX=Math.min(pageW-M-5,M+4.5+doc.getTextWidth(title)+4);
+    doc.setDrawColor(...BD); doc.line(lineX,y-.2,pageW-M,y-.2); y+=4.2;
   }
 
-  function drawGrid(fields, cols = 2, options = {}) {
-    const colW = CW / cols;
-    const rows = [];
-    for (let i = 0; i < fields.length; i += cols) rows.push(fields.slice(i, i + cols));
-    const labelSize = options.labelSize || 5.5;
-    const valueSize = options.valueSize || 8.2;
-    const basePad = options.basePad || 4.2;
-    const rowHeights = rows.map(row => {
-      return Math.max(options.minRowH || 11, ...row.map(item => {
-        const text = cleanValue(item[1], '—');
-        const lines = doc.splitTextToSize(text, colW - 10).slice(0, options.maxLines || 3);
-        return 6.8 + lines.length * 3.3;
-      }));
-    });
-    const totalH = basePad + rowHeights.reduce((a,b)=>a+b,0);
-    ensureSpace(totalH + 3.2, options.context || 'Continuação do registro');
-    doc.setFillColor(...(options.fill || [255,255,255]));
-    doc.setDrawColor(...BD);
-    doc.setLineWidth(0.22);
-    doc.roundedRect(M, y, CW, totalH, 1.8, 1.8, 'FD');
-    let yy = y + 4.2;
-    rows.forEach((row, ridx) => {
-      row.forEach((item, cidx) => {
-        const x = M + cidx * colW + 4.3;
-        doc.setTextColor(...S2);
-        doc.setFont(undefined, 'bold');
-        doc.setFontSize(labelSize);
-        doc.text(String(item[0]).toUpperCase(), x, yy);
-        doc.setTextColor(...(item[2] || INK));
-        doc.setFont(undefined, item[3] ? 'bold' : 'normal');
-        doc.setFontSize(item[4] || valueSize);
-        const lines = doc.splitTextToSize(cleanValue(item[1], '—'), colW - 10).slice(0, options.maxLines || 3);
-        doc.text(lines, x, yy + 3.5);
+  function grid(fields, cols=2, options={}) {
+    const colW=CW/cols, rows=[];
+    for(let i=0;i<fields.length;i+=cols) rows.push(fields.slice(i,i+cols));
+    const rowHeights=rows.map(row=>Math.max(options.minRowH||10.5,...row.map(it=>{
+      const lines=doc.splitTextToSize(normalize(it[1]),colW-9).slice(0,options.maxLines||3);
+      return 6.4+lines.length*3.25;
+    })));
+    const h=4+rowHeights.reduce((a,b)=>a+b,0); ensure(h+3,options.context);
+    doc.setFillColor(...(options.fill||[255,255,255])); doc.setDrawColor(...BD); doc.setLineWidth(.2); doc.roundedRect(M,y,CW,h,1.7,1.7,'FD');
+    let yy=y+4;
+    rows.forEach((row,ri)=>{
+      row.forEach((it,ci)=>{
+        const x=M+ci*colW+4;
+        doc.setTextColor(...S2); doc.setFont(undefined,'bold'); doc.setFontSize(options.labelSize||5.4); doc.text(String(it[0]).toUpperCase(),x,yy);
+        doc.setTextColor(...(it[2]||INK)); doc.setFont(undefined,it[3]?'bold':'normal'); doc.setFontSize(it[4]||options.valueSize||8);
+        doc.text(doc.splitTextToSize(normalize(it[1]),colW-9).slice(0,options.maxLines||3),x,yy+3.4);
       });
-      yy += rowHeights[ridx];
-      if (ridx < rows.length - 1) {
-        doc.setDrawColor(...BD);
-        doc.line(M + 3, yy - 2.3, M + CW - 3, yy - 2.3);
-      }
+      yy+=rowHeights[ri];
+      if(ri<rows.length-1){doc.setDrawColor(...BD);doc.line(M+3,yy-2.2,M+CW-3,yy-2.2);}
     });
-    y += totalH + 3.2;
+    y+=h+3;
   }
 
-  function drawFullField(label, value, options = {}) {
-    const lines = doc.splitTextToSize(cleanValue(value, '—'), CW - 12);
-    const h = Math.max(options.minH || 12.5, 8.3 + lines.length * (options.lineH || 3.6));
-    ensureSpace(h + 3.2, options.context || 'Continuação do registro');
-    doc.setFillColor(...(options.fill || [255,255,255]));
-    doc.setDrawColor(...(options.border || BD));
-    doc.setLineWidth(0.22);
-    doc.roundedRect(M, y, CW, h, 1.8, 1.8, 'FD');
-    if (options.accent) {
-      doc.setFillColor(...options.accent);
-      doc.roundedRect(M, y, 1.8, h, 0.8, 0.8, 'F');
-    }
-    doc.setTextColor(...(options.labelColor || S2));
-    doc.setFont(undefined, 'bold');
-    doc.setFontSize(5.8);
-    doc.text(String(label).toUpperCase(), M + 5.2, y + 4.6);
-    doc.setTextColor(...(options.textColor || INK));
-    doc.setFont(undefined, options.bold ? 'bold' : 'normal');
-    doc.setFontSize(options.size || 8.7);
-    doc.text(lines, M + 5.2, y + 8.2);
-    y += h + 3.2;
+  function textBox(label,value,options={}) {
+    const lines=doc.splitTextToSize(normalize(value),CW-11);
+    const h=Math.max(options.minH||12,7.9+lines.length*3.55); ensure(h+3,options.context);
+    doc.setFillColor(...(options.fill||[255,255,255])); doc.setDrawColor(...(options.border||BD)); doc.setLineWidth(.2); doc.roundedRect(M,y,CW,h,1.7,1.7,'FD');
+    if(options.accent){doc.setFillColor(...options.accent);doc.roundedRect(M,y,1.8,h,.8,.8,'F');}
+    doc.setTextColor(...S2);doc.setFont(undefined,'bold');doc.setFontSize(5.7);doc.text(label.toUpperCase(),M+5,y+4.4);
+    doc.setTextColor(...(options.textColor||INK));doc.setFont(undefined,options.bold?'bold':'normal');doc.setFontSize(options.size||8.4);doc.text(lines,M+5,y+7.9);
+    y+=h+3;
   }
 
-  function drawBadge(text, color, fill) {
-    const w = Math.min(CW, doc.getTextWidth(text) + 12);
-    ensureSpace(8, 'Continuação do registro');
-    doc.setFillColor(...fill);
-    doc.setDrawColor(...color);
-    doc.setLineWidth(0.22);
-    doc.roundedRect(M, y, w, 6.5, 3.1, 3.1, 'FD');
-    doc.setTextColor(...color);
-    doc.setFont(undefined, 'bold');
-    doc.setFontSize(6.8);
-    doc.text(String(text), M + 4.7, y + 4.3);
-    y += 8.4;
-  }
-
-  function drawStatusBox(label, text, color, fill) {
-    const lines = doc.splitTextToSize(text, CW - 14);
-    const h = Math.max(11.5, 7 + lines.length * 3.4);
-    ensureSpace(h + 3.2, 'Continuação do acompanhamento');
-    doc.setFillColor(...fill);
-    doc.setDrawColor(...color);
-    doc.setLineWidth(0.22);
-    doc.roundedRect(M, y, CW, h, 1.8, 1.8, 'FD');
-    doc.setFillColor(...color);
-    doc.roundedRect(M, y, 1.8, h, 0.8, 0.8, 'F');
-    doc.setTextColor(...S2);
-    doc.setFont(undefined, 'bold');
-    doc.setFontSize(5.8);
-    doc.text(String(label).toUpperCase(), M + 5.2, y + 4.6);
-    doc.setTextColor(...INK);
-    doc.setFont(undefined, 'bold');
-    doc.setFontSize(8.4);
-    doc.text(lines, M + 5.2, y + 8.4);
-    y += h + 3.2;
-  }
-
-  function drawSignatures() {
-    const sigH = 17.5, gap = 4.5, sigW = (CW - gap) / 2;
-    ensureSpace(sigH + 3.2, 'Validação do registro');
-    const boxes = [
-      { x: M, label: 'Responsável pelo registro', value: cleanValue(r.responsavel, '—') },
-      { x: M + sigW + gap, label: 'Ciência da gestão', value: '' },
-    ];
-    boxes.forEach(b => {
-      doc.setFillColor(255,255,255);
-      doc.setDrawColor(...BD);
-      doc.setLineWidth(0.22);
-      doc.roundedRect(b.x, y, sigW, sigH, 1.8, 1.8, 'FD');
-      doc.setLineDashPattern([1.1, 1.1], 0);
-      doc.line(b.x + 6, y + 9.4, b.x + sigW - 6, y + 9.4);
-      doc.setLineDashPattern([], 0);
-      if (b.x === M && r.assinatura) {
-        try { doc.addImage(r.assinatura, 'PNG', b.x + 4.5, y + 1.5, sigW - 9, 7.2); } catch(e) {}
-      }
-      doc.setTextColor(...S2);
-      doc.setFont(undefined, 'bold');
-      doc.setFontSize(5.6);
-      doc.text(String(b.label).toUpperCase(), b.x + 4.5, y + 12.6);
-      if (b.value) {
-        doc.setTextColor(...INK);
-        doc.setFont(undefined, 'normal');
-        doc.setFontSize(7.8);
-        doc.text(doc.splitTextToSize(b.value, sigW - 9).slice(0,1), b.x + 4.5, y + 15.4);
-      }
-    });
-    y += sigH + 3.2;
+  function badge(text,color,fill) {
+    const w=Math.min(CW,doc.getTextWidth(text)+12); ensure(7.5);
+    doc.setFillColor(...fill);doc.setDrawColor(...color);doc.roundedRect(M,y,w,6.2,3,3,'FD');
+    doc.setTextColor(...color);doc.setFont(undefined,'bold');doc.setFontSize(6.6);doc.text(text,M+4.5,y+4.1);y+=8;
   }
 
   drawHeader();
 
-  sectionTitle('Contexto da identificação');
-  drawGrid([
-    ['Origem do produto', origemLabel, INK, true],
-    ['Unidade de origem', cleanValue(r.unidadeOrigem, 'Não informada'), INK, true],
-    ['Setor que identificou', cleanValue(r.setorIdentificacao || r.setor, '—')],
-    ['Etapa da identificação', cleanValue(r.etapaIdentificacao, '—')],
-    ['Data do recebimento', r.dataRecebimento ? fDate(r.dataRecebimento) : 'Não informada'],
-    ['Data da identificação', fDate(r.dataIdentificacao || r.data) || '—'],
-    ['Data de abertura', fDate(r.criadoEm || r.data) || '—'],
-    ['Momento da identificação', cleanValue(r.momentoIdentificacao, '—')],
-    ['Responsável pelo registro', cleanValue(r.responsavel, '—')],
-  ], 2, { minRowH: 10.2, basePad: 4, maxLines: 2 });
-  drawFullField('Condição aparente no recebimento', cleanValue(r.condicaoRecebimento, 'Não informada'), { minH: 11.5, fill: BG });
+  section('Identificação da RNC');
+  grid([
+    ['Unidade de origem',normalize(r.unidadeOrigem)],
+    ['Origem do produto',r.origem==='CD'?'CD · Centro de Distribuição':r.origem==='CP'?'CP · Cozinha de Produção':normalize(r.origem)],
+    ['Setor que identificou',normalize(r.setorIdentificacao||r.setor)],
+    ['Etapa da identificação',normalize(r.etapaIdentificacao)],
+    ['Data da identificação',fDate(r.dataIdentificacao||r.data)||'—'],
+    ['Responsável pelo registro',normalize(r.responsavel)],
+  ],2,{minRowH:10.2});
 
-  sectionTitle('Produto e rastreabilidade');
-  drawFullField('Produto / item afetado', cleanValue(r.produto, '—'), { minH: 11.8, bold: true, size: 9.5 });
-  drawGrid([
-    ['Fornecedor', cleanValue(r.fornecedor, '—')],
-    ['Quantidade afetada confirmada', qtdAfetada],
-    ['Nota fiscal', nfTxt],
-    ['Lote', loteTxt],
-    ['Fabricação', fabricacaoTxt],
-    ['Validade', validadeTxt],
-    ['Temperatura', tempTxt],
-    ['Gravidade / impacto', impactoTxt],
-  ], 2, { minRowH: 10.4, maxLines: 2, basePad: 4 });
-  drawGrid([
-    ['Recebida', `${Number(r.qtdRecebida || 0)} ${r.unidade || ''}`],
-    ['Utilizada antes', `${Number(r.qtdUtilizadaAntes || 0)} ${r.unidade || ''}`],
-    ['Afetada confirmada', `${Number((r.qtdAfetadaConfirmada ?? r.quantidade) || 0)} ${r.unidade || ''}`],
-    ['Segregada', `${Number(r.qtdSegregada || 0)} ${r.unidade || ''}`],
-    ['Sob observação', `${Number(r.qtdSobObservacao || 0)} ${r.unidade || ''}`],
-    ['Descartada / devolvida', `${Number((r.qtdDescartadaDevolvida ?? r.qtdRecusada) || 0)} ${r.unidade || ''}`],
-  ], 3, { minRowH: 9.8, valueSize: 7.8, labelSize: 4.9, basePad: 3.8, maxLines: 1, fill: BG });
+  section('Produto e quantidades');
+  textBox('Produto',r.produto,{bold:true,size:9.1,minH:11.5});
+  grid([
+    ['Lote',normalize(r.lote)],
+    ['Manipulação / fabricação',fabricacao?fDate(fabricacao):'—'],
+    ['Validade',r.validade?fDate(r.validade):'—'],
+    ['Gravidade',normalize(r.gravidade)],
+  ],2,{minRowH:10});
+  grid([
+    ['Afetada confirmada',`${qtdAfetada} ${r.unidade||''}`],
+    ['Descartada',`${qtdDescartada} ${r.unidade||''}`],
+    ['Em observação',`${qtdObservacao} ${r.unidade||''}`],
+  ],3,{minRowH:9.5,valueSize:7.8,labelSize:5,fill:BG,maxLines:2});
 
-  sectionTitle('Não conformidade identificada');
-  drawBadge(tipoTxt, RD, RD_BG);
-  drawFullField('Descrição da ocorrência', cleanValue(r.descricao, 'Sem descrição registrada.'), { accent: RD, minH: 13.5 });
-  drawGrid([
-    ['Abrangência', cleanValue(r.abrangencia, 'Não determinada')],
-    ['Riscos identificados', riscosTxt],
-  ], 2, { minRowH: 10.4, maxLines: 3, basePad: 4 });
-  drawFullField('Contenção realizada pelo Ilha', contencaoTxt, { accent: AM, fill: AM_BG, border: AM, minH: 12 });
-  if (String(r.impactoOperacional || '').trim()) drawFullField('Impacto operacional', r.impactoOperacional, { minH: 12 });
-
-  if (constatacoesPdf.length) {
-    sectionTitle('Evolução da ocorrência');
-    constatacoesPdf.forEach((c,idx)=>{
-      const texto=[c.descricao,c.destino?`Destino: ${c.destino}`:'',c.responsavel?`Responsável: ${c.responsavel}`:''].filter(Boolean).join('\n');
-      drawFullField(`${fDate(c.data)} · +${Number(c.quantidade||0)} ${r.unidade||''}`, texto, { minH: 12, fill: idx%2?BG:[255,255,255] });
-    });
+  if (r.autoGerada && r.recebimentoId) {
+    section('Dados do recebimento relacionado');
+    grid([
+      ['Qtd. pedida',`${Number(r.qtdPedida||0)} ${r.unidade||''}`],
+      ['Qtd. recebida',`${Number(r.qtdRecebida||0)} ${r.unidade||''}`],
+      ['Diferença',`${Number(r.diferencaRecebimento||0)>0?'+':''}${Number(r.diferencaRecebimento||0)} ${r.unidade||''}`],
+      ['Preço unitário',fMoeda(r.precoUnit||0)],
+      ['Valor da divergência',fMoeda(r.valorDivergencia||0)],
+      ['Valor total do pedido',fMoeda(r.valorTotalPedido||0)],
+      ['Responsável pelo recebimento',normalize(r.responsavelRecebimento)],
+      ['Início',r.recebimentoIniciadoEm?`${fDate(r.recebimentoIniciadoEm)} · ${fHora(r.recebimentoIniciadoEm)}`:'—'],
+      ['Finalização',r.recebimentoFinalizadoEm?`${fDate(r.recebimentoFinalizadoEm)} · ${fHora(r.recebimentoFinalizadoEm)}`:'—'],
+    ],3,{minRowH:10,valueSize:7.4,labelSize:4.9,fill:BG,maxLines:2});
   }
 
-  sectionTitle('Providência solicitada ao fornecedor');
-  drawFullField('Solicitação', cleanValue(r.acao, '—'), { accent: OR, fill: OR_BG, border: OR, textColor: OR_D, bold: true, size: 9.3, minH: 12.5 });
-  if (String(r.obsAcao || '').trim()) drawFullField('Detalhes da solicitação', r.obsAcao, { minH: 12 });
+  section('Não conformidade');
+  badge(normalize(r.tipo),RD,RD_BG);
+  textBox('Descrição da ocorrência',r.descricao,{accent:RD,minH:13});
 
-  sectionTitle('Acompanhamento');
-  if (String(r.respostaFornecedor || '').trim()) drawFullField('Retorno do fornecedor', r.respostaFornecedor, { minH: 12 });
-  else drawStatusBox('Situação atual', 'Aguardando resposta do fornecedor.', OR, BG);
-  if (String(r.medidaRealizada || '').trim()) {
-    const medidaPdf = r.status === 'resolvida' && r.encerradoEm ? `${r.medidaRealizada}
-Concluída em ${fDateTime(r.encerradoEm)}.` : r.medidaRealizada;
-    drawFullField('Medida efetivamente realizada', medidaPdf, { accent: GR, fill: GR_BG, border: GR, textColor: [21,128,61], minH: 12.5, bold: true });
-  } else if (r.status === 'analise') drawStatusBox('Situação atual', 'Resposta recebida. Reposição, crédito ou correção ainda em acompanhamento.', AM, AM_BG);
-  else if (r.status === 'cancelada' && (r.motivoCancelamento || r.obsAcao)) drawStatusBox('Situação atual', `Motivo do cancelamento: ${r.motivoCancelamento || r.obsAcao}`, S1, BG);
+  section('Avaliação e contenção');
+  textBox('Abrangência',r.abrangencia,{minH:10.8});
+  textBox('Risco identificado',(Array.isArray(r.riscos)?r.riscos:[]).join(' · ')||'—',{minH:10.8});
+  textBox('Contenção realizada pela unidade',(Array.isArray(r.contencoes)?r.contencoes:[]).join(' · ')||'—',{minH:10.8});
 
-  sectionTitle('Validação do registro');
-  drawSignatures();
+  section('Impacto e providência');
+  textBox('Impacto operacional',r.impactoOperacional,{minH:12});
+  textBox('Providência solicitada ao fornecedor',providencia,{accent:OR,fill:OR_BG,border:OR,textColor:OR_D,minH:12,bold:true});
 
-  const fotosPrincipais = Array.isArray(r.fotos) ? r.fotos.map((src,i)=>({src,label:`Evidência principal ${i+1}`})) : [];
-  const fotosConstatacoes = constatacoesPdf.filter(c=>c.foto).map((c,i)=>({src:c.foto,label:`Constatação de ${fDate(c.data)} · ${c.quantidade || 0} ${r.unidade || ''}`}));
-  const fotos = [...fotosPrincipais,...fotosConstatacoes];
-  const medirImg = src => new Promise(resolve => {
-    try {
-      const im = new Image();
-      im.onload = () => resolve({ w: im.naturalWidth || 1, h: im.naturalHeight || 1 });
-      im.onerror = () => resolve(null);
-      im.src = src;
-    } catch (e) { resolve(null); }
-  });
-  const dims = [];
-  for (let i = 0; i < fotos.length; i++) dims[i] = await medirImg(fotos[i].src);
+  section('Situação atual');
+  textBox(statusMeta.label,situacao,{accent:statusMeta.color,fill:statusMeta.fill,border:statusMeta.color,minH:12,bold:true});
 
-  for (let i = 0; i < fotos.length; i++) {
-    doc.addPage();
-    drawHeader(`Evidência fotográfica ${i + 1} de ${fotos.length}`);
-    y = 33;
-    sectionTitle(`Evidência fotográfica ${i + 1}`);
-    const areaX = M, areaY = y, areaW = CW, areaH = pageH - y - 22;
-    doc.setFillColor(255,255,255);
-    doc.setDrawColor(...BD);
-    doc.setLineWidth(0.22);
-    doc.roundedRect(areaX, areaY, areaW, areaH, 1.8, 1.8, 'FD');
-    const pad = 7, labelH = 8;
-    const maxW = areaW - pad * 2, maxH = areaH - pad * 2 - labelH;
-    const d = dims[i];
-    let drawW = maxW, drawH = maxH;
-    if (d && d.w && d.h) {
-      const ratio = d.w / d.h;
-      drawH = drawW / ratio;
-      if (drawH > maxH) { drawH = maxH; drawW = drawH * ratio; }
-    }
-    const imgX = areaX + (areaW - drawW) / 2;
-    const imgY = areaY + pad + (maxH - drawH) / 2;
-    let ok = false;
-    for (const format of ['JPEG', 'PNG', 'WEBP']) {
-      try { doc.addImage(fotos[i].src, format, imgX, imgY, drawW, drawH); ok = true; break; } catch (e) {}
-    }
-    if (!ok) {
-      try { doc.addImage(fotos[i].src, imgX, imgY, drawW, drawH); ok = true; } catch (e) {}
-    }
-    if (!ok) {
-      doc.setTextColor(...S3);
-      doc.setFont(undefined, 'normal');
-      doc.setFontSize(8.6);
-      doc.text('Imagem indisponível', areaX + areaW / 2, areaY + areaH / 2, { align: 'center' });
-    }
-    doc.setTextColor(...S2);
-    doc.setFont(undefined, 'bold');
-    doc.setFontSize(6.4);
-    doc.text(fotos[i].label || `EVIDÊNCIA ${i + 1}`, areaX + pad, areaY + areaH - 4.6);
+  const fotos=Array.isArray(r.fotos)?r.fotos:[];
+  const dims=[];
+  const medir=src=>new Promise(resolve=>{try{const im=new Image();im.onload=()=>resolve({w:im.naturalWidth||1,h:im.naturalHeight||1});im.onerror=()=>resolve(null);im.src=src;}catch(e){resolve(null);}});
+  for(let i=0;i<fotos.length;i++) dims[i]=await medir(fotos[i]);
+  for(let i=0;i<fotos.length;i++){
+    doc.addPage();drawHeader(`Evidência fotográfica ${i+1} de ${fotos.length}`);y=32;section(`Evidência fotográfica ${i+1}`);
+    const ax=M,ay=y,aw=CW,ah=pageH-y-22;doc.setFillColor(255,255,255);doc.setDrawColor(...BD);doc.roundedRect(ax,ay,aw,ah,1.7,1.7,'FD');
+    const pad=7,maxW=aw-pad*2,maxH=ah-pad*2-7,d=dims[i];let dw=maxW,dh=maxH;
+    if(d?.w&&d?.h){const ratio=d.w/d.h;dh=dw/ratio;if(dh>maxH){dh=maxH;dw=dh*ratio;}}
+    const ix=ax+(aw-dw)/2,iy=ay+pad+(maxH-dh)/2;let ok=false;
+    for(const format of ['JPEG','PNG','WEBP']){try{doc.addImage(fotos[i],format,ix,iy,dw,dh);ok=true;break;}catch(e){}}
+    if(!ok){try{doc.addImage(fotos[i],ix,iy,dw,dh);ok=true;}catch(e){}}
+    if(!ok){doc.setTextColor(...S3);doc.setFontSize(8.5);doc.text('Imagem indisponível',ax+aw/2,ay+ah/2,{align:'center'});}
+    doc.setTextColor(...S2);doc.setFont(undefined,'bold');doc.setFontSize(6.3);doc.text(`EVIDÊNCIA ${i+1}`,ax+pad,ay+ah-4.5);
   }
 
-  const totalPages = doc.internal.getNumberOfPages();
-  for (let p = 1; p <= totalPages; p++) {
-    doc.setPage(p);
-    doc.setDrawColor(...BD);
-    doc.setLineWidth(0.18);
-    doc.line(M, footerY, pageW - M, footerY);
-    doc.setTextColor(...S3);
-    doc.setFont(undefined, 'normal');
-    doc.setFontSize(6.4);
-    doc.text(`NEXUS · Grupo Ilha · ${numStr}`, M, pageH - 9.1);
-    doc.text(`Emitido em ${new Date().toLocaleString('pt-BR')}`, M, pageH - 5.1);
-    doc.text(`Página ${p} de ${totalPages}`, pageW - M, pageH - 9.1, { align: 'right' });
+  const totalPages=doc.internal.getNumberOfPages();
+  for(let p=1;p<=totalPages;p++){
+    doc.setPage(p);doc.setDrawColor(...BD);doc.line(M,footerY,pageW-M,footerY);doc.setTextColor(...S3);doc.setFont(undefined,'normal');doc.setFontSize(6.3);
+    doc.text(`NEXUS · Grupo Ilha · ${numStr}`,M,pageH-9);doc.text(`Emitido em ${new Date().toLocaleString('pt-BR')}`,M,pageH-5);doc.text(`Página ${p} de ${totalPages}`,pageW-M,pageH-9,{align:'right'});
   }
-
-  doc.save(`NEXUS_RNC_${(numStr || r.id || '').replace(/[\/:*?"<>|]+/g, '_')}.pdf`);
+  doc.save(`NEXUS_RNC_${(numStr||r.id||'').replace(/[\\/:*?"<>|]+/g,'_')}.pdf`);
 }
 
 /* ══════════════════════════════════════
@@ -2018,7 +1906,7 @@ function RelatoriosTab({ toast }) {
       ${recebimentos.length === 0 && html`<div class="empty"><${Ic} n="recv" s=${32} style=${{ color: 'var(--s3)' }}/><p>Nenhum recebimento.</p></div>`}
       ${recebimentos.sort((a,b)=>new Date(b.recebimento?.finalizadoEm||0)-new Date(a.recebimento?.finalizadoEm||0)).map(p => { const st = ST_PED[p.status] || { l: p.status, c: 'bgy' }; return html`
         <div key=${p.id} class="card" style=${{ padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 12 }}>
-          <div style=${{ flex: 1, minWidth: 0 }}><div class="row" style=${{ gap: 6, marginBottom: 4 }}><span class=${`badge ${st.c}`}>${st.l}</span><span class="badge bor">${p.origem}</span></div><div style=${{ fontWeight: 700, fontSize: 14 }}>${wLbl(p.semana)}</div><div style=${{ fontSize: 12, color: 'var(--s2)' }}>${p.recebimento?.responsavel||'—'} · ${fDate(p.recebimento?.finalizadoEm)}</div></div>
+          <div style=${{ flex: 1, minWidth: 0 }}><div class="row" style=${{ gap: 6, marginBottom: 4 }}><span class=${`badge ${st.c}`}>${st.l}</span><span class="badge bor">${p.origem}</span></div><div style=${{ fontWeight: 700, fontSize: 14 }}>${wLbl(p.semana)} · ${fMoeda(p.recebimento?.valorTotalPedido ?? totaisRecebimento(p,p.recebimento?.itens||[]).valorPedido)}</div><div style=${{ fontSize: 12, color: 'var(--s2)' }}>${p.recebimento?.responsavel||'—'} · ${fDate(p.recebimento?.finalizadoEm)}${p.recebimento?.iniciadoEm&&p.recebimento?.finalizadoEm?` · ${fHora(p.recebimento.iniciadoEm)}–${fHora(p.recebimento.finalizadoEm)}`:''}</div></div>
           <button class="btn bs bsm" onClick=${() => { try { pdfRecebimento(p); toast.show('PDF gerado'); } catch(e) { toast.show('Erro'); } }}><${Ic} n="pdf" s=${14}/>PDF</button>
         </div>`; })}
     </div>`}
@@ -2390,7 +2278,7 @@ function ConfigTab({ toast }) {
     <div style=${{ marginTop: 32, marginBottom: 24, textAlign: 'center', padding: '20px 0', borderTop: '1px solid var(--bd)' }}>
       <div style=${{ fontSize: 10, fontWeight: 700, letterSpacing: '.12em', color: 'var(--s3)', textTransform: 'uppercase', marginBottom: 6 }}>Desenvolvido por</div>
       <div style=${{ fontSize: 15, fontWeight: 800, color: 'var(--ink)', marginBottom: 2, fontFamily: "'Plus Jakarta Sans',sans-serif" }}>Vinicius Candido dos Santos</div>
-      <div style=${{ fontSize: 12, color: 'var(--s2)' }}>NEXUS v2.7.0 · Grupo Ilha · ${new Date().getFullYear()}</div>
+      <div style=${{ fontSize: 12, color: 'var(--s2)' }}>NEXUS v2.8.1 · Grupo Ilha · ${new Date().getFullYear()}</div>
     </div>
 
     ${addingItem && html`<${AddItemModal} orig=${addingItem.orig} cat=${addingItem.cat} defUnit=${addingItem.unit} onClose=${() => setAddingItem(null)} onConfirm=${addItem}/>`}
@@ -2521,7 +2409,7 @@ function AdminLocal({ toast }) {
       <div class="card" style=${{ padding:16 }}>
         <div style=${{ fontWeight:800, fontSize:16, marginBottom:10 }}>Painel de saúde operacional</div>
         <div style=${{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
-          ${[['Pedidos pendentes',pedidos.filter(p=>p.status==='pendente').length],['Recebimentos parciais',pedidos.filter(p=>p.status==='parcial').length],['Recebimentos OK',pedidos.filter(p=>p.status==='recebido').length],['RNCs abertas',rncs.filter(r=>r.status==='aberta'||r.status==='analise').length],['RNCs concluídas',rncs.filter(r=>r.status==='resolvida').length],['Orçam. a autorizar',orcamentos.filter(o=>o.status==='pendente').length]].map(([l,v])=>html`<div style=${{ padding:12, border:'1px solid var(--bd)', borderRadius:12, background:'#fff' }}><div style=${{ fontSize:10,color:'var(--s3)',fontWeight:800,textTransform:'uppercase',letterSpacing:'.06em' }}>${l}</div><div style=${{ fontSize:24,fontWeight:800,fontFamily:"'Plus Jakarta Sans',sans-serif" }}>${v}</div></div>`)}
+          ${[['Pedidos pendentes',pedidos.filter(p=>p.status==='pendente').length],['Recebimentos com divergência',pedidos.filter(p=>p.status==='parcial').length],['Recebimentos OK',pedidos.filter(p=>p.status==='recebido').length],['RNCs abertas',rncs.filter(r=>r.status==='aberta'||r.status==='analise').length],['RNCs concluídas',rncs.filter(r=>r.status==='resolvida').length],['Orçam. a autorizar',orcamentos.filter(o=>o.status==='pendente').length]].map(([l,v])=>html`<div style=${{ padding:12, border:'1px solid var(--bd)', borderRadius:12, background:'#fff' }}><div style=${{ fontSize:10,color:'var(--s3)',fontWeight:800,textTransform:'uppercase',letterSpacing:'.06em' }}>${l}</div><div style=${{ fontSize:24,fontWeight:800,fontFamily:"'Plus Jakarta Sans',sans-serif" }}>${v}</div></div>`)}
         </div>
       </div>
     </div>
@@ -2631,7 +2519,7 @@ function WeekControl({ toast }) {
    DATA MIGRATION
 ══════════════════════════════════════ */
 function migrateLocalData() {
-  const target='2.7.0';
+  const target='2.8.1';
   if (LS.get('schemaVersion') === target) return true;
   const now=new Date().toISOString();
   let pedidos=LS.get('pedidos') || [];
@@ -2641,13 +2529,21 @@ function migrateLocalData() {
   const unidadesNorm=normalizeUnidades(config.unidades);
   config={...config,unidades:unidadesNorm,unidadePadrao:config.unidadePadrao||unidadesNorm[0]?.nome||''};
   pedidos=pedidos.map(p=>{
-    const itens=(p.itens||[]).map(i=>({...i,qtd:nonNeg(i.qtd)}));
+    const itens=(p.itens||[]).map(i=>({...i,qtd:nonNeg(i.qtd),precoUnit:nonNeg(i.precoUnit)}));
     const base={...p,id:p.id||uid(),semana:p.semana||dateToWeek(p.data||p.criadoEm||todayISO()),criadoEm:p.criadoEm||now,itens};
     if(!base.recebimento) return {...base,status:base.status||'pendente'};
-    const recItens=(base.recebimento.itens||itens).map(i=>({...i,qtd:nonNeg(i.qtd),qtdRecebida:nonNeg(i.qtdRecebida)}));
-    const rec={...base.recebimento,id:base.recebimento.id||uid(),data:base.recebimento.data||String(base.recebimento.finalizadoEm||base.criadoEm||todayISO()).slice(0,10),finalizadoEm:base.recebimento.finalizadoEm||base.recebimento.criadoEm||now,itens:recItens};
+    const finalizadoEm=base.recebimento.finalizadoEm||base.recebimento.criadoEm||now;
+    const recItens=(base.recebimento.itens||itens).map(i=>{
+      const pedItem=itens.find(x=>x.nome===i.nome)||i;
+      const precoUnit=nonNeg(i.precoUnit??pedItem.precoUnit??ultimoPrecoGlobal(i.nome));
+      const qtd=nonNeg(i.qtd??pedItem.qtd);
+      const qtdRecebida=nonNeg(i.qtdRecebida);
+      return {...pedItem,...i,qtd,qtdRecebida,precoUnit,subtotalPedido:qtd*precoUnit,subtotalRecebido:qtdRecebida*precoUnit};
+    });
+    const totais=recItens.reduce((m,i)=>({pedido:m.pedido+nonNeg(i.subtotalPedido),recebido:m.recebido+nonNeg(i.subtotalRecebido)}),{pedido:0,recebido:0});
+    const iniciadoEm=base.recebimento.iniciadoEm||base.recebimento.criadoEm||finalizadoEm;
     const parcial=recItens.some(i=>Math.abs(Number(i.qtdRecebida||0)-Number(i.qtd||0))>0.000001);
-    rec.status=parcial?'parcial':'completo';
+    const rec={...base.recebimento,id:base.recebimento.id||uid(),data:base.recebimento.data||String(finalizadoEm||base.criadoEm||todayISO()).slice(0,10),iniciadoEm,finalizadoEm,itens:recItens,valorTotalPedido:nonNeg(base.recebimento.valorTotalPedido||totais.pedido),valorTotalRecebido:nonNeg(base.recebimento.valorTotalRecebido||totais.recebido),duracaoMinutos:nonNeg(base.recebimento.duracaoMinutos||Math.max(0,Math.round((new Date(finalizadoEm)-new Date(iniciadoEm))/60000))),status:parcial?'divergente':'completo'};
     return {...base,recebimento:rec,status:parcial?'parcial':'recebido'};
   });
   orcamentos=orcamentos.map(o=>{
@@ -2665,7 +2561,7 @@ function migrateLocalData() {
       gravidade:r.gravidade||'Média',quantidade:qtdAfetada,qtdAfetadaInicial:nonNeg(r.qtdAfetadaInicial ?? r.quantidade),qtdAfetadaConfirmada:qtdAfetada,
       qtdPedida:nonNeg(r.qtdPedida),qtdRecebida:nonNeg(r.qtdRecebida),qtdRecusada:nonNeg(r.qtdRecusada),qtdUtilizadaAntes:nonNeg(r.qtdUtilizadaAntes),qtdSegregada:nonNeg(r.qtdSegregada),qtdSobObservacao:nonNeg(r.qtdSobObservacao),qtdDescartadaDevolvida:nonNeg(r.qtdDescartadaDevolvida ?? r.qtdRecusada),
       abrangencia:r.abrangencia||'Abrangência ainda não determinada',contencoes:Array.isArray(r.contencoes)?r.contencoes:(r.contencao?[r.contencao]:[]),riscos:Array.isArray(r.riscos)?r.riscos:(r.riscoOcorrencia?[r.riscoOcorrencia]:[]),impactoOperacional:r.impactoOperacional||'',constatacoes:Array.isArray(r.constatacoes)?r.constatacoes:[],
-      impactoFinanceiro:nonNeg(r.impactoFinanceiro),medidaRealizada:r.medidaRealizada||(status==='resolvida'?(r.verificacaoEficacia||r.planoAcao||''):''),criadoEm:r.criadoEm||now,historicoStatus:(r.historicoStatus||[]).length?r.historicoStatus:[{de:null,para:status,em:r.criadoEm||now,usuario:r.responsavel||config.responsavel||'Usuário local'}]};
+      impactoFinanceiroTipo:r.impactoFinanceiroTipo||(r.impactoFinanceiroIndeterminado?'indeterminado':(Number(r.impactoFinanceiro||0)>0?'valor':'sem_impacto')),impactoFinanceiroIndeterminado:r.impactoFinanceiroTipo==='indeterminado'||!!r.impactoFinanceiroIndeterminado,impactoFinanceiro:nonNeg(r.impactoFinanceiro),medidaRealizada:r.medidaRealizada||(status==='resolvida'?(r.verificacaoEficacia||r.planoAcao||''):''),criadoEm:r.criadoEm||now,historicoStatus:(r.historicoStatus||[]).length?r.historicoStatus:[{de:null,para:status,em:r.criadoEm||now,usuario:r.responsavel||config.responsavel||'Usuário local'}]};
     if(!base.numero || usedNumbers.has(base.numero)) base.numero=nextRncNumber(origem,[...rebuilt,...rncs],data);
     usedNumbers.add(base.numero); rebuilt.push(base);
   });
